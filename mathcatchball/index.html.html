@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Math Catch Game 🌤️</title>
+<style>
+*{box-sizing:border-box;}
+body{
+  margin:0;
+  font-family:Poppins,Arial,sans-serif;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  height:100vh;
+  background:linear-gradient(#b2f0ff,#f7fff7);
+  position:relative;
+}
+
+/* cute background */
+#sky{
+  position:absolute;
+  width:100%;
+  height:100%;
+  background:linear-gradient(180deg,#8cdcff 0%,#d3faff 70%,#98fb98 100%);
+  z-index:-2;
+}
+.cloud{
+  position:absolute;
+  background:#fff;
+  border-radius:50%;
+  opacity:0.9;
+  animation:float 40s linear infinite;
+}
+.cloud::before,.cloud::after{
+  content:'';position:absolute;background:#fff;border-radius:50%;
+}
+.cloud::before{width:60%;height:60%;top:-20%;left:10%;}
+.cloud::after{width:50%;height:50%;top:10%;left:40%;}
+@keyframes float{
+  from{transform:translateX(-200px);}
+  to{transform:translateX(120vw);}
+}
+
+/* sun */
+#sun{
+  position:absolute;
+  top:30px;right:60px;
+  width:80px;height:80px;
+  background:radial-gradient(circle at 30% 30%,#fff,#ffd95e 40%,#ffcc00 70%);
+  border-radius:50%;
+  box-shadow:0 0 40px #ffde59;
+  z-index:-1;
+}
+
+/* UI */
+h1{margin-top:10px;color:#0077b6;text-shadow:1px 1px #fff;}
+#question{font-size:1.8rem;margin:10px;color:#023e8a;font-weight:700;}
+#scoreboard{font-size:1.2rem;color:#333;margin-bottom:6px;}
+#levelInfo{font-weight:bold;color:#0077b6;margin-bottom:6px;}
+
+/* Game Area */
+#gameArea{
+  position:relative;
+  width:95%;
+  max-width:950px;
+  height:70vh;
+  border-radius:12px;
+  background:linear-gradient(#c3f2ff 0%,#ffffff 80%);
+  box-shadow:0 0 20px rgba(0,0,0,0.1);
+  overflow:hidden;
+}
+
+/* Balls */
+.ball{
+  position:absolute;
+  width:90px;height:90px;
+  border-radius:50%;
+  text-align:center;line-height:90px;
+  font-size:1.6rem;font-weight:bold;
+  color:white;background:#00b4d8;
+  user-select:none;
+  transition:transform .2s;
+}
+.ball.correct{background:#2ecc71;}
+.ball.wrong{background:#e74c3c;}
+.ball.pop{animation:pop .3s ease forwards;}
+@keyframes pop{
+  0%{transform:scale(1);}
+  50%{transform:scale(1.4);}
+  100%{transform:scale(0);opacity:0;}
+}
+
+/* Paddle */
+#paddle{
+  position:absolute;
+  bottom:20px;left:50%;
+  transform:translateX(-50%);
+  width:170px;height:35px;
+  background:linear-gradient(90deg,#ffafcc,#ff7b9c);
+  border-radius:12px;
+  box-shadow:0 4px 10px rgba(0,0,0,0.2);
+}
+
+/* Game Over screen */
+#gameOver{
+  position:absolute;top:0;left:0;
+  width:100%;height:100%;
+  background:rgba(0,0,0,0.5);
+  display:none;justify-content:center;
+  align-items:center;color:white;flex-direction:column;
+}
+button{
+  background:#00b4d8;border:none;
+  color:white;padding:10px 16px;
+  border-radius:6px;cursor:pointer;
+  font-weight:bold;margin-top:10px;
+}
+button:hover{background:#0096c7;}
+
+/* Level Up effect */
+#levelUp{
+  position:absolute;top:40%;left:50%;
+  transform:translate(-50%,-50%);
+  font-size:3rem;color:#ffb703;
+  text-shadow:2px 2px 8px #fff;
+  display:none;animation:popUp 1s ease forwards;
+}
+@keyframes popUp{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(0.5);}
+  50%{opacity:1;transform:translate(-50%,-50%) scale(1.2);}
+  100%{opacity:0;transform:translate(-50%,-50%) scale(0);}
+}
+</style>
+</head>
+<body>
+<div id="sky"></div>
+<div id="sun"></div>
+<div class="cloud" style="width:120px;height:70px;top:60px;left:10px;animation-delay:0s;"></div>
+<div class="cloud" style="width:150px;height:80px;top:140px;left:200px;animation-delay:10s;"></div>
+<div class="cloud" style="width:100px;height:60px;top:220px;left:420px;animation-delay:20s;"></div>
+
+<h1>🧮 Math Catch Game</h1>
+<div id="levelInfo">Level 1: Addition</div>
+<div id="question"></div>
+<div id="scoreboard">Score: <span id="score">0</span> | Lives: <span id="lives">3</span></div>
+
+<div id="gameArea">
+  <div id="paddle"></div>
+  <div id="levelUp">LEVEL UP!</div>
+  <div id="gameOver">
+    <h2>Game Over!</h2>
+    <p>Your Score: <span id="finalScore">0</span></p>
+    <button onclick="restartGame()">Play Again</button>
+  </div>
+</div>
+
+<script>
+const gameArea=document.getElementById("gameArea");
+const paddle=document.getElementById("paddle");
+const questionEl=document.getElementById("question");
+const scoreEl=document.getElementById("score");
+const livesEl=document.getElementById("lives");
+const gameOverScreen=document.getElementById("gameOver");
+const finalScore=document.getElementById("finalScore");
+const levelInfo=document.getElementById("levelInfo");
+const levelUpMsg=document.getElementById("levelUp");
+
+let score=0,lives=3,level=1,gameRunning=true;
+let correctAnswer=0;
+let fallSpeed=1; // slower for easier start
+let balls=[];
+
+// sound function
+function playSound(freq,type="sine",dur=0.15,vol=0.1){
+  try{
+    const ctx=new (window.AudioContext||window.webkitAudioContext)();
+    const osc=ctx.createOscillator();
+    const gain=ctx.createGain();
+    osc.type=type;osc.frequency.value=freq;gain.gain.value=vol;
+    osc.connect(gain);gain.connect(ctx.destination);
+    osc.start();osc.stop(ctx.currentTime+dur);
+  }catch(e){}
+}
+
+// generate math question by level
+function newQuestion(){
+  let a,b,op,ans;
+  if(level===1){a=Math.floor(Math.random()*10)+1;b=Math.floor(Math.random()*10)+1;ans=a+b;op="+";}
+  else if(level===2){a=Math.floor(Math.random()*15)+5;b=Math.floor(Math.random()*a);ans=a-b;op="-";}
+  else if(level===3){a=Math.floor(Math.random()*9)+1;b=Math.floor(Math.random()*9)+1;ans=a*b;op="×";}
+  else{
+    const t=Math.floor(Math.random()*3)+1;
+    level=t;
+    return newQuestion();
+  }
+  correctAnswer=ans;
+  questionEl.textContent=`${a} ${op} ${b} = ?`;
+  spawnBalls(correctAnswer);
+}
+
+// spawn balls evenly spaced
+function spawnBalls(correct){
+  balls.forEach(b=>b.remove());
+  balls=[];
+  const answers=[correct];
+  while(answers.length<4){
+    const wrong=Math.floor(Math.random()*((level===3)?81:30))+1;
+    if(!answers.includes(wrong))answers.push(wrong);
+  }
+  answers.sort(()=>Math.random()-0.5);
+  const sectionWidth=gameArea.clientWidth/(answers.length+1);
+  answers.forEach((ans,i)=>{
+    const ball=document.createElement("div");
+    ball.className="ball";
+    ball.textContent=ans;
+    const leftPos=sectionWidth*(i+1)-45;
+    ball.style.left=leftPos+"px";
+    ball.style.top="0px";
+    gameArea.appendChild(ball);
+    balls.push(ball);
+  });
+}
+
+// move paddle
+let paddleX=gameArea.clientWidth/2-85;
+document.addEventListener("keydown",e=>{
+  if(!gameRunning)return;
+  const step=45;
+  if(e.key==="ArrowLeft") paddleX=Math.max(0,paddleX-step);
+  if(e.key==="ArrowRight") paddleX=Math.min(gameArea.clientWidth-paddle.offsetWidth,paddleX+step);
+  paddle.style.left=paddleX+"px";
+});
+
+// game loop
+function update(){
+  if(!gameRunning)return;
+  balls.forEach((ball,i)=>{
+    const y=parseFloat(ball.style.top);
+    ball.style.top=y+fallSpeed+"px";
+    const rectB=ball.getBoundingClientRect();
+    const rectP=paddle.getBoundingClientRect();
+    if(rectB.bottom>=rectP.top && rectB.left<rectP.right && rectB.right>rectP.left){
+      handleCatch(ball);
+    }
+    if(y>gameArea.clientHeight){
+      ball.remove();balls.splice(i,1);
+    }
+  });
+  if(balls.length===0)newQuestion();
+  requestAnimationFrame(update);
+}
+
+// handle catch
+function handleCatch(ball){
+  const val=parseInt(ball.textContent);
+  if(val===correctAnswer){
+    score++;
+    scoreEl.textContent=score;
+    ball.classList.add("correct","pop");
+    playSound(600,"triangle");
+    setTimeout(()=>ball.remove(),300);
+    if(score%5===0) nextLevel();
+  }else{
+    lives--;
+    livesEl.textContent=lives;
+    ball.classList.add("wrong","pop");
+    playSound(150,"sawtooth");
+    setTimeout(()=>ball.remove(),300);
+  }
+  if(lives<=0){endGame();}
+  newQuestion();
+}
+
+// level up
+function nextLevel(){
+  level++;
+  if(level>4) level=4;
+  levelInfo.textContent=`Level ${level}: ${
+    level===1?'Addition':level===2?'Subtraction':level===3?'Multiplication':'Mixed'
+  }`;
+  fallSpeed+=0.25;
+  showLevelUp();
+  playSound(880,"square",0.3,0.15);
+  playSound(660,"square",0.3,0.15);
+}
+
+// level up animation
+function showLevelUp(){
+  levelUpMsg.style.display="block";
+  setTimeout(()=>levelUpMsg.style.display="none",1200);
+}
+
+// end game
+function endGame(){
+  gameRunning=false;
+  gameOverScreen.style.display="flex";
+  finalScore.textContent=score;
+  playSound(120,"square",0.6);
+}
+
+// restart
+function restartGame(){
+  score=0;lives=3;fallSpeed=1;level=1;
+  scoreEl.textContent=0;livesEl.textContent=3;
+  levelInfo.textContent="Level 1: Addition";
+  gameRunning=true;
+  gameOverScreen.style.display="none";
+  newQuestion();
+  requestAnimationFrame(update);
+}
+
+// start
+newQuestion();
+requestAnimationFrame(update);
+</script>
+</body>
+</html>

@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Treasure Speller — Pop-Up Rewards</title>
+<style>
+  :root{
+    --sky:#7ee0ff; --sand:#f4d6a6; --chest-dark:#6f3f27; --accent:#ff8da1; --gold:#ffd166;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; font-family:Inter,system-ui,Arial,sans-serif;
+    background: linear-gradient(180deg,var(--sky) 0%, #fff7d6 72%);
+    min-height:100vh; display:flex;flex-direction:column;align-items:center;padding:18px;color:#043240;
+  }
+  h1{margin:14px 0;font-size:1.6rem;color:#03424b}
+  .topbar{width:95%;max-width:1100px;display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
+  .stat{background:rgba(255,255,255,0.95);padding:8px 12px;border-radius:12px;font-weight:800;box-shadow:0 8px 20px rgba(0,0,0,0.06)}
+  .controls{display:flex;gap:8px;align-items:center}
+  .btn{padding:8px 12px;border-radius:10px;border:none;background:linear-gradient(90deg,#ffd6e0,#bff3ff);font-weight:800;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,0.08)}
+
+  main#gameWrap{
+    width:95%;max-width:1100px;background:rgba(255,255,255,0.96);border-radius:18px;padding:18px;box-shadow:0 12px 40px rgba(0,0,0,0.08);
+    display:flex;flex-direction:column;align-items:center;gap:12px;position:relative;overflow:visible;
+  }
+  #prompt{font-weight:900;color:#01424b}
+  #hint{color:#0a7f8f;font-weight:700}
+  #choices{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;width:100%;padding:12px}
+  .choice{
+    height:120px;border-radius:12px;background:linear-gradient(180deg,#b76a39,#6f3f27);
+    color:#ffe6c8;font-weight:900;display:flex;align-items:flex-end;justify-content:center;padding-bottom:12px;
+    box-shadow:0 14px 30px rgba(0,0,0,0.18);cursor:pointer;transition:transform .12s,box-shadow .12s;user-select:none;outline:none;
+  }
+  .choice:hover{transform:translateY(-6px);box-shadow:0 22px 44px rgba(0,0,0,0.22)}
+  .label{font-size:clamp(14px,1.8vw,20px);letter-spacing:2px;text-shadow:0 1px 2px rgba(0,0,0,0.25);}
+
+  #message{min-height:30px;font-weight:800;color:#0a6e5a}
+
+  /* pop-up reward */
+  .popup {
+    position:fixed; left:50%; top:42%; transform:translate(-50%,-50%) scale(0.92);
+    background:linear-gradient(180deg,#fff,#fff8e6);
+    border-radius:14px; padding:18px 22px; box-shadow:0 18px 60px rgba(0,0,0,0.15);
+    display:flex;gap:12px;align-items:center;z-index:9999; opacity:0; pointer-events:none;
+    transition:opacity .22s, transform .28s;
+  }
+  .popup.show{ opacity:1; transform:translate(-50%,-50%) scale(1); pointer-events:auto; }
+  .treasureIcon{width:86px;height:86px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:34px}
+  .popText{font-weight:900;color:#0b4c63}
+
+  /* CSS treasure visuals (small stylized icons using gradients & shapes) */
+  .icon-coin{ background: radial-gradient(circle at 30% 30%, #fff,#ffd166); box-shadow: inset 0 -6px 10px rgba(0,0,0,0.08); border:4px solid #c78e2a; }
+  .coin-shine{ position:absolute;width:10px;height:6px; background:rgba(255,255,255,0.9); border-radius:4px; transform:translate(-10px,-18px) rotate(-12deg); opacity:0.95 }
+  .icon-gem{ background: linear-gradient(180deg,#a8f0ff,#7bd7ff); clip-path: polygon(50% 0%, 85% 30%, 70% 80%, 30% 80%, 15% 30%); box-shadow: 0 8px 18px rgba(0,0,0,0.12); border:3px solid #7cc9e6;}
+  .icon-crown{ background: linear-gradient(180deg,#ffe17a,#ffd166); height:86px; display:flex; align-items:flex-end; padding-bottom:8px; border-radius:10px; box-shadow:0 8px 16px rgba(0,0,0,0.12); border:3px solid #d6a744; }
+  .crown-peaks{ width:80%; display:flex; justify-content:space-around; margin:0 auto; }
+  .peak{ width:18px; height:28px; background:linear-gradient(180deg,#ffd166,#ffb23a); border-radius:4px 4px 0 0; box-shadow:inset 0 -6px 8px rgba(0,0,0,0.08);}
+  .icon-map{ background:linear-gradient(180deg,#fff8e6,#fff1d9); border-radius:10px; width:86px; height:86px; display:flex; align-items:center; justify-content:center; font-weight:900; border:3px solid #d4b36b }
+  .icon-shell{ background: linear-gradient(180deg,#ffdede,#ffeef0); border-radius:50%; width:86px; height:86px; display:flex; align-items:center; justify-content:center; border:3px solid #f1bfc1; box-shadow:inset 0 -8px 14px rgba(0,0,0,0.06) }
+  .icon-bag{ background: linear-gradient(180deg,#ffe6c8,#ffd1a8); border-radius:12px; width:86px; height:86px; display:flex; align-items:center; justify-content:center; border:3px solid #d9ad6e; box-shadow:0 8px 16px rgba(0,0,0,0.08) }
+  .icon-anchor{ background: linear-gradient(180deg,#e6f7ff,#d2f0ff); border-radius:10px; width:86px; height:86px; display:flex; align-items:center; justify-content:center; border:3px solid #7cc0d6 }
+
+  /* small coin/confetti pieces animation (created dynamically) */
+  .confetti{position:fixed;width:10px;height:10px;border-radius:3px;animation:rise 1s linear forwards;}
+  @keyframes rise{0%{transform:translateY(0) rotate(0);opacity:1}100%{transform:translateY(-160px) rotate(540deg);opacity:0}}
+
+  footer{margin:18px 0 30px;color:#074;font-weight:800}
+
+  @media (max-width:780px){
+    .popup{left:50%;top:46%}
+    .treasureIcon{width:74px;height:74px;font-size:28px}
+  }
+</style>
+</head>
+<body>
+  <h1>Treasure Speller — Pop-Up Rewards</h1>
+
+  <div class="topbar">
+    <div class="stat">Round: <span id="roundNum">1</span></div>
+    <div class="stat">Score: <span id="score">0</span></div>
+    <div class="controls">
+      <button id="repeatBtn" class="btn">🔁 Repeat</button>
+      <button id="restartBtn" class="btn">♻️ Restart</button>
+      <button id="muteBtn" class="btn">🔊 Sound</button>
+    </div>
+  </div>
+
+  <main id="gameWrap">
+    <div id="prompt">How do you spell this word?</div>
+    <div id="hint" aria-live="polite"></div>
+    <div id="choices" aria-live="polite"></div>
+    <div id="message" role="status"></div>
+  </main>
+
+  <!-- popup reward -->
+  <div id="popup" class="popup" aria-hidden="true" role="dialog" aria-live="assertive">
+    <div class="treasureIcon" id="treasureIcon"></div>
+    <div class="popText" id="popText">You found a gem!</div>
+  </div>
+
+  <footer>Choose the correctly spelled chest to earn a treasure! Press 1/2/3 to pick.</footer>
+
+<script>
+/* Treasure Speller — Pop-Up Reward Edition (working)
+   - After correct answer show animated CSS treasure popup for 1.6s, then auto-continue
+   - No repeats in session until pool is exhausted; refill afterwards
+   - Speech prompt (browser TTS), ding/buzz, confetti, keyboard choices 1/2/3
+*/
+
+/* Word pool */
+const WORDS = [
+  "APPLE","BANANA","TIGER","COOKIE","MONKEY","GARDEN","RABBIT","BASKET","ISLAND","SUNSET",
+  "PENGUIN","OCEAN","CLOUD","FLOWER","ORANGE","MOUSE","ELEPHANT","CARROT","PIZZA","SCHOOL",
+  "BOTTLE","TABLE","CHAIR","WINDOW","DOCTOR","CASTLE","BRIDGE","CANDLE","PENCIL","UMBRELLA",
+  "VIOLIN","ZEBRA","YELLOW","PURPLE","GREEN","BLUE","BLACK","WHITE","BREAD","MOTHER",
+  "FATHER","SISTER","BROTHER","ROCKET","PLANET","GALAXY","WATER","FIRE","MOUNTAIN","RIVER",
+  "FOREST","DOLPHIN","BUTTERFLY","HIPPO","ORCHARD","DRAGON"
+];
+
+/* UI elements */
+const roundNumEl = document.getElementById('roundNum');
+const scoreEl = document.getElementById('score');
+const promptEl = document.getElementById('prompt');
+const hintEl = document.getElementById('hint');
+const choicesEl = document.getElementById('choices');
+const messageEl = document.getElementById('message');
+const popupEl = document.getElementById('popup');
+const treasureIconEl = document.getElementById('treasureIcon');
+const popTextEl = document.getElementById('popText');
+const repeatBtn = document.getElementById('repeatBtn');
+const restartBtn = document.getElementById('restartBtn');
+const muteBtn = document.getElementById('muteBtn');
+
+let pool = shuffle([...WORDS]);
+let used = new Set();
+let currentWord = null;
+let roundCount = 0;
+let score = 0;
+let soundOn = true;
+
+/* tiny audio */
+const AudioCtx = (window.AudioContext || window.webkitAudioContext);
+const audioCtx = AudioCtx ? new AudioCtx() : null;
+function playTone(freq,type='sine',dur=0.12,vol=0.08){
+  if(!soundOn || !audioCtx) return;
+  if(audioCtx.state === 'suspended') audioCtx.resume().catch(()=>{});
+  const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+  o.type = type; o.frequency.value = freq; g.gain.value = vol;
+  o.connect(g); g.connect(audioCtx.destination);
+  o.start(); o.stop(audioCtx.currentTime + dur);
+}
+function ding(){ playTone(880,'triangle',0.12,0.14); setTimeout(()=>playTone(1120,'sine',0.08,0.08),70); }
+function buzz(){ playTone(160,'sawtooth',0.24,0.14); }
+
+/* speech */
+function speak(text){
+  if(!soundOn) return;
+  if(!('speechSynthesis' in window)) return;
+  try{
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'en-US'; u.rate = 0.95;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+
+/* helpers */
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function pickWord(){
+  if(pool.length === 0){
+    // refill with unused if possible, else reset
+    pool = shuffle([...WORDS].filter(w => !used.has(w)));
+    if(pool.length === 0){ used.clear(); pool = shuffle([...WORDS]); }
+  }
+  const w = pool.pop(); used.add(w); return w;
+}
+function misspell(word){
+  const arr = word.split(''); const r = Math.floor(Math.random()*3);
+  if(r===0 && arr.length>2){ const i=Math.floor(Math.random()*arr.length); const j=Math.floor(Math.random()*arr.length); [arr[i],arr[j]]=[arr[j],arr[i]]; }
+  else if(r===1 && arr.length>=1){ const i=Math.floor(Math.random()*arr.length); const alpha="ABCDEFGHIJKLMNOPQRSTUVWXYZ"; arr[i]=alpha[Math.floor(Math.random()*26)]; }
+  else { if(arr.length>3) arr.splice(Math.floor(Math.random()*arr.length),1); else arr.push('A'); }
+  return arr.join('');
+}
+function getHint(word){
+  const lower = word.toLowerCase();
+  if(['apple','banana','orange','pear','mango'].includes(lower)) return 'fruit';
+  if(['tiger','penguin','monkey','rabbit','zebra','elephant','dolphin','hippo'].includes(lower)) return 'animal';
+  if(['ocean','island','garden','mountain','river','forest'].includes(lower)) return 'place';
+  if(['cookie','pizza','bread'].includes(lower)) return 'food';
+  return 'listen carefully';
+}
+
+/* Render a round */
+function renderRound(){
+  messageEl.textContent = '';
+  const word = pickWord();
+  currentWord = word;
+  roundCount++; roundNumEl.textContent = roundCount;
+  promptEl.textContent = 'Listen and spell the word';
+  hintEl.textContent = 'Hint: ' + getHint(word);
+  speak(word);
+  // options
+  let a = misspell(word), b = misspell(word);
+  while(a === word) a = misspell(word);
+  while(b === word || b === a) b = misspell(word);
+  const opts = shuffle([word, a, b]);
+  choicesEl.innerHTML = '';
+  opts.forEach((opt, i) => {
+    const div = document.createElement('div');
+    div.className = 'choice';
+    const width = Math.max(110, Math.min(240, opt.length * 14 + 40));
+    div.style.width = width + 'px';
+    div.dataset.spelling = opt;
+    div.tabIndex = 0;
+    div.innerHTML = `<div class="label">${opt}</div>`;
+    div.addEventListener('click', onPick);
+    div.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' ') div.click(); });
+    choicesEl.appendChild(div);
+  });
+}
+
+/* Handle pick */
+function onPick(e){
+  const picked = e.currentTarget.dataset.spelling;
+  if(picked === currentWord){
+    ding();
+    score++; scoreEl.textContent = score;
+    // show popup treasure
+    const treasure = sampleTreasure();
+    showPopupTreasure(treasure);
+    // disable choices to prevent double picks
+    Array.from(choicesEl.children).forEach(c => c.removeEventListener('click', onPick));
+    // proceed to next round after popup hide
+  } else {
+    buzz();
+    messageEl.textContent = 'Not quite — try another chest!';
+    e.currentTarget.animate([{transform:'translateX(0)'},{transform:'translateX(-8px)'},{transform:'translateX(8px)'},{transform:'translateX(0)'}],{duration:420});
+  }
+}
+
+/* treasure definitions (CSS class + display text) */
+const TREASURES = [
+  {id:'coin', text:'Golden Coin', cls:'icon-coin', emoji:'🪙'},
+  {id:'gem', text:'Shiny Gem', cls:'icon-gem', emoji:'💎'},
+  {id:'crown', text:'Royal Crown', cls:'icon-crown', emoji:'👑'},
+  {id:'map', text:'Map Piece', cls:'icon-map', emoji:'🗺️'},
+  {id:'shell', text:'Seashell', cls:'icon-shell', emoji:'🐚'},
+  {id:'bag', text:'Bag of Gold', cls:'icon-bag', emoji:'💰'},
+  {id:'anchor', text:'Anchor Charm', cls:'icon-anchor', emoji:'⚓'},
+  {id:'lantern', text:'Magic Lantern', cls:'icon-bag', emoji:'🏮'} // reuse bag style for lantern-ish
+];
+
+function sampleTreasure(){ return TREASURES[Math.floor(Math.random()*TREASURES.length)]; }
+
+/* show popup treasure animation, then auto-continue */
+let popupTimeout = null;
+function showPopupTreasure(t){
+  // create visuals inside popup
+  treasureIconEl.className = 'treasureIcon ' + t.cls;
+  // special small additions (coin shine or crown peaks)
+  if(t.id === 'coin'){
+    treasureIconEl.innerHTML = '<div class="coin-shine"></div>';
+  } else if(t.id === 'crown'){
+    treasureIconEl.innerHTML = '<div class="crown-peaks"><div class="peak"></div><div class="peak"></div><div class="peak"></div></div>';
+  } else if(t.id === 'map'){
+    treasureIconEl.innerHTML = '🗺️';
+  } else if(t.id === 'shell'){
+    treasureIconEl.innerHTML = '🐚';
+  } else if(t.id === 'bag'){
+    treasureIconEl.innerHTML = '💰';
+  } else if(t.id === 'anchor'){
+    treasureIconEl.innerHTML = '⚓';
+  } else if(t.id === 'lantern'){
+    treasureIconEl.innerHTML = '🏮';
+  } else {
+    treasureIconEl.innerHTML = '';
+  }
+
+  popTextEl.textContent = `You found a ${t.text}! ${t.emoji}`;
+  popupEl.classList.add('show');
+  popupEl.setAttribute('aria-hidden','false');
+  messageEl.textContent = 'Nice! You got a treasure!';
+  // small confetti burst
+  smallConfetti();
+  // play ding already happened on correct; optionally play small sparkle
+  if(soundOn) playTone(980,'triangle',0.12,0.10);
+
+  // hide after 1.6s and then continue
+  clearTimeout(popupTimeout);
+  popupTimeout = setTimeout(()=> {
+    popupEl.classList.remove('show');
+    popupEl.setAttribute('aria-hidden','true');
+    // clear icon content
+    treasureIconEl.innerHTML = '';
+    messageEl.textContent = '';
+    setTimeout(()=> renderRound(), 260);
+  }, 1600);
+}
+
+/* small confetti burst function */
+function smallConfetti(){
+  const wrap = document.getElementById('gameWrap').getBoundingClientRect();
+  for(let i=0;i<12;i++){
+    const p = document.createElement('div');
+    p.className = 'confetti';
+    p.style.left = (wrap.left + wrap.width/2 + (Math.random()*320 - 160)) + 'px';
+    p.style.top = (wrap.top + 40 + Math.random()*60) + 'px';
+    p.style.background = ['#ffd166','#ff7ab6','#7be4ff','#9ae6b4','#a78bfa'][Math.floor(Math.random()*5)];
+    document.body.appendChild(p);
+    setTimeout(()=> p.remove(), 1000 + Math.random()*600);
+  }
+}
+
+/* control handlers */
+repeatBtn.addEventListener('click', ()=> { if(currentWord) speak(currentWord); });
+restartBtn.addEventListener('click', ()=> {
+  pool = shuffle([...WORDS]);
+  used.clear();
+  currentWord = null;
+  roundCount = 0; score = 0;
+  roundNumEl.textContent = 0; scoreEl.textContent = 0;
+  messageEl.textContent = '';
+  popupEl.classList.remove('show');
+  setTimeout(()=> renderRound(), 120);
+});
+muteBtn.addEventListener('click', ()=> {
+  soundOn = !soundOn;
+  muteBtn.textContent = soundOn ? '🔊 Sound' : '🔇 Muted';
+  if(!soundOn && 'speechSynthesis' in window) speechSynthesis.cancel();
+});
+
+/* keyboard 1/2/3 */
+document.addEventListener('keydown', (e)=>{
+  if(['1','2','3'].includes(e.key)){
+    const idx = Number(e.key) - 1;
+    const choices = Array.from(choicesEl.children);
+    if(choices[idx]) choices[idx].click();
+  }
+});
+
+/* start game */
+renderRound();
+
+/* expose some helpers for internal calls */
+function renderRound(){ // defined earlier, but safe to be here
+  messageEl.textContent = '';
+  const word = pickWord();
+  currentWord = word;
+  roundCount++; roundNumEl.textContent = roundCount;
+  promptEl.textContent = 'How do you spell this word?';
+  hintEl.textContent = 'Hint: ' + getHint(word);
+  speak(word);
+
+  let a = misspell(word), b = misspell(word);
+  while(a === word) a = misspell(word);
+  while(b === word || b === a) b = misspell(word);
+  const opts = shuffle([word, a, b]);
+
+  choicesEl.innerHTML = '';
+  opts.forEach(opt => {
+    const div = document.createElement('div');
+    div.className = 'choice';
+    const width = Math.max(110, Math.min(240, opt.length * 14 + 40));
+    div.style.width = width + 'px';
+    div.dataset.spelling = opt;
+    div.tabIndex = 0;
+    div.innerHTML = `<div class="label">${opt}</div>`;
+    div.addEventListener('click', onPick);
+    div.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' ') div.click(); });
+    choicesEl.appendChild(div);
+  });
+}
+
+/* functions used above (redeclared here to ensure correct order) */
+function pickWord(){ if(pool.length === 0){ pool = shuffle([...WORDS].filter(w=>!used.has(w))); if(pool.length === 0){ used.clear(); pool = shuffle([...WORDS]); } } const w = pool.pop(); used.add(w); return w; }
+function misspell(word){
+  const arr = word.split(''); const r = Math.floor(Math.random()*3);
+  if(r===0 && arr.length>2){ const i=Math.floor(Math.random()*arr.length); const j=Math.floor(Math.random()*arr.length); [arr[i],arr[j]]=[arr[j],arr[i]]; }
+  else if(r===1 && arr.length>=1){ const i=Math.floor(Math.random()*arr.length); const alpha="ABCDEFGHIJKLMNOPQRSTUVWXYZ"; arr[i]=alpha[Math.floor(Math.random()*26)]; }
+  else { if(arr.length>3) arr.splice(Math.floor(Math.random()*arr.length),1); else arr.push('A'); }
+  return arr.join('');
+}
+function getHint(word){
+  const lower = word.toLowerCase();
+  if(['apple','banana','orange','pear','mango'].includes(lower)) return 'fruit';
+  if(['tiger','penguin','monkey','rabbit','zebra','elephant','dolphin','hippo'].includes(lower)) return 'animal';
+  if(['ocean','island','garden','mountain','river','forest'].includes(lower)) return 'place';
+  if(['cookie','pizza','bread'].includes(lower)) return 'food';
+  return 'listen carefully';
+}
+
+/* utility shuffle */
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a; }
+
+/* small playTone helper (used in popup too) */
+function playTone(freq,type='sine',dur=0.12,vol=0.08){ if(!soundOn || !audioCtx) return; if(audioCtx.state==='suspended') audioCtx.resume().catch(()=>{}); const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.type=type; o.frequency.value=freq; g.gain.value=vol; o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+dur); }
+
+</script>
+</body>
+</html>

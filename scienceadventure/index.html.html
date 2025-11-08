@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌈 Science Adventure — Infinite Fun!</title>
+<style>
+@keyframes gradientShift {
+  0%{background-position:0% 50%;}
+  50%{background-position:100% 50%;}
+  100%{background-position:0% 50%;}
+}
+body {
+  margin:0;
+  font-family:"Poppins",sans-serif;
+  color:#03374d;
+  display:flex;flex-direction:column;align-items:center;
+  min-height:100vh;
+  background:linear-gradient(270deg,#d1f4ff,#ffd6f9,#fffbda,#d7ffea);
+  background-size:800% 800%;
+  animation:gradientShift 10s ease infinite;
+  overflow-x:hidden;
+}
+h1 {
+  font-size:2rem;
+  margin:16px 0 6px;
+  color:#004d73;
+  text-shadow:1px 1px 3px rgba(0,0,0,0.15);
+}
+#topBar {
+  display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:center;
+  margin-bottom:12px;
+}
+.stat {
+  background:rgba(255,255,255,0.8);
+  padding:8px 14px;
+  border-radius:12px;
+  font-weight:800;
+  box-shadow:0 4px 16px rgba(0,0,0,0.1);
+}
+#gameArea {
+  width:95%;max-width:1100px;min-height:540px;
+  background:rgba(255,255,255,0.85);
+  box-shadow:0 8px 30px rgba(0,0,0,0.1);
+  border-radius:20px;
+  padding:18px;
+  display:flex;flex-direction:column;align-items:center;gap:16px;
+  transition:background 0.5s;
+}
+.row {display:flex;flex-wrap:wrap;justify-content:center;gap:16px;width:100%;}
+.card,.target{
+  border-radius:14px;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 6px 18px rgba(0,0,0,0.08);
+  transition:transform 0.2s;
+}
+.card{
+  background:#fff;width:110px;height:110px;font-size:2.5rem;cursor:grab;
+}
+.card:hover{transform:scale(1.08);}
+.target{
+  background:#eefaff;width:150px;height:120px;font-weight:800;color:#024;
+}
+.target.active{outline:4px dashed rgba(6,104,148,0.25);}
+.target.done{background:#eaffea;}
+.btn{
+  padding:10px 16px;border:none;border-radius:10px;font-weight:800;cursor:pointer;
+  background:linear-gradient(90deg,#ffafcc,#7be4ff);
+  box-shadow:0 4px 20px rgba(0,0,0,0.1);
+  transition:transform 0.2s;
+}
+.btn:hover{transform:scale(1.1);}
+.confetti{
+  position:absolute;width:10px;height:10px;border-radius:3px;
+  animation:fly 1s linear forwards;
+}
+@keyframes fly{
+  0%{transform:translateY(0) rotate(0);opacity:1}
+  100%{transform:translateY(-150px) rotate(720deg);opacity:0}
+}
+.flash {
+  animation:flash 0.5s ease;
+}
+@keyframes flash {
+  0%,100%{background:rgba(255,255,255,0.85);}
+  50%{background:#ffd1d1;}
+}
+</style>
+</head>
+<body>
+<h1>🌈 Science Adventure — Infinite Fun!</h1>
+<div id="topBar">
+  <div class="stat">Level: <span id="levelNum">1</span></div>
+  <div class="stat">Score: <span id="score">0</span></div>
+  <div class="stat" id="timer">⏱️ 30s</div>
+  <button class="btn" id="restartBtn">🔄 Restart</button>
+</div>
+<div id="gameArea"></div>
+
+<script>
+/* Random pool of educational emoji sets */
+const pools = {
+  animals:[
+    {emoji:"🐶",target:"Home"},{emoji:"🐳",target:"Ocean"},{emoji:"🐍",target:"Jungle"},{emoji:"🐫",target:"Desert"},{emoji:"🦒",target:"Savanna"},
+    {emoji:"🐧",target:"Ice"},{emoji:"🐎",target:"Farm"},{emoji:"🐸",target:"Swamp"},{emoji:"🦭",target:"Arctic"},{emoji:"🦜",target:"Sky"}
+  ],
+  weather:[
+    {emoji:"☀️",target:"Sunny"},{emoji:"🌧️",target:"Rainy"},{emoji:"❄️",target:"Snowy"},{emoji:"🌪️",target:"Windy"},{emoji:"🌈",target:"Rainbow"},
+    {emoji:"🌫️",target:"Foggy"},{emoji:"⚡",target:"Stormy"},{emoji:"🌤️",target:"Cloudy"},{emoji:"🔥",target:"Hot"},{emoji:"💨",target:"Breezy"}
+  ],
+  plants:[
+    {emoji:"🌸",target:"Flower"},{emoji:"🌱",target:"Stem"},{emoji:"🌿",target:"Leaf"},{emoji:"🌾",target:"Root"},{emoji:"🌻",target:"Seed"},
+    {emoji:"🌴",target:"Trunk"},{emoji:"🍂",target:"Fallen Leaf"},{emoji:"🌷",target:"Bloom"},{emoji:"🍃",target:"Leaf"},{emoji:"🌺",target:"Flower"}
+  ],
+  energy:[
+    {emoji:"☀️",target:"Solar"},{emoji:"💨",target:"Wind"},{emoji:"💧",target:"Water"},{emoji:"🪨",target:"Coal"},{emoji:"🔋",target:"Battery"},
+    {emoji:"⚡",target:"Electric"},{emoji:"🔥",target:"Heat"},{emoji:"🌊",target:"Wave"},{emoji:"🌋",target:"Volcano"},{emoji:"🌞",target:"Sun"}
+  ],
+  space:[
+    {emoji:"🌎",target:"Earth"},{emoji:"🪐",target:"Saturn"},{emoji:"🔴",target:"Mars"},{emoji:"🌕",target:"Moon"},{emoji:"☀️",target:"Sun"},
+    {emoji:"💫",target:"Star"},{emoji:"☄️",target:"Comet"},{emoji:"🛰️",target:"Satellite"},{emoji:"🚀",target:"Rocket"},{emoji:"🪩",target:"Galaxy"}
+  ],
+  body:[
+    {emoji:"👁️",target:"Eye"},{emoji:"👂",target:"Ear"},{emoji:"👃",target:"Nose"},{emoji:"👄",target:"Mouth"},{emoji:"🧠",target:"Brain"},
+    {emoji:"💪",target:"Muscle"},{emoji:"🫀",target:"Heart"},{emoji:"🦶",target:"Foot"},{emoji:"🦵",target:"Leg"},{emoji:"✋",target:"Hand"}
+  ]
+};
+const categories = Object.keys(pools);
+
+let level=0,score=0,placed=0,timeLeft=30,timerInterval,gameOver=false;
+const scoreEl=document.getElementById("score");
+const levelEl=document.getElementById("levelNum");
+const timerEl=document.getElementById("timer");
+const gameArea=document.getElementById("gameArea");
+
+/* Sounds */
+const ctx=new (window.AudioContext||window.webkitAudioContext)();
+function tone(f,t="sine",d=0.12,v=0.08){const o=ctx.createOscillator(),g=ctx.createGain();o.type=t;o.frequency.value=f;g.gain.value=v;o.connect(g);g.connect(ctx.destination);o.start();o.stop(ctx.currentTime+d);}
+function ding(){tone(880,"triangle",0.12,0.1);setTimeout(()=>tone(1100,"sine",0.08,0.07),60);}
+function buzz(){tone(150,"sawtooth",0.25,0.12);}
+function success(){tone(900,"square",0.15,0.1);setTimeout(()=>tone(650,"triangle",0.15,0.08),90);}
+function sadSound(){tone(200,"triangle",0.25,0.15);setTimeout(()=>tone(150,"sine",0.3,0.1),180);}
+
+/* Utility */
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function randomColor(){const colors=["#fff5f5","#e3faff","#f8ffe5","#ffeaf2","#f2f1ff"];return colors[Math.floor(Math.random()*colors.length)];}
+
+/* Timer + Rounds */
+function startLevel(){
+  if(gameOver)return;
+  level++;
+  levelEl.textContent=level;
+  gameArea.style.background=randomColor();
+  clearInterval(timerInterval);
+  timeLeft=30;
+  timerEl.textContent="⏱️ "+timeLeft+"s";
+  timerInterval=setInterval(()=>{
+    timeLeft--;
+    timerEl.textContent="⏱️ "+timeLeft+"s";
+    if(timeLeft<=0){clearInterval(timerInterval); triggerGameOver();}
+  },1000);
+
+  const category=categories[level%categories.length];
+  const pool=[...pools[category]];
+  const difficulty= level<5 ? 3 : level<10 ? 4 : 5;
+  const items=shuffle(pool).slice(0,difficulty);
+  const targets=shuffle([...items]);
+  gameArea.innerHTML="";
+  const title=document.createElement("h2");
+  title.textContent="🔍 "+category.toUpperCase()+" Round!";
+  gameArea.appendChild(title);
+  const row1=document.createElement("div");row1.className="row";
+  const row2=document.createElement("div");row2.className="row";
+  items.forEach(i=>{
+    const card=document.createElement("div");
+    card.className="card";card.textContent=i.emoji;card.dataset.target=i.target;
+    attachDrag(card);
+    row1.appendChild(card);
+  });
+  targets.forEach(i=>{
+    const target=document.createElement("div");
+    target.className="target";target.textContent=i.target;target.dataset.name=i.target;
+    row2.appendChild(target);
+  });
+  gameArea.append(row1,row2);
+  placed=0;
+}
+
+/* Drag + Drop */
+function attachDrag(el){
+  let drag=false,offX=0,offY=0;
+  el.addEventListener("pointerdown",e=>{
+    drag=true;el.setPointerCapture(e.pointerId);
+    const r=el.getBoundingClientRect();offX=e.clientX-r.left;offY=e.clientY-r.top;
+    el.style.position="absolute";el.style.zIndex=1000;
+  });
+  el.addEventListener("pointermove",e=>{
+    if(!drag)return;
+    const wrap=gameArea.getBoundingClientRect();
+    el.style.left=e.clientX-wrap.left-offX+"px";
+    el.style.top=e.clientY-wrap.top-offY+"px";
+    document.querySelectorAll(".target").forEach(t=>{
+      const tr=t.getBoundingClientRect();
+      if(e.clientX>tr.left&&e.clientX<tr.right&&e.clientY>tr.top&&e.clientY<tr.bottom)t.classList.add("active");
+      else t.classList.remove("active");
+    });
+  });
+  el.addEventListener("pointerup",e=>{
+    if(!drag)return;drag=false;
+    let dropped=null;
+    document.querySelectorAll(".target").forEach(t=>{
+      const tr=t.getBoundingClientRect();
+      if(e.clientX>tr.left&&e.clientX<tr.right&&e.clientY>tr.top&&e.clientY<tr.bottom)dropped=t;
+      t.classList.remove("active");
+    });
+    if(dropped){
+      if(dropped.dataset.name===el.dataset.target){
+        ding();score++;scoreEl.textContent=score;
+        dropped.textContent=el.textContent+" "+dropped.dataset.name;
+        dropped.classList.add("done");
+        el.remove();placed++;
+        confetti(dropped);
+        if(placed>=document.querySelectorAll(".target").length){
+          success();clearInterval(timerInterval);
+          setTimeout(()=>startLevel(),900);
+        }
+      }else{
+        buzz();
+        el.style.left="";el.style.top="";el.style.position="";
+      }
+    }else{
+      el.style.left="";el.style.top="";el.style.position="";
+    }
+  });
+}
+
+/* Confetti */
+function confetti(target){
+  const rect=target.getBoundingClientRect(),wrap=gameArea.getBoundingClientRect();
+  const cx=rect.left+rect.width/2-wrap.left,cy=rect.top+rect.height/2-wrap.top;
+  for(let i=0;i<12;i++){
+    const c=document.createElement("div");c.className="confetti";
+    c.style.left=(cx+Math.random()*80-40)+"px";c.style.top=(cy+Math.random()*40-20)+"px";
+    c.style.background=["#ff6b6b","#ffd166","#2ecc71","#7be4ff","#a78bfa"][Math.floor(Math.random()*5)];
+    gameArea.appendChild(c);setTimeout(()=>c.remove(),1000);
+  }
+}
+
+/* Game Over */
+function triggerGameOver(){
+  if(gameOver)return;
+  gameOver=true;
+  sadSound();
+  gameArea.classList.add("flash");
+  setTimeout(()=>{
+    gameArea.classList.remove("flash");
+    gameArea.innerHTML=`<h2>😢 Game Over!</h2>
+    <p>You ran out of time! Final score: <strong>${score}</strong></p>
+    <button class="btn" onclick="restartGame()">Try Again</button>`;
+  },600);
+}
+
+/* Restart */
+function restartGame(){
+  gameOver=false;
+  level=0;score=0;scoreEl.textContent=score;
+  startLevel();
+}
+document.getElementById("restartBtn").onclick=()=>restartGame();
+
+/* Start */
+startLevel();
+</script>
+</body>
+</html>

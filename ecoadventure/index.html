@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eco Adventure: Save the Planet!</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Comic Sans MS', cursive, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            color: #2c5530;
+        }
+
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background-color: rgba(255, 255, 255, 0.9);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        h1 {
+            color: #4a7c59;
+            margin-bottom: 20px;
+            font-size: 2.5rem;
+            text-shadow: 2px 2px 0 #c8e6c9;
+        }
+
+        h2 {
+            color: #6b8e23;
+            margin: 15px 0;
+        }
+
+        p {
+            margin: 10px 0;
+            line-height: 1.6;
+        }
+
+        .screen {
+            display: none;
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        #start-screen {
+            display: block;
+        }
+
+        .character {
+            width: 150px;
+            height: 150px;
+            margin: 20px auto;
+            background-color: #8bc34a;
+            border-radius: 50%;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .character::before, .character::after {
+            content: '';
+            position: absolute;
+            background-color: #4caf50;
+        }
+
+        .character::before {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            top: 30px;
+            left: 45px;
+        }
+
+        .character::after {
+            width: 100px;
+            height: 60px;
+            border-radius: 50% 50% 0 0;
+            bottom: 0;
+            left: 25px;
+        }
+
+        .btn {
+            background: linear-gradient(to bottom, #8bc34a, #4caf50);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            margin: 10px;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 0 #388e3c;
+        }
+
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 0 #388e3c;
+        }
+
+        .btn:active {
+            transform: translateY(1px);
+            box-shadow: 0 2px 0 #388e3c;
+        }
+
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .bins-container {
+            display: flex;
+            justify-content: space-around;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .items-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+
+        .game-item {
+            background-color: #e8f5e9;
+            border-radius: 15px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 3px solid transparent;
+            min-height: 120px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .game-item:hover {
+            transform: scale(1.05);
+            border-color: #4caf50;
+        }
+
+        .bin {
+            min-width: 150px;
+        }
+
+        .icon {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #e0e0e0;
+            border-radius: 10px;
+            margin: 20px 0;
+            overflow: hidden;
+        }
+
+        .progress {
+            height: 100%;
+            background: linear-gradient(to right, #4caf50, #8bc34a);
+            width: 0%;
+            transition: width 0.5s;
+        }
+
+        .score-display {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #4caf50;
+            margin: 10px 0;
+        }
+
+        .feedback {
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            font-weight: bold;
+            animation: pop 0.5s;
+        }
+
+        .correct {
+            background-color: #e8f5e9;
+            color: #4caf50;
+            border: 2px solid #4caf50;
+        }
+
+        .incorrect {
+            background-color: #ffebee;
+            color: #f44336;
+            border: 2px solid #f44336;
+        }
+
+        .facts {
+            background-color: #f1f8e9;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            border-left: 5px solid #8bc34a;
+        }
+
+        .timer-container {
+            margin: 15px 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .timer {
+            font-size: 1.5rem;
+            font-weight: bold;
+            padding: 8px 15px;
+            border-radius: 10px;
+            background-color: #e8f5e9;
+            border: 2px solid #4caf50;
+            color: #2c5530;
+        }
+
+        .timer.warning {
+            background-color: #fff3e0;
+            border-color: #ff9800;
+            color: #e65100;
+            animation: pulse 1s infinite;
+        }
+
+        .timer.danger {
+            background-color: #ffebee;
+            border-color: #f44336;
+            color: #c62828;
+            animation: pulse 0.5s infinite;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes pop {
+            0% { transform: scale(0.8); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .celebration {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+            display: none;
+        }
+
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #f44336;
+            animation: fall linear forwards;
+        }
+
+        @keyframes fall {
+            to {
+                transform: translateY(100vh) rotate(360deg);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌍 Eco Adventure 🌱</h1>
+        
+        <!-- Start Screen -->
+        <div id="start-screen" class="screen">
+            <div class="character"></div>
+            <h2>Welcome to Eco Adventure!</h2>
+            <p>Join our eco-friendly character on a journey to save the planet!</p>
+            <p>Learn about recycling, renewable energy, and conservation while having fun.</p>
+            <button id="start-btn" class="btn">Start Game</button>
+        </div>
+        
+        <!-- Game Screen -->
+        <div id="game-screen" class="screen">
+            <h2 id="level-title">Sort the Waste!</h2>
+            <p id="level-description">Drag each item to the correct bin.</p>
+            
+            <div class="timer-container">
+                <span>Time Left:</span>
+                <div class="timer" id="timer">30</div>
+            </div>
+            
+            <div class="score-display">
+                Score: <span id="score">0</span> | 
+                Streak: <span id="streak">0</span>
+            </div>
+            
+            <div id="feedback" class="feedback"></div>
+            
+            <div class="game-container">
+                <div class="bins-container" id="bins-container">
+                    <!-- Bins will be generated here -->
+                </div>
+                
+                <div class="items-container" id="items-container">
+                    <!-- Items will be generated here -->
+                </div>
+            </div>
+            
+            <div class="facts" id="facts">
+                <h3>Did You Know?</h3>
+                <p id="fact-text">Recycling one aluminum can saves enough energy to run a TV for three hours!</p>
+            </div>
+        </div>
+        
+        <!-- End Screen -->
+        <div id="end-screen" class="screen">
+            <h2>Game Over!</h2>
+            <p>You've completed the Eco Adventure!</p>
+            <div class="score-display">
+                Final Score: <span id="final-score">0</span>
+            </div>
+            <p id="end-message">You're an eco-hero!</p>
+            <button id="restart-btn" class="btn">Play Again</button>
+        </div>
+    </div>
+    
+    <div class="celebration" id="celebration"></div>
+
+    <script>
+        // Game data - expanded with more items
+        const gameData = {
+            categories: [
+                {
+                    title: "Recycling Sort",
+                    description: "Sort these items into the correct bins!",
+                    bins: [
+                        { type: "recycling", name: "Recycling", icon: "♻️" },
+                        { type: "compost", name: "Compost", icon: "🌱" },
+                        { type: "landfill", name: "Landfill", icon: "🗑️" }
+                    ],
+                    items: [
+                        { name: "Plastic Bottle", type: "recycling", icon: "🧴" },
+                        { name: "Apple Core", type: "compost", icon: "🍎" },
+                        { name: "Newspaper", type: "recycling", icon: "📰" },
+                        { name: "Battery", type: "landfill", icon: "🔋" },
+                        { name: "Glass Jar", type: "recycling", icon: "🫙" },
+                        { name: "Banana Peel", type: "compost", icon: "🍌" },
+                        { name: "Pizza Box", type: "compost", icon: "🍕" },
+                        { name: "Soda Can", type: "recycling", icon: "🥤" },
+                        { name: "Plastic Bag", type: "landfill", icon: "🛍️" },
+                        { name: "Coffee Grounds", type: "compost", icon: "☕" },
+                        { name: "Cardboard", type: "recycling", icon: "📦" },
+                        { name: "Light Bulb", type: "landfill", icon: "💡" }
+                    ],
+                    facts: [
+                        "Recycling one aluminum can saves enough energy to run a TV for three hours!",
+                        "Composting food waste reduces methane emissions from landfills.",
+                        "It takes 500 years for plastic bottles to decompose in landfills.",
+                        "Glass can be recycled endlessly without loss in quality.",
+                        "The average person generates over 4 pounds of trash every day."
+                    ]
+                },
+                {
+                    title: "Energy Sources",
+                    description: "Identify renewable and non-renewable energy sources!",
+                    bins: [
+                        { type: "renewable", name: "Renewable", icon: "🌿" },
+                        { type: "non-renewable", name: "Non-Renewable", icon: "💨" }
+                    ],
+                    items: [
+                        { name: "Solar Panels", type: "renewable", icon: "☀️" },
+                        { name: "Coal", type: "non-renewable", icon: "⛏️" },
+                        { name: "Wind Turbines", type: "renewable", icon: "🌬️" },
+                        { name: "Natural Gas", type: "non-renewable", icon: "🔥" },
+                        { name: "Hydroelectric", type: "renewable", icon: "💧" },
+                        { name: "Oil", type: "non-renewable", icon: "🛢️" },
+                        { name: "Geothermal", type: "renewable", icon: "🌋" },
+                        { name: "Nuclear", type: "non-renewable", icon: "☢️" },
+                        { name: "Biomass", type: "renewable", icon: "🌽" },
+                        { name: "Tidal", type: "renewable", icon: "🌊" }
+                    ],
+                    facts: [
+                        "Solar energy is the most abundant energy resource on Earth.",
+                        "Wind power could provide more than 40 times the world's current electricity needs.",
+                        "Fossil fuels like coal and oil take millions of years to form.",
+                        "Renewable energy creates 3 times more jobs than fossil fuels.",
+                        "The sun provides enough energy in one hour to power the world for a year!"
+                    ]
+                },
+                {
+                    title: "Water Conservation",
+                    description: "Identify water-saving and water-wasting activities!",
+                    bins: [
+                        { type: "saving", name: "Water Saving", icon: "✅" },
+                        { type: "wasting", name: "Water Wasting", icon: "❌" }
+                    ],
+                    items: [
+                        { name: "Short Shower", type: "saving", icon: "🚿" },
+                        { name: "Leaky Faucet", type: "wasting", icon: "💧" },
+                        { name: "Rain Barrel", type: "saving", icon: "🛢️" },
+                        { name: "Running Tap", type: "wasting", icon: "🚰" },
+                        { name: "Drip Irrigation", type: "saving", icon: "💦" },
+                        { name: "Long Bath", type: "wasting", icon: "🛁" },
+                        { name: "Full Dishwasher", type: "saving", icon: "🍽️" },
+                        { name: "Watering Lawn at Noon", type: "wasting", icon: "🌞" },
+                        { name: "Fixing Leaks", type: "saving", icon: "🔧" },
+                        { name: "Car Wash at Home", type: "wasting", icon: "🚗" }
+                    ],
+                    facts: [
+                        "A leaky faucet can waste over 3,000 gallons of water per year.",
+                        "Taking a 5-minute shower uses 10-25 gallons of water.",
+                        "A full bath can use up to 70 gallons of water.",
+                        "Turning off the tap while brushing teeth can save 8 gallons per day.",
+                        "Only 1% of Earth's water is available for human use."
+                    ]
+                },
+                {
+                    title: "Eco-Friendly Habits",
+                    description: "Identify eco-friendly and harmful habits!",
+                    bins: [
+                        { type: "eco-friendly", name: "Eco-Friendly", icon: "🌍" },
+                        { type: "harmful", name: "Harmful", icon: "⚠️" }
+                    ],
+                    items: [
+                        { name: "Using Reusable Bags", type: "eco-friendly", icon: "🛍️" },
+                        { name: "Littering", type: "harmful", icon: "🗑️" },
+                        { name: "Planting Trees", type: "eco-friendly", icon: "🌳" },
+                        { name: "Driving Alone", type: "harmful", icon: "🚗" },
+                        { name: "Using Public Transport", type: "eco-friendly", icon: "🚌" },
+                        { name: "Leaving Lights On", type: "harmful", icon: "💡" },
+                        { name: "Buying Local Food", type: "eco-friendly", icon: "🍎" },
+                        { name: "Using Plastic Straws", type: "harmful", icon: "🥤" },
+                        { name: "Composting", type: "eco-friendly", icon: "🌱" },
+                        { name: "Burning Trash", type: "harmful", icon: "🔥" }
+                    ],
+                    facts: [
+                        "If everyone used reusable bags, we could save hundreds of billions of plastic bags each year.",
+                        "Planting trees helps combat climate change by absorbing CO2 from the atmosphere.",
+                        "Public transportation produces 95% less carbon monoxide per passenger mile than private vehicles.",
+                        "Food transportation accounts for about 11% of the carbon emissions in the food system.",
+                        "Composting can reduce household waste by up to 30%."
+                    ]
+                }
+            ]
+        };
+
+        // Game state
+        let currentCategory = 0;
+        let score = 0;
+        let streak = 0;
+        let usedItems = [];
+        let currentQuestionItems = [];
+        let timer;
+        let timeLeft = 30;
+        let timerInterval;
+
+        // DOM elements
+        const startScreen = document.getElementById('start-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const endScreen = document.getElementById('end-screen');
+        const startBtn = document.getElementById('start-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const binsContainer = document.getElementById('bins-container');
+        const itemsContainer = document.getElementById('items-container');
+        const scoreDisplay = document.getElementById('score');
+        const streakDisplay = document.getElementById('streak');
+        const timerDisplay = document.getElementById('timer');
+        const feedback = document.getElementById('feedback');
+        const factText = document.getElementById('fact-text');
+        const levelTitle = document.getElementById('level-title');
+        const levelDescription = document.getElementById('level-description');
+        const finalScore = document.getElementById('final-score');
+        const endMessage = document.getElementById('end-message');
+        const celebration = document.getElementById('celebration');
+
+        // Event listeners
+        startBtn.addEventListener('click', startGame);
+        restartBtn.addEventListener('click', restartGame);
+
+        // Start the game
+        function startGame() {
+            startScreen.style.display = 'none';
+            gameScreen.style.display = 'block';
+            currentCategory = 0;
+            score = 0;
+            streak = 0;
+            usedItems = [];
+            timeLeft = 30;
+            loadQuestion();
+            startTimer();
+        }
+
+        // Load a question
+        function loadQuestion() {
+            const category = gameData.categories[currentCategory];
+            
+            // Update UI
+            levelTitle.textContent = category.title;
+            levelDescription.textContent = category.description;
+            scoreDisplay.textContent = score;
+            streakDisplay.textContent = streak;
+            feedback.textContent = '';
+            feedback.className = 'feedback';
+            
+            // Reset timer
+            timeLeft = 30;
+            timerDisplay.textContent = timeLeft;
+            timerDisplay.className = 'timer';
+            
+            // Display random fact
+            const randomFact = category.facts[Math.floor(Math.random() * category.facts.length)];
+            factText.textContent = randomFact;
+            
+            // Create bins
+            binsContainer.innerHTML = '';
+            category.bins.forEach(bin => {
+                const binElement = document.createElement('div');
+                binElement.className = 'game-item bin';
+                binElement.dataset.type = bin.type;
+                binElement.innerHTML = `
+                    <div class="icon">${bin.icon}</div>
+                    <div>${bin.name}</div>
+                `;
+                binElement.addEventListener('dragover', handleDragOver);
+                binElement.addEventListener('drop', handleDrop);
+                binsContainer.appendChild(binElement);
+            });
+            
+            // Select random items that haven't been used yet
+            const availableItems = category.items.filter(item => 
+                !usedItems.some(used => used.name === item.name && used.category === currentCategory)
+            );
+            
+            // If we've used all items in this category, reset used items for this category
+            if (availableItems.length < 3) {
+                usedItems = usedItems.filter(used => used.category !== currentCategory);
+            }
+            
+            // Select 3 random items
+            currentQuestionItems = [];
+            for (let i = 0; i < 3; i++) {
+                if (availableItems.length > 0) {
+                    const randomIndex = Math.floor(Math.random() * availableItems.length);
+                    const item = availableItems.splice(randomIndex, 1)[0];
+                    currentQuestionItems.push(item);
+                    usedItems.push({...item, category: currentCategory});
+                }
+            }
+            
+            // Create items
+            itemsContainer.innerHTML = '';
+            currentQuestionItems.forEach((item, index) => {
+                const itemElement = document.createElement('div');
+                itemElement.className = 'game-item item';
+                itemElement.draggable = true;
+                itemElement.dataset.index = index;
+                itemElement.dataset.type = item.type;
+                itemElement.innerHTML = `
+                    <div class="icon">${item.icon}</div>
+                    <div>${item.name}</div>
+                `;
+                itemElement.addEventListener('dragstart', handleDragStart);
+                itemsContainer.appendChild(itemElement);
+            });
+        }
+
+        // Start the timer
+        function startTimer() {
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                timerDisplay.textContent = timeLeft;
+                
+                // Update timer color based on remaining time
+                if (timeLeft <= 10) {
+                    timerDisplay.className = 'timer danger';
+                } else if (timeLeft <= 20) {
+                    timerDisplay.className = 'timer warning';
+                }
+                
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    playSound('wrong');
+                    feedback.textContent = "Time's up! Let's try another question.";
+                    feedback.className = 'feedback incorrect';
+                    streak = 0;
+                    streakDisplay.textContent = streak;
+                    
+                    // Move to next question after a delay
+                    setTimeout(() => {
+                        nextQuestion();
+                    }, 2000);
+                }
+            }, 1000);
+        }
+
+        // Drag and drop handlers
+        function handleDragStart(e) {
+            e.dataTransfer.setData('text/plain', e.target.dataset.index);
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            const itemIndex = e.dataTransfer.getData('text/plain');
+            const item = currentQuestionItems[itemIndex];
+            const binType = e.target.closest('.bin').dataset.type;
+            
+            // Check if correct
+            if (item.type === binType) {
+                // Correct
+                score += 10;
+                streak++;
+                scoreDisplay.textContent = score;
+                streakDisplay.textContent = streak;
+                feedback.textContent = `Correct! ${item.name} goes in ${getBinName(binType)}.`;
+                feedback.className = 'feedback correct';
+                playSound('correct');
+                
+                // Remove the item from the game
+                const itemElement = document.querySelector(`.item[data-index="${itemIndex}"]`);
+                itemElement.style.opacity = '0.5';
+                itemElement.style.pointerEvents = 'none';
+                
+                // Check if all items are placed
+                const remainingItems = document.querySelectorAll('.item:not([style*="opacity: 0.5"])');
+                if (remainingItems.length === 0) {
+                    // Show celebration for perfect score
+                    if (streak >= 3) {
+                        createConfetti();
+                    }
+                    
+                    // Move to next question after a short delay
+                    setTimeout(() => {
+                        nextQuestion();
+                    }, 1500);
+                }
+            } else {
+                // Incorrect
+                streak = 0;
+                streakDisplay.textContent = streak;
+                feedback.textContent = `Not quite! ${item.name} does not go in ${getBinName(binType)}.`;
+                feedback.className = 'feedback incorrect';
+                playSound('wrong');
+            }
+        }
+
+        // Get bin name from type
+        function getBinName(type) {
+            const category = gameData.categories[currentCategory];
+            const bin = category.bins.find(bin => bin.type === type);
+            return bin ? bin.name : type;
+        }
+
+        // Next question
+        function nextQuestion() {
+            // Move to next category or loop back
+            currentCategory = (currentCategory + 1) % gameData.categories.length;
+            loadQuestion();
+            startTimer();
+        }
+
+        // Play sound effects
+        function playSound(type) {
+            // Create audio context for sound generation
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            
+            if (type === 'correct') {
+                // Create a "ding" sound for correct answers
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime); // C5
+                oscillator.frequency.setValueAtTime(659.25, audioContext.currentTime + 0.1); // E5
+                oscillator.frequency.setValueAtTime(783.99, audioContext.currentTime + 0.2); // G5
+                
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.5);
+            } else if (type === 'wrong') {
+                // Create a "buzz" sound for wrong answers
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.type = 'sawtooth';
+                oscillator.frequency.setValueAtTime(100, audioContext.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(50, audioContext.currentTime + 0.5);
+                
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.5);
+            }
+        }
+
+        // End game (not used in endless mode, but kept for structure)
+        function endGame() {
+            gameScreen.style.display = 'none';
+            endScreen.style.display = 'block';
+            finalScore.textContent = score;
+            endMessage.textContent = "Great job! You're helping save the planet!";
+            createConfetti();
+            clearInterval(timerInterval);
+        }
+
+        // Restart game
+        function restartGame() {
+            endScreen.style.display = 'none';
+            startScreen.style.display = 'block';
+            clearInterval(timerInterval);
+        }
+
+        // Create confetti celebration
+        function createConfetti() {
+            celebration.style.display = 'block';
+            celebration.innerHTML = '';
+            
+            for (let i = 0; i < 100; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.left = Math.random() * 100 + 'vw';
+                confetti.style.backgroundColor = getRandomColor();
+                confetti.style.animationDuration = (Math.random() * 3 + 2) + 's';
+                confetti.style.width = (Math.random() * 10 + 5) + 'px';
+                confetti.style.height = (Math.random() * 10 + 5) + 'px';
+                celebration.appendChild(confetti);
+            }
+            
+            setTimeout(() => {
+                celebration.style.display = 'none';
+            }, 5000);
+        }
+
+        // Get random color for confetti
+        function getRandomColor() {
+            const colors = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', 
+                           '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4caf50',
+                           '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800'];
+            return colors[Math.floor(Math.random() * colors.length)];
+        }
+    </script>
+</body>
+</html>

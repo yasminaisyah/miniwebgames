@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Virus vs Immune System — Fixed</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;font-family:'Comic Sans MS',cursive,sans-serif}
+    body{
+      background:linear-gradient(to bottom,#1a2980,#26d0ce);
+      color:white;min-height:100vh;overflow-x:hidden;padding:20px;
+    }
+    .container{max-width:1000px;margin:0 auto;padding:10px}
+    header{text-align:center;padding:10px 0}
+    h1{font-size:2.5rem;text-shadow:3px 3px 0 #ff5252;margin-bottom:5px}
+    .subtitle{font-size:1.2rem;margin-bottom:15px}
+    .game-container{display:flex;flex-direction:column;align-items:center}
+    .game-screen{
+      width:100%;max-width:800px;height:400px;
+      background:rgba(0,0,0,0.3);border-radius:15px;position:relative;
+      overflow:hidden;box-shadow:0 8px 25px rgba(0,0,0,0.5);margin-bottom:15px;
+    }
+
+    /* overlay screens */
+    .screen{
+      position:absolute;top:0;left:0;width:100%;height:100%;
+      display:flex;flex-direction:column;justify-content:center;align-items:center;
+      background:rgba(0,0,0,0.85);z-index:50;text-align:center;padding:20px;
+    }
+    .game-over-screen,.win-screen{display:none}
+
+    .btn{
+      background:#ff5252;color:white;border:none;padding:12px 25px;font-size:1.1rem;
+      border-radius:50px;cursor:pointer;margin-top:15px;transition:all .3s;box-shadow:0 5px 0 #c50e29;
+    }
+    .btn:hover{background:#ff7979;transform:translateY(-3px)}
+    .btn:active{transform:translateY(2px);box-shadow:0 2px 0 #c50e29}
+
+    /* player / enemies - player now positioned via left (no translate) */
+    .player{
+      position:absolute;width:60px;height:60px;
+      background:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%23ffffff" stroke="%23007acc" stroke-width="5"/><circle cx="35" cy="40" r="8" fill="%23007acc"/><circle cx="65" cy="40" r="8" fill="%23007acc"/><path d="M35,65 Q50,75 65,65" stroke="%23007acc" stroke-width="5" fill="none"/></svg>');
+      background-size:contain;bottom:20px;left:0;transition:all .05s;z-index:20;
+      animation:float 3s ease-in-out infinite;
+    }
+
+    .virus{position:absolute;width:50px;height:50px;background-size:contain;top:-60px;z-index:10;
+      background:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="%23ff5252"/><circle cx="30" cy="30" r="10" fill="%23ffffff"/><circle cx="70" cy="30" r="10" fill="%23ffffff"/><circle cx="30" cy="70" r="10" fill="%23ffffff"/><circle cx="70" cy="70" r="10" fill="%23ffffff"/><circle cx="50" cy="20" r="8" fill="%23ffffff"/><circle cx="50" cy="80" r="8" fill="%23ffffff"/><circle cx="20" cy="50" r="8" fill="%23ffffff"/><circle cx="80" cy="50" r="8" fill="%23ffffff"/></svg>')}
+
+    .bacteria{position:absolute;width:45px;height:45px;background-size:contain;top:-60px;z-index:10;
+      background:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><ellipse cx="50" cy="50" rx="45" ry="30" fill="%23ff9800"/><circle cx="30" cy="40" r="8" fill="%23ffffff"/><circle cx="70" cy="40" r="8" fill="%23ffffff"/><path d="M35,65 Q50,55 65,65" stroke="%23ffffff" stroke-width="5" fill="none"/></svg>')}
+
+    .antibody{position:absolute;width:15px;height:30px;background-size:contain;z-index:15;
+      background:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M50,10 L60,40 L90,40 L65,60 L75,90 L50,70 L25,90 L35,60 L10,40 L40,40 Z" fill="%234caf50"/></svg>')}
+
+    .powerup{position:absolute;width:25px;height:25px;background-size:contain;top:-40px;z-index:12;
+      background:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="%23ffeb3b"/><polygon points="50,15 60,40 85,40 65,55 75,85 50,70 25,85 35,55 15,40 40,40" fill="%23ff9800"/></svg>')}
+
+    .white-blood-cell{position:absolute;width:60px;height:60px;background-size:contain;top:-80px;z-index:12;
+      background:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%23ffffff"/><circle cx="35" cy="40" r="10" fill="%23007acc"/><circle cx="65" cy="40" r="10" fill="%23007acc"/><path d="M35,65 Q50,75 65,65" stroke="%23007acc" stroke-width="5" fill="none"/></svg>')}
+
+    .info-panel{display:flex;justify-content:space-between;width:100%;max-width:800px;background:rgba(255,255,255,0.2);padding:12px;border-radius:12px;margin-bottom:15px}
+    .stats{display:flex;gap:15px}
+    .stat{background:rgba(0,0,0,0.3);padding:8px 12px;border-radius:8px;font-size:1rem}
+    .educational-tip{background:rgba(255,255,255,0.9);color:#333;padding:12px;border-radius:12px;width:100%;max-width:800px;font-size:1rem;line-height:1.4;text-align:center;box-shadow:0 5px 15px rgba(0,0,0,0.2);margin-bottom:15px}
+    .educational-tip h3{color:#1a2980;margin-bottom:8px}
+    @keyframes float{0%{transform:translateY(0)}50%{transform:translateY(-10px)}100%{transform:translateY(0)}}
+    @keyframes shake{0%{transform:translateX(0)}25%{transform:translateX(-5px)}50%{transform:translateX(5px)}75%{transform:translateX(-5px)}100%{transform:translateX(0)}}
+    .hit-animation{animation:shake .3s ease-in-out}
+    .level-up{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:2.5rem;color:#ffeb3b;text-shadow:3px 3px 0 #ff9800;opacity:0;transition:opacity .5s;z-index:40}
+    .controls{display:flex;gap:15px;margin-top:15px;flex-wrap:wrap;justify-content:center}
+    .control-key{background:rgba(255,255,255,0.2);padding:8px 12px;border-radius:8px;font-size:1rem;display:flex;align-items:center;gap:8px}
+    .key{background:white;color:#333;padding:4px 8px;border-radius:5px;font-weight:bold}
+    .game-elements{display:flex;flex-wrap:wrap;justify-content:center;gap:15px;margin:15px 0}
+    .element{display:flex;align-items:center;background:rgba(255,255,255,0.2);padding:8px 12px;border-radius:8px;gap:8px}
+    .element-icon{width:30px;height:30px;background-size:contain}
+    @media(max-width:768px){h1{font-size:2rem}.subtitle{font-size:1rem}.game-screen{height:350px}.info-panel{flex-direction:column;gap:10px}.stats{justify-content:space-between}.game-elements{flex-direction:column;align-items:center}}
+    @media(max-width:480px){.game-screen{height:300px}.controls{flex-direction:column;align-items:center}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Virus vs Immune System</h1>
+      <div class="subtitle">Defend the body from pathogens and learn about your immune system!</div>
+    </header>
+
+    <div class="game-container">
+      <div class="info-panel">
+        <div class="stats">
+          <div class="stat">Health: <span id="health">100</span>%</div>
+          <div class="stat">Score: <span id="score">0</span></div>
+          <div class="stat">Level: <span id="level">1</span></div>
+        </div>
+        <div class="stats">
+          <div class="stat">Antibodies: <span id="antibodies">10</span></div>
+          <div class="stat">Nutrients: <span id="nutrients">0</span></div>
+        </div>
+      </div>
+
+      <div class="game-screen" id="gameScreen">
+        <div class="screen start-screen" id="startScreen">
+          <h2>Welcome to Immune Defense!</h2>
+          <p>You are a white blood cell defending the body from viruses and bacteria.</p>
+          <p><strong>Goal:</strong> Survive through 5 levels to win the game!</p>
+
+          <div class="game-elements">
+            <div class="element"><div class="element-icon" style="background:url('data:image/svg+xml;utf8,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; viewBox=&quot;0 0 100 100&quot;><circle cx=&quot;50&quot; cy=&quot;50&quot; r=&quot;40&quot; fill=&quot;%23ff5252&quot;/></svg>')"></div><div>Virus (-10 health)</div></div>
+            <div class="element"><div class="element-icon" style="background:url('data:image/svg+xml;utf8,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; viewBox=&quot;0 0 100 100&quot;><ellipse cx=&quot;50&quot; cy=&quot;50&quot; rx=&quot;45&quot; ry=&quot;30&quot; fill=&quot;%23ff9800&quot;/></svg>')"></div><div>Bacteria (-5 health)</div></div>
+            <div class="element"><div class="element-icon" style="background:url('data:image/svg+xml;utf8,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; viewBox=&quot;0 0 100 100&quot;><circle cx=&quot;50&quot; cy=&quot;50&quot; r=&quot;40&quot; fill=&quot;%23ffeb3b&quot;/></svg>')"></div><div>Nutrient (+10 health)</div></div>
+            <div class="element"><div class="element-icon" style="background:url('data:image/svg+xml;utf8,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; viewBox=&quot;0 0 100 100&quot;><circle cx=&quot;50&quot; cy=&quot;50&quot; r=&quot;45&quot; fill=&quot;%23ffffff&quot;/></svg>')"></div><div>Helper (+5 antibodies)</div></div>
+          </div>
+
+          <p>Use arrow keys to move and SPACE to shoot antibodies.</p>
+          <p>The game gets harder each level - more enemies, faster speed!</p>
+          <button class="btn" id="startBtn">Start Game</button>
+        </div>
+
+        <div class="screen game-over-screen" id="gameOverScreen">
+          <h2>Game Over!</h2>
+          <p>Your final score: <span id="finalScore">0</span></p>
+          <p>The body needs rest to recover. Try again!</p>
+          <button class="btn" id="restartBtn">Play Again</button>
+        </div>
+
+        <div class="screen win-screen" id="winScreen">
+          <h2>Congratulations!</h2>
+          <p>You successfully defended the body!</p>
+          <p>Final Score: <span id="winScore">0</span></p>
+          <p>You've completed all 5 levels!</p>
+          <button class="btn" id="winRestartBtn">Play Again</button>
+        </div>
+
+        <div class="player" id="player"></div>
+        <div class="level-up" id="levelUp">Level Up!</div>
+      </div>
+
+      <div class="educational-tip" id="educationalTip">
+        <h3>Did You Know?</h3>
+        <p>White blood cells are the soldiers of your immune system, constantly patrolling your body for invaders!</p>
+      </div>
+
+      <div class="controls">
+        <div class="control-key"><span class="key">←</span> Move Left</div>
+        <div class="control-key"><span class="key">→</span> Move Right</div>
+        <div class="control-key"><span class="key">Space</span> Shoot Antibody</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Elements
+    const gameScreen = document.getElementById('gameScreen');
+    const startScreen = document.getElementById('startScreen');
+    const gameOverScreen = document.getElementById('gameOverScreen');
+    const winScreen = document.getElementById('winScreen');
+    const player = document.getElementById('player');
+    const levelUp = document.getElementById('levelUp');
+    const educationalTip = document.getElementById('educationalTip');
+
+    const healthDisplay = document.getElementById('health');
+    const scoreDisplay = document.getElementById('score');
+    const levelDisplay = document.getElementById('level');
+    const antibodiesDisplay = document.getElementById('antibodies');
+    const nutrientsDisplay = document.getElementById('nutrients');
+    const finalScoreDisplay = document.getElementById('finalScore');
+    const winScoreDisplay = document.getElementById('winScore');
+
+    const startBtn = document.getElementById('startBtn');
+    const restartBtn = document.getElementById('restartBtn');
+    const winRestartBtn = document.getElementById('winRestartBtn');
+
+    // Game state
+    let gameActive = false;
+    let health = 100;
+    let score = 0;
+    let level = 1;
+    let antibodies = 10;
+    let nutrients = 0;
+    let playerX = 0;
+    let lastVirusSpawn = 0;
+    let lastBacteriaSpawn = 0;
+    let lastPowerupSpawn = 0;
+    let lastWhiteCellSpawn = 0;
+    let spawnRate = 2000;
+    let gameSpeed = 2;
+    let antibodiesFired = [];
+    let viruses = [];
+    let bacteria = [];
+    let powerups = [];
+    let whiteBloodCells = [];
+    let keys = {};
+    let animationId = null;
+    const levelTarget = 5;
+
+    // educational tips
+    const educationalTips = [
+      "White blood cells are the soldiers of your immune system, constantly patrolling your body for invaders!",
+      "Antibodies are special proteins that recognize and neutralize specific pathogens like viruses and bacteria.",
+      "Your immune system has a memory - it remembers pathogens it has fought before to respond faster next time!",
+      "Fever is actually a defense mechanism - higher body temperature helps fight off infections.",
+      "Vaccines teach your immune system to recognize pathogens without making you sick.",
+      "Some white blood cells 'eat' pathogens in a process called phagocytosis.",
+      "Your skin is the first line of defense against pathogens - it acts as a physical barrier.",
+      "Lymph nodes are like immune system checkpoints where white blood cells gather to fight infections.",
+      "T-cells are a type of white blood cell that can directly attack infected cells.",
+      "B-cells produce antibodies that circulate in the blood to target pathogens.",
+      "The spleen filters blood and helps remove old red blood cells and pathogens.",
+      "Mucus in your nose and throat traps pathogens before they can enter your body.",
+      "Inflammation brings more blood to infected areas, helping white blood cells reach pathogens faster.",
+      "Natural killer cells can recognize and destroy virus-infected cells and cancer cells.",
+      "The thymus gland is where T-cells mature and learn to recognize the body's own cells.",
+      "Complement proteins in your blood can directly destroy some bacteria.",
+      "Interferons are proteins that interfere with virus replication in infected cells.",
+      "Memory cells remain after an infection to provide long-term immunity.",
+      "The bone marrow produces all the different types of blood cells, including white blood cells.",
+      "Antigens are molecules on pathogens that your immune system recognizes as foreign."
+    ];
+    let usedTips = [];
+
+    // Web Audio
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    let audioLocked = true; // Resume on first user gesture
+
+    function ensureAudioUnlocked() {
+      if (!audioLocked) return;
+      if (audioContext.state === 'suspended') {
+        audioContext.resume().then(() => {
+          audioLocked = false;
+        }).catch(() => { audioLocked = false; });
+      } else {
+        audioLocked = false;
+      }
+    }
+
+    function playSound(frequency, duration, type='sine') {
+      // allow some sounds even before gameActive for feedback like start click by unlocking audio
+      if (audioLocked) return;
+      if (!audioContext) return;
+      const o = audioContext.createOscillator();
+      const g = audioContext.createGain();
+      o.type = type;
+      o.frequency.value = frequency;
+      o.connect(g);
+      g.connect(audioContext.destination);
+      g.gain.setValueAtTime(0.25, audioContext.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+      o.start(audioContext.currentTime);
+      o.stop(audioContext.currentTime + duration);
+    }
+
+    // Utility: random int
+    function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+    // Initialize/Reset game state
+    function initGame() {
+      ensureAudioUnlocked();
+
+      gameActive = true;
+      health = 100;
+      score = 0;
+      level = 1;
+      antibodies = 10;
+      nutrients = 0;
+      spawnRate = 2000;
+      gameSpeed = 2;
+      lastVirusSpawn = lastBacteriaSpawn = lastPowerupSpawn = lastWhiteCellSpawn = Date.now();
+
+      // center player
+      playerX = Math.round((gameScreen.clientWidth - player.offsetWidth) / 2);
+      player.style.left = playerX + 'px';
+
+      // clear existing DOM objects
+      antibodiesFired.forEach(a=>a.remove());
+      viruses.forEach(v=>v.element.remove());
+      bacteria.forEach(b=>b.element.remove());
+      powerups.forEach(p=>p.element.remove());
+      whiteBloodCells.forEach(w=>w.element.remove());
+
+      antibodiesFired = []; viruses = []; bacteria = []; powerups = []; whiteBloodCells = [];
+
+      // reset used tips
+      if (usedTips.length === educationalTips.length) usedTips = [];
+
+      updateDisplays();
+      // hide overlays
+      startScreen.style.display = 'none';
+      gameOverScreen.style.display = 'none';
+      winScreen.style.display = 'none';
+
+      // start loop
+      cancelAnimationFrame(animationId);
+      animationId = requestAnimationFrame(gameLoop);
+    }
+
+    function updateDisplays() {
+      healthDisplay.textContent = health;
+      scoreDisplay.textContent = score;
+      levelDisplay.textContent = level;
+      antibodiesDisplay.textContent = antibodies;
+      nutrientsDisplay.textContent = nutrients;
+    }
+
+    // movement & firing
+    function movePlayer() {
+      if (keys['ArrowLeft'] || keys['Left']) {
+        playerX = Math.max(0, playerX - 7);
+      }
+      if (keys['ArrowRight'] || keys['Right']) {
+        playerX = Math.min(gameScreen.clientWidth - player.offsetWidth, playerX + 7);
+      }
+      player.style.left = playerX + 'px';
+    }
+
+    function fireAntibody() {
+      if (!gameActive) return;
+      if (antibodies <= 0) return;
+      antibodies--;
+      updateDisplays();
+
+      const ab = document.createElement('div');
+      ab.className = 'antibody';
+      const leftPos = playerX + Math.round(player.offsetWidth / 2) - 7;
+      ab.style.left = leftPos + 'px';
+      ab.style.bottom = '80px';
+      gameScreen.appendChild(ab);
+      antibodiesFired.push(ab);
+
+      playSound(800, 0.08, 'square');
+    }
+
+    function moveAntibodies() {
+      for (let i = antibodiesFired.length - 1; i >= 0; i--) {
+        const ab = antibodiesFired[i];
+        const bottom = parseInt(ab.style.bottom, 10) || 0;
+        ab.style.bottom = (bottom + 10) + 'px';
+        if (bottom > gameScreen.clientHeight + 40) {
+          ab.remove();
+          antibodiesFired.splice(i,1);
+        }
+      }
+    }
+
+    // spawn functions (create DOM element + push to arrays)
+    function spawnVirus() {
+      const elt = document.createElement('div');
+      elt.className = 'virus';
+      const left = Math.random() * (gameScreen.clientWidth - 50);
+      elt.style.left = left + 'px';
+      gameScreen.appendChild(elt);
+      viruses.push({element: elt, x: left, y: -60, speed: 1 + Math.random() * gameSpeed});
+    }
+
+    function spawnBacteria() {
+      const elt = document.createElement('div');
+      elt.className = 'bacteria';
+      const left = Math.random() * (gameScreen.clientWidth - 45);
+      elt.style.left = left + 'px';
+      gameScreen.appendChild(elt);
+      bacteria.push({element: elt, x: left, y: -60, speed: 1 + Math.random() * gameSpeed});
+    }
+
+    function spawnPowerup() {
+      const elt = document.createElement('div');
+      elt.className = 'powerup';
+      const left = Math.random() * (gameScreen.clientWidth - 25);
+      elt.style.left = left + 'px';
+      gameScreen.appendChild(elt);
+      powerups.push({element: elt, x: left, y: -40, speed: 1 + Math.random() * 2});
+    }
+
+    function spawnWhiteBloodCell() {
+      const elt = document.createElement('div');
+      elt.className = 'white-blood-cell';
+      const left = Math.random() * (gameScreen.clientWidth - 60);
+      elt.style.left = left + 'px';
+      gameScreen.appendChild(elt);
+      whiteBloodCells.push({element: elt, x: left, y: -80, speed: 1 + Math.random() * 2});
+    }
+
+    // movement of enemies
+    function moveViruses() {
+      for (let i = viruses.length - 1; i >= 0; i--) {
+        const v = viruses[i];
+        v.y += v.speed;
+        v.element.style.top = v.y + 'px';
+        if (v.y > gameScreen.clientHeight + 60) {
+          v.element.remove();
+          viruses.splice(i,1);
+        }
+      }
+    }
+
+    function moveBacteria() {
+      for (let i = bacteria.length - 1; i >= 0; i--) {
+        const b = bacteria[i];
+        b.y += b.speed;
+        b.element.style.top = b.y + 'px';
+        if (b.y > gameScreen.clientHeight + 60) {
+          b.element.remove();
+          bacteria.splice(i,1);
+        }
+      }
+    }
+
+    function movePowerups() {
+      for (let i = powerups.length - 1; i >= 0; i--) {
+        const p = powerups[i];
+        p.y += p.speed;
+        p.element.style.top = p.y + 'px';
+        if (p.y > gameScreen.clientHeight + 60) {
+          p.element.remove();
+          powerups.splice(i,1);
+        }
+      }
+    }
+
+    function moveWhiteBloodCells() {
+      for (let i = whiteBloodCells.length - 1; i >= 0; i--) {
+        const w = whiteBloodCells[i];
+        w.y += w.speed;
+        w.element.style.top = w.y + 'px';
+        if (w.y > gameScreen.clientHeight + 80) {
+          w.element.remove();
+          whiteBloodCells.splice(i,1);
+        }
+      }
+    }
+
+    // spawn manager
+    function spawnEnemies() {
+      const now = Date.now();
+      if (now - lastVirusSpawn > spawnRate) {
+        spawnVirus(); lastVirusSpawn = now;
+      }
+      if (now - lastBacteriaSpawn > spawnRate * 1.5) {
+        spawnBacteria(); lastBacteriaSpawn = now;
+      }
+      if (now - lastPowerupSpawn > spawnRate * 3) {
+        spawnPowerup(); lastPowerupSpawn = now;
+      }
+      if (now - lastWhiteCellSpawn > spawnRate * 5) {
+        spawnWhiteBloodCell(); lastWhiteCellSpawn = now;
+      }
+    }
+
+    // collision utilities
+    function isColliding(r1, r2) {
+      return !(r1.right < r2.left || r1.left > r2.right || r1.bottom < r2.top || r1.top > r2.bottom);
+    }
+
+    function checkCollisions() {
+      // antibody vs virus
+      for (let i = antibodiesFired.length - 1; i >= 0; i--) {
+        const ab = antibodiesFired[i];
+        const abRect = ab.getBoundingClientRect();
+        for (let j = viruses.length - 1; j >= 0; j--) {
+          const v = viruses[j];
+          const vRect = v.element.getBoundingClientRect();
+          if (isColliding(abRect, vRect)) {
+            ab.remove(); antibodiesFired.splice(i,1);
+            v.element.remove(); viruses.splice(j,1);
+            score += 50; updateDisplays();
+            playSound(300, 0.15, 'sawtooth');
+            break;
+          }
+        }
+      }
+
+      // antibody vs bacteria
+      for (let i = antibodiesFired.length - 1; i >= 0; i--) {
+        const ab = antibodiesFired[i];
+        const abRect = ab.getBoundingClientRect();
+        for (let j = bacteria.length - 1; j >= 0; j--) {
+          const b = bacteria[j];
+          const bRect = b.element.getBoundingClientRect();
+          if (isColliding(abRect, bRect)) {
+            ab.remove(); antibodiesFired.splice(i,1);
+            b.element.remove(); bacteria.splice(j,1);
+            score += 30; updateDisplays();
+            playSound(400, 0.15, 'sawtooth');
+            break;
+          }
+        }
+      }
+
+      // player collisions (use player bounding)
+      const playerRect = player.getBoundingClientRect();
+
+      for (let i = viruses.length - 1; i >= 0; i--) {
+        const v = viruses[i];
+        if (isColliding(playerRect, v.element.getBoundingClientRect())) {
+          v.element.remove(); viruses.splice(i,1);
+          health -= 10; updateDisplays();
+          player.classList.add('hit-animation');
+          setTimeout(()=>player.classList.remove('hit-animation'), 300);
+          playSound(200, 0.25, 'square');
+        }
+      }
+
+      for (let i = bacteria.length - 1; i >= 0; i--) {
+        const b = bacteria[i];
+        if (isColliding(playerRect, b.element.getBoundingClientRect())) {
+          b.element.remove(); bacteria.splice(i,1);
+          health -= 5; updateDisplays();
+          player.classList.add('hit-animation');
+          setTimeout(()=>player.classList.remove('hit-animation'), 300);
+          playSound(250, 0.25, 'square');
+        }
+      }
+
+      for (let i = powerups.length - 1; i >= 0; i--) {
+        const p = powerups[i];
+        if (isColliding(playerRect, p.element.getBoundingClientRect())) {
+          p.element.remove(); powerups.splice(i,1);
+          nutrients++; score += 20; health = Math.min(100, health + 10); updateDisplays();
+          playSound(600, 0.18, 'sine');
+        }
+      }
+
+      for (let i = whiteBloodCells.length - 1; i >= 0; i--) {
+        const w = whiteBloodCells[i];
+        if (isColliding(playerRect, w.element.getBoundingClientRect())) {
+          w.element.remove(); whiteBloodCells.splice(i,1);
+          antibodies += 5; updateDisplays();
+          playSound(800, 0.18, 'triangle');
+        }
+      }
+    }
+
+    // level up/win/lose
+    function levelUpGame() {
+      level++; levelDisplay.textContent = level;
+      spawnRate = Math.max(500, spawnRate - 200);
+      gameSpeed += 0.5;
+      levelUp.style.opacity = '1';
+      setTimeout(()=>levelUp.style.opacity = '0', 1800);
+      updateEducationalTip();
+      playSound(1000, 0.35, 'sine');
+      health = Math.min(100, health + 20);
+      updateDisplays();
+    }
+
+    function updateEducationalTip() {
+      if (usedTips.length === educationalTips.length) usedTips = [];
+      let available = educationalTips.filter(t => !usedTips.includes(t));
+      if (available.length === 0) available = educationalTips.slice();
+      const i = Math.floor(Math.random() * available.length);
+      const tip = available[i];
+      usedTips.push(tip);
+      educationalTip.querySelector('p').textContent = tip;
+    }
+
+    function endGame() {
+      gameActive = false;
+      cancelAnimationFrame(animationId);
+      finalScoreDisplay.textContent = score;
+      gameOverScreen.style.display = 'flex';
+      playSound(150, 0.9, 'sawtooth');
+    }
+
+    function winGame() {
+      gameActive = false;
+      cancelAnimationFrame(animationId);
+      winScoreDisplay.textContent = score;
+      winScreen.style.display = 'flex';
+      playSound(1200, 0.9, 'sine');
+    }
+
+    // main loop
+    function gameLoop() {
+      if (!gameActive) return;
+      movePlayer();
+      moveAntibodies();
+      moveViruses();
+      moveBacteria();
+      movePowerups();
+      moveWhiteBloodCells();
+      checkCollisions();
+      spawnEnemies();
+
+      // level progression
+      if (score >= level * 500) { levelUpGame(); }
+
+      if (health <= 0) { endGame(); return; }
+
+      if (level > levelTarget) { winGame(); return; }
+
+      animationId = requestAnimationFrame(gameLoop);
+    }
+
+    // event listeners
+    startBtn.addEventListener('click', (e)=>{ ensureAudioUnlocked(); playSound(600,0.08,'sine'); initGame(); });
+    restartBtn.addEventListener('click', initGame);
+    winRestartBtn.addEventListener('click', initGame);
+
+    // keyboard handling: support e.key and e.code for space
+    document.addEventListener('keydown', (e) => {
+      // first unlock audio if user presses a key
+      ensureAudioUnlocked();
+
+      keys[e.key] = true;
+      // arrow keys: ArrowLeft/ArrowRight or Left/Right older browsers
+      if ((e.code === 'Space' || e.key === ' ' || e.key === 'Spacebar' || e.key === 'Space') && gameActive) {
+        e.preventDefault(); fireAntibody();
+      }
+    });
+
+    document.addEventListener('keyup', (e) => {
+      keys[e.key] = false;
+    });
+
+    // keep player centered on resize
+    window.addEventListener('resize', () => {
+      playerX = Math.min(playerX, gameScreen.clientWidth - player.offsetWidth);
+      player.style.left = playerX + 'px';
+    });
+
+    // initial tip
+    updateEducationalTip();
+
+    // Helpful: make sure start overlay visible on load
+    startScreen.style.display = 'flex';
+  </script>
+</body>
+</html>

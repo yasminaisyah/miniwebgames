@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quiz Maze – Fun Learning Adventure</title>
+<style>
+  :root {
+    --bg:linear-gradient(135deg,#8fd3f4 0%,#84fab0 100%);
+    --path:#ffffffaa;
+    --wall:#5aa9e6;
+    --player:#facc15;
+    --gate:#f87171;
+    --finish:#34d399;
+    --text:#1e293b;
+    --highlight:#ffb703;
+  }
+
+  body {
+    background:var(--bg);
+    color:var(--text);
+    font-family:"Poppins",sans-serif;
+    display:flex;
+    justify-content:center;
+    align-items:flex-start;
+    gap:30px;
+    height:100vh;
+    padding:20px;
+    overflow:hidden;
+  }
+
+  #info {
+    width:260px;
+    padding:20px;
+    background:rgba(255,255,255,0.8);
+    border-radius:15px;
+    box-shadow:0 0 10px rgba(0,0,0,0.2);
+  }
+  #info h2{color:var(--highlight);margin-bottom:10px}
+
+  #maze {
+    display:grid;
+    grid-template-columns:repeat(9,45px);
+    grid-template-rows:repeat(9,45px);
+    gap:4px;
+  }
+  .cell {
+    width:45px;height:45px;border-radius:8px;
+    display:flex;justify-content:center;align-items:center;
+    font-weight:bold;font-size:18px;
+    box-shadow:inset 0 0 5px rgba(0,0,0,0.2);
+  }
+  .wall {background:var(--wall);}
+  .path {background:var(--path);}
+  .player {background:var(--player);}
+  .gate {background:var(--gate);color:#fff;}
+  .finish {background:var(--finish);}
+  #overlay,#quizBox,#winBox{display:none}
+
+  #quizBox,#winBox{
+    position:fixed;top:50%;left:50%;
+    transform:translate(-50%,-50%);
+    background:#ffffffee;
+    color:#1e293b;
+    padding:30px;
+    border-radius:20px;
+    text-align:center;
+    box-shadow:0 0 30px rgba(0,0,0,0.2);
+    width:380px;
+  }
+  #quizBox h3{color:var(--highlight)}
+  .option{
+    background:#e2e8f0;
+    padding:10px;
+    margin:8px 0;
+    border-radius:10px;
+    cursor:pointer;
+    transition:background .3s;
+  }
+  .option:hover{background:var(--highlight);color:#000}
+  #overlay{
+    position:fixed;top:0;left:0;width:100%;height:100%;
+    background:rgba(0,0,0,.6);
+  }
+  button{
+    background:var(--highlight);
+    color:#000;font-weight:bold;
+    border:none;border-radius:10px;
+    padding:10px 20px;cursor:pointer;
+  }
+</style>
+</head>
+<body>
+<div id="info">
+  <h2>🌈 Quiz Maze</h2>
+  <p>🎮 Use arrow keys to move</p>
+  <p><b>Level:</b> <span id="level">1</span></p>
+  <p><b>Score:</b> <span id="score">0</span></p>
+  <p><b>Gates unlocked:</b> <span id="unlocked">0</span></p>
+  <p><b>Moves:</b> <span id="moves">0</span></p>
+</div>
+<div id="maze"></div>
+
+<div id="overlay"></div>
+<div id="quizBox">
+  <h3 id="question"></h3>
+  <div id="options"></div>
+</div>
+<div id="winBox">
+  <h2>🎉 You Win Level!</h2>
+  <p>Your current score: <span id="finalScore"></span></p>
+  <button id="nextLevelBtn">Next Level</button>
+</div>
+
+<!-- Sounds -->
+<audio id="correctSound" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg"></audio>
+<audio id="wrongSound" src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg"></audio>
+<audio id="winSound" src="https://actions.google.com/sounds/v1/cartoon/slide_whistle_to_drum_hit.ogg"></audio>
+<audio id="bgMusic" src="Sakura-Girl-Yay-chosic.com_.mp3" loop></audio>
+
+<button id="musicBtn" style="
+  position:fixed;
+  bottom:20px;
+  right:20px;
+  background:#facc15;
+  border:none;
+  border-radius:10px;
+  padding:8px 14px;
+  font-weight:bold;
+  cursor:pointer;">
+  🔊 Play Music
+</button>
+
+
+<script>
+const size=9;
+const mazeEl=document.getElementById('maze');
+let grid=[],player={x:0,y:0},finish={x:8,y:8};
+let score=0,moves=0,unlocked=0,level=1;
+let gates=[],asked=new Set();
+
+const qsBase = [
+  {q:"5+3=?",options:["6","8","10","7"],answer:"8"},
+  {q:"Largest planet?",options:["Earth","Mars","Jupiter","Venus"],answer:"Jupiter"},
+  {q:"Water freezes at?",options:["0°C","100°C","50°C","-10°C"],answer:"0°C"},
+  {q:"H₂O is?",options:["Hydrogen","Oxygen","Water","Helium"],answer:"Water"},
+  {q:"Red planet?",options:["Venus","Mars","Saturn","Mercury"],answer:"Mars"},
+  {q:"3×4=?",options:["12","10","8","14"],answer:"12"},
+  {q:"Capital of Japan?",options:["Seoul","Beijing","Tokyo","Kyoto"],answer:"Tokyo"},
+  {q:"Heart pumps?",options:["Air","Water","Blood","Juice"],answer:"Blood"},
+  {q:"Sun is a ...?",options:["Planet","Star","Moon","Rock"],answer:"Star"},
+  {q:"What is 10-6?",options:["6","5","4","3"],answer:"4"},
+  {q:"Square root of 81?",options:["8","9","7","6"],answer:"9"},
+  {q:"Who wrote 'Romeo and Juliet'?",options:["Shakespeare","Hemingway","Tolkien","Rowling"],answer:"Shakespeare"},
+  {q:"Speed of light?",options:["300,000 km/s","150,000 km/s","1,000 km/s","30,000 km/s"],answer:"300,000 km/s"},
+  {q:"Which gas do plants breathe in?",options:["Oxygen","Carbon Dioxide","Nitrogen","Helium"],answer:"Carbon Dioxide"},
+  {q:"7×8=?",options:["54","56","64","58"],answer:"56"},
+
+  // 🌍 More General Knowledge Questions
+  {q:"Smallest planet in our solar system?",options:["Mercury","Mars","Venus","Earth"],answer:"Mercury"},
+  {q:"How many continents are there?",options:["5","6","7","8"],answer:"7"},
+  {q:"Fastest land animal?",options:["Cheetah","Lion","Horse","Tiger"],answer:"Cheetah"},
+  {q:"Which ocean is the largest?",options:["Atlantic","Indian","Pacific","Arctic"],answer:"Pacific"},
+  {q:"Who painted the Mona Lisa?",options:["Leonardo da Vinci","Picasso","Van Gogh","Michelangelo"],answer:"Leonardo da Vinci"},
+  {q:"What is the currency of the UK?",options:["Euro","Dollar","Pound","Franc"],answer:"Pound"},
+  {q:"Which planet is known for its rings?",options:["Mars","Venus","Saturn","Earth"],answer:"Saturn"},
+  {q:"In which country is the Eiffel Tower?",options:["Italy","Germany","France","Spain"],answer:"France"},
+  {q:"Which animal is known as the King of the Jungle?",options:["Tiger","Elephant","Lion","Leopard"],answer:"Lion"},
+  {q:"How many colors are there in a rainbow?",options:["5","6","7","8"],answer:"7"},
+  {q:"What is the largest mammal?",options:["Elephant","Blue Whale","Giraffe","Hippopotamus"],answer:"Blue Whale"},
+  {q:"Which country invented paper?",options:["India","Egypt","China","Greece"],answer:"China"},
+  {q:"How many hours are there in two days?",options:["24","36","48","60"],answer:"48"},
+  {q:"Which language has the most native speakers?",options:["English","Spanish","Mandarin","Hindi"],answer:"Mandarin"},
+  {q:"Which planet is closest to the Sun?",options:["Mercury","Venus","Earth","Mars"],answer:"Mercury"},
+  {q:"What is the tallest mountain in the world?",options:["K2","Mount Everest","Kilimanjaro","Denali"],answer:"Mount Everest"},
+  {q:"Who was the first man to walk on the Moon?",options:["Neil Armstrong","Buzz Aldrin","Yuri Gagarin","John Glenn"],answer:"Neil Armstrong"},
+  {q:"Which is the hardest natural substance?",options:["Iron","Gold","Diamond","Silver"],answer:"Diamond"},
+  {q:"Which continent is Egypt in?",options:["Asia","Europe","Africa","South America"],answer:"Africa"},
+  {q:"How many players in a football (soccer) team?",options:["9","10","11","12"],answer:"11"},
+  {q:"What is the chemical symbol for gold?",options:["Gd","Go","Au","Ag"],answer:"Au"},
+  {q:"Which month has 28 days?",options:["February","All months","January","April"],answer:"All months"},
+  {q:"What is the largest organ in the human body?",options:["Heart","Liver","Skin","Brain"],answer:"Skin"},
+  {q:"How many legs does a spider have?",options:["6","8","10","12"],answer:"8"},
+
+  // 🧠 Extra new questions
+  {q:"Which planet is known as the Morning Star?",options:["Venus","Mars","Jupiter","Mercury"],answer:"Venus"},
+  {q:"How many bones are there in the adult human body?",options:["200","206","210","208"],answer:"206"},
+  {q:"Which country is known as the Land of the Rising Sun?",options:["China","Japan","Korea","Thailand"],answer:"Japan"},
+  {q:"What is the capital of Australia?",options:["Sydney","Canberra","Melbourne","Perth"],answer:"Canberra"},
+  {q:"Which metal is liquid at room temperature?",options:["Mercury","Iron","Silver","Copper"],answer:"Mercury"},
+  {q:"Which blood type is known as the universal donor?",options:["O-","O+","AB+","A+"],answer:"O-"},
+  {q:"Which country hosted the 2016 Olympics?",options:["China","Brazil","UK","Japan"],answer:"Brazil"},
+  {q:"What is the national flower of Japan?",options:["Rose","Lily","Cherry Blossom","Tulip"],answer:"Cherry Blossom"},
+  {q:"What does DNA stand for?",options:["Deoxyribonucleic Acid","Dynamic Neural Acid","Double Helix Atom","Data Network Array"],answer:"Deoxyribonucleic Acid"},
+  {q:"Which instrument has keys, pedals, and strings?",options:["Violin","Guitar","Piano","Flute"],answer:"Piano"},
+  {q:"What is the largest desert in the world?",options:["Sahara","Arctic","Gobi","Kalahari"],answer:"Sahara"},
+  {q:"Which planet is known as the Blue Planet?",options:["Earth","Neptune","Uranus","Venus"],answer:"Earth"},
+  {q:"Who discovered gravity?",options:["Einstein","Galileo","Newton","Tesla"],answer:"Newton"},
+  {q:"How many sides does a hexagon have?",options:["5","6","7","8"],answer:"6"},
+  {q:"Which gas do humans exhale?",options:["Oxygen","Carbon Dioxide","Nitrogen","Helium"],answer:"Carbon Dioxide"},
+  {q:"Which bird can mimic human speech?",options:["Crow","Owl","Parrot","Eagle"],answer:"Parrot"},
+  {q:"What color do you get when you mix red and blue?",options:["Green","Purple","Orange","Pink"],answer:"Purple"},
+  {q:"How many days are there in a leap year?",options:["365","366","364","367"],answer:"366"},
+  {q:"Which country is famous for pizza and pasta?",options:["Spain","France","Italy","Greece"],answer:"Italy"},
+  {q:"Which is the smallest ocean?",options:["Indian","Arctic","Pacific","Atlantic"],answer:"Arctic"},
+  {q:"Who invented the telephone?",options:["Alexander Graham Bell","Edison","Newton","Einstein"],answer:"Alexander Graham Bell"},
+  {q:"Which part of the plant carries out photosynthesis?",options:["Root","Stem","Leaf","Flower"],answer:"Leaf"},
+  {q:"Which continent has the most countries?",options:["Asia","Europe","Africa","South America"],answer:"Africa"},
+  {q:"Which shape has three sides?",options:["Square","Triangle","Circle","Rectangle"],answer:"Triangle"},
+  {q:"How many planets are in our solar system?",options:["7","8","9","10"],answer:"8"},
+  {q:"Which fruit is known as the king of fruits?",options:["Mango","Apple","Banana","Pineapple"],answer:"Mango"},
+  {q:"Which festival is known as the festival of lights?",options:["Holi","Diwali","Eid","Christmas"],answer:"Diwali"},
+  {q:"What is the capital of Canada?",options:["Toronto","Vancouver","Ottawa","Montreal"],answer:"Ottawa"},
+  {q:"Which is the largest bird in the world?",options:["Eagle","Ostrich","Peacock","Penguin"],answer:"Ostrich"},
+  {q:"What is the hardest rock?",options:["Granite","Diamond","Marble","Limestone"],answer:"Diamond"},
+  {q:"How many teeth does an adult human usually have?",options:["28","30","32","36"],answer:"32"},
+  {q:"Which is the largest internal organ?",options:["Heart","Liver","Lung","Kidney"],answer:"Liver"},
+  {q:"Which sport uses a shuttlecock?",options:["Tennis","Badminton","Table Tennis","Squash"],answer:"Badminton"},
+  {q:"Which planet has the most moons?",options:["Earth","Jupiter","Saturn","Mars"],answer:"Saturn"},
+  {q:"What is the capital of Italy?",options:["Rome","Venice","Milan","Florence"],answer:"Rome"},
+  {q:"What does CPU stand for?",options:["Central Power Unit","Central Processing Unit","Computer Process Unit","Core Processor Utility"],answer:"Central Processing Unit"},
+  {q:"Which animal lays eggs?",options:["Cow","Bat","Dog","Duck"],answer:"Duck"},
+  {q:"Which ocean touches the west coast of the United States?",options:["Atlantic","Indian","Pacific","Arctic"],answer:"Pacific"}
+];
+
+function rand(n){return Math.floor(Math.random()*n)}
+function getCell(x,y){return document.querySelector(`.cell[data-x='${x}'][data-y='${y}']`)}
+
+function generateMaze(){
+  grid=Array(size).fill().map(()=>Array(size).fill(1));
+  function carve(x,y){
+    const dirs=[[1,0],[-1,0],[0,1],[0,-1]].sort(()=>Math.random()-0.5);
+    for(const[dX,dY] of dirs){
+      const nx=x+dX*2,ny=y+dY*2;
+      if(nx>=0&&ny>=0&&nx<size&&ny<size&&grid[ny][nx]===1){
+        grid[y+dY][x+dX]=0;
+        grid[ny][nx]=0;
+        carve(nx,ny);
+      }
+    }
+  }
+  grid[0][0]=0; carve(0,0); grid[size-1][size-1]=0;
+}
+
+function drawMaze(){
+  mazeEl.innerHTML='';
+  mazeEl.style.gridTemplateColumns=`repeat(${size},45px)`;
+  mazeEl.style.gridTemplateRows=`repeat(${size},45px)`;
+  for(let y=0;y<size;y++){
+    for(let x=0;x<size;x++){
+      const c=document.createElement('div');
+      c.dataset.x=x;c.dataset.y=y;
+      c.classList.add('cell',grid[y][x]===1?'wall':'path');
+      mazeEl.appendChild(c);
+    }
+  }
+  player={x:0,y:0};
+  finish={x:size-1,y:size-1};
+  getCell(player.x,player.y).classList.add('player');
+  getCell(finish.x,finish.y).classList.add('finish');
+  placeGates();
+}
+
+function placeGates(){
+  gates=[];
+  let placed=0;
+  while(placed<4){
+    const x=rand(size),y=rand(size);
+    if(grid[y][x]===0 && !(x===0&&y===0)&&!(x===finish.x&&y===finish.y)){
+      const c=getCell(x,y);
+      if(!c.classList.contains('gate')){
+        c.classList.add('gate');c.textContent='?';
+        gates.push({x,y});
+        placed++;
+      }
+    }
+  }
+}
+
+function updateStats(){
+  document.getElementById('score').textContent=score;
+  document.getElementById('moves').textContent=moves;
+  document.getElementById('unlocked').textContent=unlocked;
+  document.getElementById('level').textContent=level;
+}
+
+function movePlayer(dx,dy){
+  const nx=player.x+dx,ny=player.y+dy;
+  if(nx<0||ny<0||nx>=size||ny>=size)return;
+  if(grid[ny][nx]===1)return;
+  const next=getCell(nx,ny);
+  if(next.classList.contains('gate')){
+    showQuiz(nx,ny);
+    return;
+  }
+  getCell(player.x,player.y).classList.remove('player');
+  player={x:nx,y:ny};
+  getCell(player.x,player.y).classList.add('player');
+  moves++;updateStats();
+  if(player.x===finish.x&&player.y===finish.y)winGame();
+}
+
+function showQuiz(x,y){
+  const remaining=qsBase.filter(q=>!asked.has(q.q));
+  if(remaining.length===0){winGame();return;}
+  const q=remaining[rand(remaining.length)];
+  const difficulty = Math.min(3, Math.floor(level/2)); 
+  asked.add(q.q);
+  const qBox=document.getElementById('quizBox');
+  document.getElementById('question').textContent=q.q;
+  const optBox=document.getElementById('options');
+  optBox.innerHTML='';
+  const shuffled=q.options.sort(()=>Math.random()-0.5);
+  shuffled.forEach(o=>{
+    const div=document.createElement('div');
+    div.classList.add('option');div.textContent=o;
+    div.onclick=()=>{
+      if(o===q.answer){
+        document.getElementById('correctSound').play();
+        score+=10*difficulty;
+        unlocked++;
+        const g=getCell(x,y);
+        g.classList.remove('gate');g.textContent='';
+      }else{
+        document.getElementById('wrongSound').play();
+        score-=5*difficulty;
+      }
+      closeQuiz();updateStats();
+    };
+    optBox.appendChild(div);
+  });
+  document.getElementById('overlay').style.display='block';
+  qBox.style.display='block';
+}
+
+function closeQuiz(){
+  document.getElementById('overlay').style.display='none';
+  document.getElementById('quizBox').style.display='none';
+}
+
+function winGame(){
+  document.getElementById('overlay').style.display='block';
+  const w=document.getElementById('winBox');
+  document.getElementById('finalScore').textContent=score;
+  w.style.display='block';
+  document.getElementById('winSound').play();
+}
+
+function nextLevel(){
+  level++;
+  asked.clear();
+  document.getElementById('overlay').style.display='none';
+  document.getElementById('winBox').style.display='none';
+  generateMaze();drawMaze();updateStats();
+}
+
+document.addEventListener('keydown',e=>{
+  if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.key)){
+    e.preventDefault();
+    const dirs={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0]};
+    movePlayer(...dirs[e.key]);
+  }
+});
+
+document.getElementById('nextLevelBtn').onclick=nextLevel;
+const bgMusic = document.getElementById('bgMusic');
+bgMusic.volume = 0.3;
+
+// Wait for user interaction before playing music
+function startMusicOnce() {
+  bgMusic.play().catch(err => console.log('Autoplay blocked, waiting for user action.'));
+  document.removeEventListener('click', startMusicOnce);
+  document.removeEventListener('keydown', startMusicOnce);
+}
+
+// Add listeners for first user action
+document.addEventListener('click', startMusicOnce);
+document.addEventListener('keydown', startMusicOnce);
+
+const musicBtn = document.getElementById('musicBtn');
+musicBtn.onclick = () => {
+  if (bgMusic.paused) {
+    bgMusic.play();
+    musicBtn.textContent = "🔈 Pause Music";
+  } else {
+    bgMusic.pause();
+    musicBtn.textContent = "🔊 Play Music";
+  }
+};
+
+generateMaze();drawMaze();updateStats();
+</script>
+</body>
+</html>

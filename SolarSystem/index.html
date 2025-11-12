@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar System Fact Finder</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.5/Tone.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* Base styles for a space theme */
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background-color: #0d1117; /* Dark space background */
+            color: #ffffff;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 50px 20px; 
+            box-sizing: border-box;
+        }
+        
+        /* Star Field Background Effect */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 10% 20%, rgba(77, 196, 255, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 90%, rgba(255, 255, 255, 0.05) 0%, transparent 70%),
+                radial-gradient(circle at 50% 50%, #1b2631 0%, #0d1117 100%);
+            z-index: -1;
+            animation: moveStars 30s linear infinite;
+        }
+
+        @keyframes moveStars {
+            from { background-position: 0 0; }
+            to { background-position: 100% 100%; }
+        }
+
+        /* --- Animated Planet Background Styles --- */
+        .planet {
+            position: fixed;
+            border-radius: 50%;
+            opacity: 0.35; 
+            filter: blur(2px); 
+            z-index: 1; 
+            pointer-events: none; 
+        }
+
+        .planet-1 {
+            width: 250px;
+            height: 250px;
+            background: radial-gradient(circle at 30% 30%, #ff8c42, #8d4000);
+            top: 10%;
+            left: -10%;
+            animation: animate-drift-1 45s linear infinite;
+        }
+
+        .planet-2 {
+            width: 150px;
+            height: 150px;
+            background: radial-gradient(circle at 60% 60%, #e74c3c, #c0392b);
+            bottom: 5%;
+            right: -10%;
+            animation: animate-drift-2 35s linear infinite reverse;
+        }
+
+        .planet-3 {
+            width: 100px;
+            height: 100px;
+            background: radial-gradient(circle at 50% 50%, #4dc4ff, #2980b9);
+            top: 70%;
+            right: 20%;
+            animation: animate-drift-3 55s ease-in-out infinite alternate;
+        }
+
+        @keyframes animate-drift-1 {
+            0% { transform: translate(0, 0) rotate(0deg); }
+            50% { transform: translate(15vw, 15vh) rotate(180deg); }
+            100% { transform: translate(0, 0) rotate(360deg); }
+        }
+
+        @keyframes animate-drift-2 {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(-20vw, -10vh) scale(1.1); }
+        }
+
+        @keyframes animate-drift-3 {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(-30vw, -30vh); }
+        }
+        /* --- End Animated Planet Background Styles --- */
+
+
+        /* Main game container */
+        .game-container {
+            background: rgba(31, 42, 56, 0.95); /* Slightly transparent for depth */
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7), 0 0 0 5px rgba(77, 196, 255, 0.1) inset;
+            padding: 30px;
+            max-width: 650px;
+            width: 100%;
+            text-align: center;
+            transition: transform 0.3s ease;
+            position: relative;
+            z-index: 10; /* Ensures quiz is on top of planets */
+        }
+
+        h1 {
+            color: #4dc4ff; /* Bright blue title */
+            margin-bottom: 20px;
+            font-size: 2.2rem;
+            text-shadow: 0 0 15px rgba(77, 196, 255, 0.8);
+        }
+        
+        /* Level Selection Styles */
+        .level-selection {
+            margin-bottom: 25px;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+        
+        .level-button {
+            background-color: #34495e;
+            color: #ffffff;
+            border: 1px solid #5d6d7e;
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background-color 0.2s, box-shadow 0.2s;
+        }
+
+        .level-button:hover:not(:disabled) {
+            background-color: #4a6582;
+        }
+        
+        .level-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .level-button.selected {
+            background-color: #4dc4ff;
+            color: #0d1117;
+            font-weight: bold;
+            border-color: #4dc4ff;
+            box-shadow: 0 0 10px rgba(77, 196, 255, 0.8);
+        }
+
+        .question-card {
+            background: #283747;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.5);
+            min-height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-left: 5px solid #4dc4ff; /* Accent line */
+        }
+
+        #fact-display {
+            font-size: 1.15rem;
+            line-height: 1.6;
+            font-weight: 400;
+            color: #e0f7fa;
+        }
+
+        /* Answer buttons grid */
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        /* Adjusting grid for 6 options (Expert) on desktop */
+        .options-grid[data-option-count="6"] {
+            grid-template-columns: 1fr 1fr 1fr;
+        }
+
+        .option-button {
+            background-color: #34495e;
+            color: #ffffff;
+            border: 2px solid #5d6d7e;
+            padding: 15px 10px;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;
+            touch-action: manipulation;
+        }
+        
+        /* Style for the central Start Quiz button */
+        #start-button {
+            grid-column: 1 / -1; 
+            font-size: 1.2rem; 
+            padding: 20px;
+        }
+
+        .option-button:hover:not(:disabled) {
+            background-color: #3b5065;
+            box-shadow: 0 0 15px rgba(77, 196, 255, 0.4);
+            transform: translateY(-3px);
+        }
+
+        .option-button:active:not(:disabled) {
+            transform: translateY(0);
+            background-color: #4a6582;
+        }
+
+        .option-button:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        /* Feedback/Score area */
+        #feedback-message {
+            margin-top: 25px;
+            font-size: 1.2rem;
+            font-weight: 700;
+            min-height: 30px;
+            transition: color 0.3s ease, opacity 0.3s ease;
+        }
+
+        .correct {
+            color: #4cf08c; /* Neon green for correct */
+            text-shadow: 0 0 5px #4cf08c;
+        }
+
+        .incorrect {
+            color: #ff5252; /* Bright red for incorrect */
+            text-shadow: 0 0 5px #ff5252;
+        }
+
+        /* Stat Row */
+        #game-stats-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 0 10px;
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+
+        #timer-display {
+            color: #ffcc00; /* Amber/Orange for time pressure */
+        }
+        
+        #multiplier-tracker {
+            color: #4cf08c; /* Neon Green for positive effect */
+            transition: transform 0.2s;
+        }
+
+        #score-tracker {
+            font-size: 1.1rem;
+            margin-top: 15px;
+            color: #bbdefb;
+        }
+        
+        #streak-tracker {
+            font-size: 1.1rem;
+            margin-top: 5px;
+            color: #ffd700; /* Gold */
+            font-weight: 700;
+        }
+        
+        /* --- SCHEMATIC STYLES --- */
+        #planet-schematic-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: none; /* Hidden by default */
+            opacity: 0; /* Use opacity for fade transition */
+            background: rgba(31, 42, 56, 0.99);
+            border-radius: 20px;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.3s ease-in-out;
+            z-index: 20;
+            overflow: hidden;
+        }
+
+        #planet-schematic-container.visible {
+            display: flex;
+            opacity: 1;
+        }
+
+        /* Core positioning */
+        .solar-system {
+            position: relative;
+            width: 90%;
+            padding-bottom: 90%; /* Creates a square aspect ratio */
+            max-width: 400px;
+            margin: auto;
+        }
+
+        .sun {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #ffe54c, #ff9900);
+            box-shadow: 0 0 15px rgba(255, 153, 0, 0.9);
+            z-index: 10;
+        }
+
+        /* Orbits - Using border property */
+        .orbit {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border: 1px dashed rgba(77, 196, 255, 0.2);
+            border-radius: 50%;
+        }
+
+        /* Planet Icon Base Style */
+        .planet-icon {
+            position: absolute;
+            border-radius: 50%;
+            width: 8px;
+            height: 8px;
+            transform: translate(-50%, -50%); /* Center the icon */
+            z-index: 15;
+            transition: box-shadow 0.2s ease, transform 0.2s ease;
+        }
+        
+        /* Highlight style */
+        .planet-icon.highlight {
+            box-shadow: 0 0 10px 5px #4cf08c, 0 0 20px 10px rgba(76, 240, 140, 0.5);
+            transform: translate(-50%, -50%) scale(1.5);
+        }
+
+        /* Orbital Positioning and Colors */
+        .o-mercury { width: 60px; height: 60px; }
+        .p-Mercury { 
+            background: #a9a9a9; 
+            top: 50%; left: 50%; 
+            margin-left: 30px; 
+            margin-top: 0;
+            width: 6px; height: 6px;
+        }
+
+        .o-venus { width: 100px; height: 100px; }
+        .p-Venus { 
+            background: #ffaa33; 
+            top: 50%; left: 50%; 
+            margin-left: 50px; 
+            margin-top: 0;
+            width: 7px; height: 7px;
+        }
+
+        .o-earth { width: 140px; height: 140px; }
+        .p-Earth { 
+            background: #00bcd4; 
+            top: 50%; left: 50%; 
+            margin-left: -70px; 
+            margin-top: 0; 
+            width: 8px; height: 8px;
+        }
+
+        .o-mars { width: 180px; height: 180px; }
+        .p-Mars { 
+            background: #e74c3c; 
+            top: 50%; left: 50%; 
+            margin-left: 90px; 
+            margin-top: 0; 
+            width: 7px; height: 7px;
+        }
+        
+        .o-jupiter { width: 250px; height: 250px; }
+        .p-Jupiter { 
+            background: #ffcc99; 
+            top: 50%; left: 50%; 
+            margin-left: -125px; 
+            margin-top: 0; 
+            width: 12px; height: 12px;
+        }
+
+        .o-saturn { width: 320px; height: 320px; }
+        .p-Saturn { 
+            background: #f1c40f; 
+            top: 50%; left: 50%; 
+            margin-left: 160px; 
+            margin-top: 0; 
+            width: 10px; height: 10px;
+        }
+
+        .o-uranus { width: 390px; height: 390px; }
+        .p-Uranus { 
+            background: #7bdcb5; 
+            top: 50%; left: 50%; 
+            margin-left: -195px; 
+            margin-top: 0; 
+            width: 9px; height: 9px;
+        }
+
+        .o-neptune { width: 460px; height: 460px; }
+        .p-Neptune { 
+            background: #2980b9; 
+            top: 50%; left: 50%; 
+            margin-left: 230px; 
+            margin-top: 0; 
+            width: 9px; height: 9px;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 500px) {
+            .game-container {
+                padding: 20px;
+                margin: 10px;
+            }
+            /* Scale down schematic slightly for smaller screens */
+            .solar-system {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="planet planet-1"></div>
+    <div class="planet planet-2"></div>
+    <div class="planet planet-3"></div>
+
+    <div class="game-container">
+        <h1>Solar System Fact Finder</h1>
+
+        <div id="planet-schematic-container">
+            <div class="solar-system">
+                <div class="sun"></div>
+                <div class="orbit o-mercury"></div>
+                <div class="orbit o-venus"></div>
+                <div class="orbit o-earth"></div>
+                <div class="orbit o-mars"></div>
+                <div class="orbit o-jupiter"></div>
+                <div class="orbit o-saturn"></div>
+                <div class="orbit o-uranus"></div>
+                <div class="orbit o-neptune"></div>
+                
+                <div class="planet-icon p-Mercury" id="p-Mercury"></div>
+                <div class="planet-icon p-Venus" id="p-Venus"></div>
+                <div class="planet-icon p-Earth" id="p-Earth"></div>
+                <div class="planet-icon p-Mars" id="p-Mars"></div>
+                <div class="planet-icon p-Jupiter" id="p-Jupiter"></div>
+                <div class="planet-icon p-Saturn" id="p-Saturn"></div>
+                <div class="planet-icon p-Uranus" id="p-Uranus"></div>
+                <div class="planet-icon p-Neptune" id="p-Neptune"></div>
+            </div>
+        </div>
+        
+        <div class="level-selection" id="level-selection-container">
+            <button class="level-button" data-level="easy" onclick="setGameLevel('easy')">Easy (2 Options)</button>
+            <button class="level-button selected" data-level="hard" onclick="setGameLevel('hard')">Hard (4 Options)</button>
+            <button class="level-button" data-level="expert" onclick="setGameLevel('expert')">Expert (6 Options)</button>
+        </div>
+
+        <div id="game-stats-row">
+            <div id="timer-display">Time Left: 60s</div>
+            <div id="multiplier-tracker">Multiplier: 1.0x</div>
+        </div>
+
+        <div class="question-card">
+            <p id="fact-display">Choose your level, then press 'Start Quiz' to begin the 60-second time challenge!</p>
+        </div>
+
+        <div class="options-grid" id="options-container">
+            <button class="option-button" id="start-button" onclick="startGameButtonHandler()">Start Quiz</button>
+        </div>
+
+        <div id="feedback-message"></div>
+        <div id="score-tracker">Score: 0 | Asked: 0</div>
+        <div id="streak-tracker">Streak: 0</div>
+    </div>
+
+    <script>
+        // Data structure for the quiz
+        const quizQuestions = [
+            { id: 1, fact: "Known for its stunning and vast system of icy rings, it is the second-largest planet.", answer: "Saturn"},
+            { id: 2, fact: "It is the largest planet in our solar system, famous for its Great Red Spot—a massive, persistent storm.", answer: "Jupiter"},
+            { id: 3, fact: "Dubbed 'The Red Planet' due to iron oxide on its surface, it is a primary focus for human exploration.", answer: "Mars"},
+            { id: 4, fact: "Farthest planet from the Sun, named after the Roman god of the sea, and has the fastest winds.", answer: "Neptune"},
+            { id: 5, fact: "The smallest planet and the closest to the Sun, it races around the sun in just 88 Earth days.", answer: "Mercury"},
+            { id: 6, fact: "Often called Earth's 'sister planet,' it has a thick, toxic atmosphere and is the hottest planet in the solar system.", answer: "Venus"},
+            { id: 7, fact: "The only celestial body known to harbor life, with over 70% of its surface covered by water.", answer: "Earth"},
+            { id: 8, fact: "An ice giant whose axis of rotation is tilted sideways, making it appear to roll around the Sun.", answer: "Uranus"},
+            { id: 9, fact: "It is the largest moon of Saturn and the second largest in the Solar System, possessing a dense atmosphere and liquid methane lakes.", answer: "Titan"},
+            { id: 10, fact: "This object was reclassified as a dwarf planet in 2006, leading to much debate.", answer: "Pluto"}
+        ];
+        
+        // A list of all possible answers/decoy names for dynamic options generation
+        const allPossibleOptions = quizQuestions.map(q => q.answer);
+
+        // Map of major planets for schematic highlighting
+        const majorPlanets = ["Mercury", "Venus", "Earth", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune"];
+
+
+        // Tone.js Instruments and Volume Control
+        let correctSynth = null;
+        let incorrectSynth = null;
+        let volumeControl = null; 
+
+        // Game State (UPDATED FOR TIMER & MULTIPLIER)
+        let gameLevel = 'hard'; 
+        let score = 0;
+        let totalAttempts = 0;
+        let currentStreak = 0;
+        let scoreMultiplier = 1.0; 
+        const MAX_TIME = 60; 
+        let timeLeft = MAX_TIME; 
+        let timerInterval = null; 
+        const RECENT_QUESTION_LIMIT = 3;
+        let recentlyAskedIds = []; 
+        let currentQuestion = null;
+
+        // DOM Elements
+        const factDisplay = document.getElementById('fact-display');
+        const optionsContainer = document.getElementById('options-container');
+        const scoreTracker = document.getElementById('score-tracker');
+        const streakTracker = document.getElementById('streak-tracker');
+        const feedbackMessage = document.getElementById('feedback-message');
+        const timerDisplay = document.getElementById('timer-display'); 
+        const multiplierTracker = document.getElementById('multiplier-tracker'); 
+        const schematicContainer = document.getElementById('planet-schematic-container'); // NEW
+
+        // --- Tone.js Sound Setup ---
+        function setupAudio() {
+            try {
+                // Initialize Gain node to control overall sound volume (0.2 = 20% volume)
+                volumeControl = new Tone.Gain(0.2).toDestination(); 
+
+                correctSynth = new Tone.Synth({
+                    oscillator: { type: "sine" },
+                    envelope: { attack: 0.005, decay: 0.1, sustain: 0.1, release: 0.5 }
+                }).connect(volumeControl); 
+
+                incorrectSynth = new Tone.Synth({
+                    oscillator: { type: "triangle" },
+                    envelope: { attack: 0.005, decay: 0.1, sustain: 0.1, release: 0.5 }
+                }).connect(volumeControl); 
+                
+                // Only start context if not already running
+                if (Tone.context.state !== 'running') {
+                    Tone.start(); 
+                }
+            } catch (e) {
+                console.error("Audio initialization failed:", e);
+            }
+        }
+
+        function playCorrectSound() {
+            if (correctSynth) {
+                correctSynth.triggerAttackRelease("G5", "8n"); 
+                correctSynth.triggerAttackRelease("B5", "8n", "+0.1");
+            }
+        }
+
+        function playIncorrectSound() {
+            if (incorrectSynth) {
+                incorrectSynth.triggerAttackRelease("C3", "8n");
+                incorrectSynth.triggerAttackRelease("B2", "8n", "+0.1");
+            }
+        }
+        // -----------------------------
+
+        // --- Timer and Game Over Functions ---
+        function startTimer() {
+            if (timerInterval) clearInterval(timerInterval); 
+
+            timerDisplay.textContent = `Time Left: ${timeLeft}s`;
+
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                timerDisplay.textContent = `Time Left: ${timeLeft}s`;
+
+                if (timeLeft < 10) {
+                    timerDisplay.style.color = '#ff5252'; 
+                } else {
+                    timerDisplay.style.color = '#ffcc00';
+                }
+
+                if (timeLeft <= 0) {
+                    gameOver();
+                }
+            }, 1000);
+        }
+
+        function stopTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }
+
+        function gameOver() {
+            stopTimer();
+            factDisplay.textContent = `Game Over! You scored ${score.toFixed(1)} points in ${totalAttempts} questions. Select a level and click 'Restart Quiz' to play again!`;
+            optionsContainer.innerHTML = `<button class="option-button" id="start-button" onclick="startGameButtonHandler()">Restart Quiz</button>`;
+            
+            // Disable level selection until restart
+            document.querySelectorAll('.level-button').forEach(btn => btn.disabled = true);
+        }
+        // -------------------------------------
+
+
+        // Handler for the initial start button click
+        function startGameButtonHandler() {
+            const startButton = document.getElementById('start-button');
+            if (startButton) startButton.remove();
+            initializeGame();
+        }
+
+        // Sets the game difficulty level
+        function setGameLevel(level) {
+            gameLevel = level;
+            // Update UI to highlight selected button
+            document.querySelectorAll('.level-button').forEach(btn => {
+                btn.classList.remove('selected');
+                if (btn.getAttribute('data-level') === level) {
+                    btn.classList.add('selected');
+                }
+            });
+            // If the game is running (timer is active), immediately load a new question
+            if (timerInterval) {
+                 loadQuestion();
+            }
+        }
+
+        // Helper function to shuffle an array (Fisher-Yates)
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        // Initialize or restart the game
+        function initializeGame() {
+            setupAudio();
+            score = 0;
+            totalAttempts = 0;
+            currentStreak = 0;
+            scoreMultiplier = 1.0; 
+            timeLeft = MAX_TIME; 
+            stopTimer(); 
+
+            recentlyAskedIds = [];
+            schematicContainer.classList.remove('visible');
+            
+            // Re-enable level selection
+            document.querySelectorAll('.level-button').forEach(btn => btn.disabled = false);
+
+            updateScoreDisplay();
+            startTimer(); 
+            loadQuestion();
+        }
+
+        // Selects a random question that hasn't been asked recently
+        function selectNextQuestion() {
+            const availableQuestions = quizQuestions.filter(q => !recentlyAskedIds.includes(q.id));
+            
+            if (availableQuestions.length === 0) {
+                // Reset history if all questions have been asked recently
+                recentlyAskedIds = [];
+                return quizQuestions[Math.floor(Math.random() * quizQuestions.length)];
+            }
+
+            const randomIndex = Math.floor(Math.random() * availableQuestions.length);
+            const question = availableQuestions[randomIndex];
+
+            // Update history: add new ID and prune the oldest one
+            recentlyAskedIds.push(question.id);
+            if (recentlyAskedIds.length > RECENT_QUESTION_LIMIT) {
+                recentlyAskedIds.shift();
+            }
+
+            return question;
+        }
+
+        // Generates the options based on the difficulty level
+        function generateOptions(correctAnswer) {
+            let optionCount;
+            switch (gameLevel) {
+                case 'easy':
+                    optionCount = 2;
+                    break;
+                case 'hard':
+                    optionCount = 4;
+                    break;
+                case 'expert':
+                    optionCount = 6;
+                    break;
+                default:
+                    optionCount = 4;
+            }
+
+            // Get decoys (incorrect answers)
+            const decoys = allPossibleOptions.filter(opt => opt !== correctAnswer);
+            
+            // Shuffle decoys and take enough for the current difficulty
+            const shuffledDecoys = shuffleArray(decoys).slice(0, optionCount - 1);
+
+            // Combine correct answer and decoys
+            const finalOptions = shuffleArray([correctAnswer, ...shuffledDecoys]);
+            
+            return { finalOptions, optionCount };
+        }
+
+
+        // Display the current question's fact and options
+        function loadQuestion() {
+            feedbackMessage.textContent = '';
+            factDisplay.textContent = 'Loading Next Fact...'; // Initial load text
+            optionsContainer.innerHTML = ''; 
+            schematicContainer.classList.remove('visible'); // Ensure schematic is hidden
+
+            currentQuestion = selectNextQuestion();
+            factDisplay.textContent = currentQuestion.fact;
+
+            const { finalOptions, optionCount } = generateOptions(currentQuestion.answer);
+
+            // Set grid columns based on option count
+            optionsContainer.setAttribute('data-option-count', optionCount);
+
+            finalOptions.forEach(option => {
+                const button = document.createElement('button');
+                button.textContent = option;
+                button.className = 'option-button';
+                button.onclick = () => checkAnswer(option, currentQuestion.answer);
+                optionsContainer.appendChild(button);
+            });
+            // Ensure buttons are enabled if the timer is running
+            if (!timerInterval) {
+                 Array.from(optionsContainer.children).forEach(btn => btn.disabled = true);
+            }
+        }
+        
+        /**
+         * UPDATED: Visual Feedback Logic
+         * This function handles the 2.0 second schematic display and hide.
+         * @param {string} correctAnswer The correct answer name.
+         */
+        function showSchematicFeedback(correctAnswer, isCorrect, feedbackText) {
+            schematicContainer.classList.add('visible');
+            const planetId = `p-${correctAnswer}`;
+            
+            // Remove previous highlights
+            document.querySelectorAll('.planet-icon').forEach(p => p.classList.remove('highlight'));
+
+            // Highlight the correct body
+            if (majorPlanets.includes(correctAnswer)) {
+                const planetElement = document.getElementById(planetId);
+                if (planetElement) {
+                    planetElement.classList.add('highlight');
+                }
+            } else {
+                // Flash the sun for non-planets
+                document.querySelector('.sun').style.boxShadow = '0 0 20px 10px rgba(255, 255, 0, 0.8)';
+            }
+            
+            // --- STEP 2 & 3: Hide Schematic (2.0 seconds total delay) ---
+            setTimeout(() => {
+                // 3. The schematic hides.
+                schematicContainer.classList.remove('visible');
+                document.querySelectorAll('.planet-icon').forEach(p => p.classList.remove('highlight'));
+                document.querySelector('.sun').style.boxShadow = '0 0 15px rgba(255, 153, 0, 0.9)'; // Reset sun glow
+
+                // --- STEP 4: Update Question Area (Feedback message) ---
+                // We use the factDisplay here to match the "main question area updates"
+                if (isCorrect) {
+                     factDisplay.textContent = `✅ Correct! ${correctAnswer} was the answer.`;
+                } else {
+                     factDisplay.textContent = feedbackText; // Show the detailed incorrect feedback here
+                }
+                
+                // --- STEP 5: Load Next Question (1.5 seconds later) ---
+                setTimeout(loadQuestion, 1500); 
+
+            }, 2000); // Wait 2.0 seconds after click
+        }
+
+        // Handle the user's answer selection
+        function checkAnswer(selectedOption, correctAnswer) {
+            // Do nothing if game is over
+            if (timeLeft <= 0) return;
+
+            // Temporarily disable buttons
+            Array.from(optionsContainer.children).forEach(btn => btn.disabled = true);
+            
+            totalAttempts++;
+            const isCorrect = selectedOption === correctAnswer;
+            let feedbackText = '';
+            
+            if (isCorrect) {
+                // Multiplier Logic
+                let pointsEarned = 1 * scoreMultiplier;
+                score += pointsEarned; 
+
+                currentStreak++;
+                playCorrectSound();
+                
+                feedbackMessage.className = 'correct';
+                
+                if (currentStreak > 0 && currentStreak % 3 === 0) {
+                    scoreMultiplier = Math.min(scoreMultiplier + 0.5, 3.0); // Max multiplier of 3x
+                    multiplierTracker.style.transform = 'scale(1.2)'; // Animation flash
+                    setTimeout(() => multiplierTracker.style.transform = 'scale(1)', 200);
+                    feedbackText = `🔥 +${pointsEarned.toFixed(1)} points! Multiplier is now ${scoreMultiplier.toFixed(1)}x!`;
+                } else {
+                    // This message is placed in the tiny #feedback-message area
+                    feedbackText = `+${pointsEarned.toFixed(1)} points earned.`;
+                }
+
+            } else {
+                // Incorrect Logic
+                if (scoreMultiplier > 1.0) {
+                    scoreMultiplier = Math.max(scoreMultiplier - 0.5, 1.0);
+                    feedbackText = `❌ Incorrect. Multiplier dropped to ${scoreMultiplier.toFixed(1)}x. The correct answer was ${correctAnswer}.`;
+                } else {
+                    feedbackText = `❌ Incorrect. The correct answer was ${correctAnswer}.`;
+                }
+                
+                currentStreak = 0; // Reset streak
+                playIncorrectSound();
+                feedbackMessage.className = 'incorrect';
+                
+                // For incorrect answers, we display the detailed feedback in the main fact area right after the schematic hides.
+            }
+            
+            feedbackMessage.textContent = feedbackText; // Show the multiplier/streak update immediately
+            updateScoreDisplay();
+
+            // Highlight the correct and selected answer colors immediately on the options grid
+            Array.from(optionsContainer.children).forEach(btn => {
+                if (btn.textContent === correctAnswer) {
+                    btn.style.backgroundColor = isCorrect ? '#4cf08c' : '#72983c'; 
+                } else if (btn.textContent === selectedOption) {
+                    btn.style.backgroundColor = '#ff5252'; // Red for wrong guess
+                }
+            });
+            
+            // STEP 1 & 2: Show Schematic (starts the entire process)
+            showSchematicFeedback(correctAnswer, isCorrect, feedbackText);
+        }
+
+        function updateScoreDisplay() {
+            scoreTracker.textContent = `Score: ${score.toFixed(1)} | Asked: ${totalAttempts}`;
+            streakTracker.textContent = `Streak: ${currentStreak}`;
+            multiplierTracker.textContent = `Multiplier: ${scoreMultiplier.toFixed(1)}x`;
+            if (timerDisplay) timerDisplay.textContent = `Time Left: ${timeLeft}s`;
+        }
+
+        // Initial setup on window load
+        window.onload = () => {
+             updateScoreDisplay(); 
+        };
+
+    </script>
+
+</body>
+</html>

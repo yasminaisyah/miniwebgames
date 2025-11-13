@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Math Master</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    
+    <style>
+        /* Import a fun, readable font */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            /* CSS variables for theme switching */
+            --color-bg: #E0F7FA; /* Light Cyan */
+            --color-card: #FFFFFF;
+            --color-text: #0D47A1; /* Dark Blue */
+            --color-accent: #00B0FF; /* Bright Blue */
+            --color-accent-dark: #0091EA;
+            --color-correct: #69F0AE; /* Bright Green */
+            --color-wrong: #FF8A80; /* Bright Red */
+            
+            transition: background-color 0.5s ease;
+            background-color: var(--color-bg);
+        }
+
+        /* Theme definitions */
+        body.theme-space {
+            --color-bg: #1A237E; /* Indigo */
+            --color-card: #303F9F;
+            --color-text: #E3F2FD; /* Light Blue */
+            --color-accent: #536DFE; /* Light Indigo */
+            --color-accent-dark: #3D5AFE;
+        }
+        body.theme-jungle {
+            --color-bg: #388E3C; /* Green */
+            --color-card: #66BB6A;
+            --color-text: #E8F5E9; /* Light Green */
+            --color-accent: #FFEB3B; /* Yellow */
+            --color-accent-dark: #FDD835;
+        }
+        body.theme-ocean {
+            --color-bg: #0277BD; /* Light Blue */
+            --color-card: #03A9F4;
+            --color-text: #E1F5FE; /* Lightest Blue */
+            --color-accent: #FFD600; /* Yellow */
+            --color-accent-dark: #FFC400;
+        }
+
+        /* Main game card styling */
+        .game-card {
+            background-color: var(--color-card);
+            color: var(--color-text);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            border-radius: 20px;
+            transition: all 0.3s ease;
+        }
+        /* Buttons */
+        .btn-action {
+            background-color: var(--color-accent);
+            color: var(--color-text);
+            transition: all 0.2s;
+            border-radius: 12px;
+            font-weight: 700;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        .btn-action:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2);
+            background-color: var(--color-accent-dark);
+        }
+        .btn-action:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: translateY(0);
+        }
+        
+        /* Background flash animations */
+        .bg-correct-flash { animation: flashGreen 0.3s ease-out; }
+        .bg-wrong-flash { animation: flashRed 0.3s ease-out; }
+
+        @keyframes flashGreen {
+            50% { background-color: var(--color-correct); }
+        }
+        @keyframes flashRed {
+            50% { background-color: var(--color-wrong); }
+        }
+
+        /* Floating emoji animation */
+        @keyframes flyOut {
+            0% { transform: translate(0, 0) scale(1); opacity: 1; }
+            100% { 
+                transform: translate(var(--x, 0), var(--y, -150px)) scale(0.5); 
+                opacity: 0; 
+            }
+        }
+        .floating-emoji {
+            position: absolute;
+            font-size: 3.5rem; /* Large emoji */
+            pointer-events: none;
+            user-select: none;
+            animation: flyOut 1.2s cubic-bezier(0.17, 0.84, 0.44, 1) forwards;
+            z-index: 100;
+        }
+
+        /* Progress Bar Styling */
+        #progress-bar {
+            background-color: rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        #progress-fill {
+            height: 100%;
+            border-radius: 10px;
+            background-color: var(--color-accent);
+            transition: width 0.3s ease-out;
+            box-shadow: 0 0 10px var(--color-accent);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div id="game-container" class="w-full max-w-5xl flex flex-col lg:flex-row gap-6">
+
+        <div class="lg:w-1/3 flex flex-col gap-6">
+            <div class="game-card p-5">
+                <h2 class="text-2xl font-bold mb-4 text-center" style="color: var(--color-accent);">Game Setup</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label for="theme-select" class="block text-sm font-medium mb-1">Theme</label>
+                        <select id="theme-select" class="w-full p-2 border border-gray-300 rounded-lg bg-white bg-opacity-50">
+                            <option value="default">🎨 Cheerful (Default)</option>
+                            <option value="space">🌌 Space</option>
+                            <option value="jungle">🌿 Jungle</option>
+                            <option value="ocean">🌊 Ocean</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="difficulty-select" class="block text-sm font-medium mb-1">Difficulty</label>
+                        <select id="difficulty-select" class="w-full p-2 border border-gray-300 rounded-lg bg-white bg-opacity-50">
+                            <option value="easy">⭐ Easy (Add/Sub, 0-10)</option>
+                            <option value="medium">💪 Medium (Mul/Div, 0-12)</option>
+                            <option value="hard">🧠 Hard (All, 0-20)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="game-card p-5 flex-grow">
+                <h2 class="text-2xl font-bold mb-4 text-center" style="color: var(--color-accent);">Scoreboard</h2>
+                <div class="space-y-3 text-center">
+                    <div>
+                        <div class="text-sm uppercase tracking-wider">Your Rank</div>
+                        <div id="rank-display" class="text-3xl font-black">Newbie</div>
+                    </div>
+                    <hr class="my-2 border-t border-black border-opacity-10">
+                    <div>
+                        <div class="text-sm uppercase tracking-wider">High Score</div>
+                        <div id="high-score-display" class="text-3xl font-black">0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="game-card lg:w-2/3 p-6 md:p-10 flex flex-col items-center">
+            <h1 class="text-3xl md:text-5xl font-extrabold mb-4" style="color: var(--color-accent);">Math Master</h1>
+
+            <div class="flex justify-around w-full max-w-xl mb-4 text-lg md:text-2xl font-bold">
+                <div class="text-center">
+                    <span class="block text-sm font-normal">Score</span>
+                    <span id="score-display">0</span>
+                </div>
+                <div class="text-center">
+                    <span class="block text-sm font-normal">Streak</span>
+                    <i class="fas fa-fire text-orange-400"></i> <span id="streak-display">0</span>
+                </div>
+            </div>
+
+            <div class="w-full max-w-xl mb-4">
+                <div class="flex justify-between items-center text-sm mb-1">
+                    <span class="font-bold">Next Rank: <span id="next-rank-display">Beginner (10)</span></span>
+                    <span class="font-bold"><i class="fas fa-clock"></i> Time: <span id="timer-display">60</span>s</span>
+                </div>
+                <div id="progress-bar" class="w-full h-5">
+                    <div id="progress-fill" class="h-full" style="width: 0%;"></div>
+                </div>
+            </div>
+            
+            <div id="powerup-container" class="w-full max-w-xl mb-6 h-12 flex justify-center items-center space-x-4">
+                </div>
+
+            <div id="problem-display" class="text-5xl md:text-8xl font-black text-center my-8 select-none" style="min-height: 80px;">
+                Press Start!
+            </div>
+
+            <div id="input-area" class="w-full max-w-md flex flex-col items-center space-y-4">
+                <input
+                    type="number"
+                    id="answer-input"
+                    class="w-full p-4 text-3xl text-center font-bold rounded-xl border-2 border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-300"
+                    placeholder="?"
+                    disabled
+                >
+                <button
+                    id="submit-btn"
+                    class="btn-action w-full p-4 text-xl"
+                    disabled
+                >
+                    Submit (Enter)
+                </button>
+            </div>
+
+            <div id="message-box" class="mt-6 h-6 text-center">
+                <p id="game-message" class="text-lg font-semibold">Select theme & difficulty to begin!</p>
+            </div>
+
+            <div class="mt-4">
+                <button id="start-btn" class="btn-action p-4 text-2xl" style="background-color: #4CAF50;">
+                    Start Game
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="level-up-modal" class="fixed inset-0 bg-black bg-opacity-75 hidden items-center justify-center p-4 z-50">
+        <div class="game-card p-8 w-full max-w-sm text-center transform scale-90 opacity-0 transition-all duration-300" 
+             style="background-color: #673AB7; color: #EDE7F6; border: 4px solid #D1C4E9;">
+            <h2 class="text-4xl font-black text-yellow-300 mb-4 animate-bounce">LEVEL UP! 🚀</h2>
+            <p class="text-xl text-white mb-2">You've achieved the rank of:</p>
+            <p id="new-rank-display" class="text-3xl font-extrabold text-yellow-300 mb-6">Beginner</p>
+            <button
+                id="level-up-close-btn"
+                class="btn-action p-3 font-bold"
+                style="background-color: #7E57C2; color: white;"
+            >
+                Keep Going!
+            </button>
+        </div>
+    </div>
+
+    <div id="game-over-modal" class="fixed inset-0 bg-black bg-opacity-75 hidden items-center justify-center p-4 z-50">
+        <div class="game-card p-8 w-full max-w-lg text-center transform scale-90 opacity-0 transition-all duration-300">
+            <h2 class="text-3xl font-bold mb-4" style="color: var(--color-accent);">Time's Up!</h2>
+            <p class="text-xl mb-2">Final Score:</p>
+            <p id="final-score-display" class="text-6xl font-black text-green-500 mb-6">0</p>
+            <p id="high-score-message" class="text-lg font-semibold text-yellow-500 mb-4"></p>
+
+            <div class="my-6 text-left">
+                <h3 class="text-lg font-bold mb-2">Mistake Review</h3>
+                <ul id="review-list" class="text-sm max-h-32 overflow-y-auto bg-black bg-opacity-5 p-3 rounded-lg">
+                    </ul>
+            </div>
+
+            <div class="my-6">
+                <h3 class="text-lg font-bold mb-2 text-yellow-600">Did You Know?</h3>
+                <p id="math-fact-display" class="text-sm italic px-4">
+                    </p>
+            </div>
+
+            <button
+                id="play-again-btn"
+                class="btn-action p-3 font-bold"
+                style="background-color: #f44336; color: white;"
+            >
+                Play Again
+            </button>
+        </div>
+    </div>
+
+
+    <script>
+        // --- Configuration ---
+        const GAME_TIME = 60; // Total game time in seconds
+        const STREAK_GOAL = 5; // Correct answers in a row for a bonus
+        const STREAK_BONUS_POINTS = 10;
+        
+        const DIFFICULTY = {
+            easy: { ops: ['+', '-'], min: 0, max: 10 },
+            medium: { ops: ['*', '/'], min: 1, max: 12 },
+            hard: { ops: ['+', '-', '*', '/'], min: 0, max: 20 }
+        };
+        
+        const BADGES = [
+            { score: 0, name: "Newbie" },
+            { score: 10, name: "Beginner" },
+            { score: 20, name: "Apprentice" },
+            { score: 30, name: "Adept" },
+            { score: 50, name: "Prodigy" },
+            { score: 75, name: "Master" },
+            { score: 100, name: "Wizard" },
+            { score: 150, name: "Grandmaster" }
+        ];
+
+        const MATH_FACTS = [
+            "A 'googol' is the number 1 followed by 100 zeros!",
+            "Zero (0) is the only number that can't be represented in Roman numerals.",
+            "In a room of 23 people, there's a 50% chance two share a birthday.",
+            "The spiral shapes of sunflowers follow the Fibonacci sequence.",
+            "Ancient Babylonians did math in base 60, which is why we have 60 seconds in a minute.",
+            "'Hundred' comes from the Old Norse word 'hundrath', which actually means 120!",
+            "Pi ($\pi$) is an irrational number, meaning its decimal form never ends or repeats."
+        ];
+
+        // --- Game State ---
+        let gameState = {
+            active: false,
+            score: 0,
+            streak: 0,
+            timeLeft: GAME_TIME,
+            timerInterval: null,
+            currentProblem: null,
+            difficulty: 'easy',
+            highScore: 0,
+            powerUps: {
+                freezeTime: 0,
+                doublePoints: 0
+            },
+            wrongAnswers: [],
+            usedMathFacts: [],
+            currentBadgeIndex: 0
+        };
+
+        // --- Sound Synths (Tone.js) ---
+        let correctSynth, wrongSynth, levelUpSynth, timerTickSynth;
+
+        // --- DOM Elements ---
+        const body = document.body;
+        const scoreDisplay = document.getElementById('score-display');
+        const streakDisplay = document.getElementById('streak-display');
+        const timerDisplay = document.getElementById('timer-display');
+        const progressFill = document.getElementById('progress-fill');
+        const rankDisplay = document.getElementById('rank-display');
+        const nextRankDisplay = document.getElementById('next-rank-display');
+        const highScoreDisplay = document.getElementById('high-score-display');
+        const problemDisplay = document.getElementById('problem-display');
+        const answerInput = document.getElementById('answer-input');
+        const submitBtn = document.getElementById('submit-btn');
+        const startBtn = document.getElementById('start-btn');
+        const gameMessage = document.getElementById('game-message');
+        const powerupContainer = document.getElementById('powerup-container');
+        
+        // Selectors
+        const themeSelect = document.getElementById('theme-select');
+        const difficultySelect = document.getElementById('difficulty-select');
+
+        // Modals
+        const levelUpModal = document.getElementById('level-up-modal');
+        const newRankDisplay = document.getElementById('new-rank-display');
+        const levelUpCloseBtn = document.getElementById('level-up-close-btn');
+        const gameOverModal = document.getElementById('game-over-modal');
+        const finalScoreDisplay = document.getElementById('final-score-display');
+        const highScoreMessage = document.getElementById('high-score-message');
+        const reviewList = document.getElementById('review-list');
+        const mathFactDisplay = document.getElementById('math-fact-display');
+        const playAgainBtn = document.getElementById('play-again-btn');
+
+        
+        // --- 1. Audio Functions ---
+        
+        function initAudio() {
+            // Check if Tone.js is loaded
+            if (typeof Tone === 'undefined') {
+                console.warn("Tone.js not loaded. Sound effects will be disabled.");
+                return;
+            }
+            
+            // Resume audio context on first user interaction
+            const startAudio = async () => {
+                await Tone.start();
+                console.log("Audio context started!");
+                // Remove listener after it runs once
+                document.documentElement.removeEventListener('click', startAudio);
+            };
+            document.documentElement.addEventListener('click', startAudio);
+
+            // Correct answer sound: Bright, rising pitch
+            correctSynth = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: "triangle" },
+                envelope: { attack: 0.01, decay: 0.1, sustain: 0.2, release: 0.2 }
+            }).toDestination();
+            correctSynth.volume.value = -10;
+
+            // Wrong answer sound: Low, dissonant buzz
+            wrongSynth = new Tone.PolySynth(Tone.FMSynth, {
+                harmonicity: 2,
+                modulationIndex: 10,
+                envelope: { attack: 0.01, decay: 0.2, release: 0.2 }
+            }).toDestination();
+            wrongSynth.volume.value = -15;
+
+            // Level up sound: Chime-like arpeggio
+            levelUpSynth = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: "sine" },
+                envelope: { attack: 0.05, decay: 0.2, sustain: 0.3, release: 0.5 }
+            }).toDestination();
+            levelUpSynth.volume.value = -8;
+
+            // Timer tick sound: Sharp click
+            timerTickSynth = new Tone.MembraneSynth({
+                pitchDecay: 0.01,
+                octaves: 2,
+                envelope: { attack: 0.001, decay: 0.1, sustain: 0 }
+            }).toDestination();
+            timerTickSynth.volume.value = -20;
+        }
+
+        function playSound(type) {
+            if (!correctSynth) return; // Audio not initialized
+            
+            const now = Tone.now();
+            try {
+                if (type === 'correct') {
+                    correctSynth.triggerAttackRelease(["C5", "E5", "G5"], "8n", now);
+                } else if (type === 'wrong') {
+                    wrongSynth.triggerAttackRelease(["C3", "C#3"], "8n", now);
+                } else if (type === 'levelUp') {
+                    levelUpSynth.triggerAttackRelease(["C4", "E4", "G4", "C5"], "4n", now);
+                } else if (type === 'tick') {
+                    timerTickSynth.triggerAttack("C5", now);
+                }
+            } catch (e) {
+                console.error("Error playing sound:", e);
+            }
+        }
+
+        // --- 2. Visual & UI Functions ---
+
+        function updateTheme(themeName) {
+            body.className = `min-h-screen flex items-center justify-center p-4 ${themeName ? `theme-${themeName}` : ''}`;
+        }
+        
+        function flashBackground(type) {
+            const className = type === 'correct' ? 'bg-correct-flash' : 'bg-wrong-flash';
+            body.classList.add(className);
+            // Remove class after animation finishes
+            setTimeout(() => body.classList.remove(className), 300);
+        }
+
+        function createFloatingEmoji(emoji) {
+            const emojiEl = document.createElement('div');
+            emojiEl.textContent = emoji;
+            emojiEl.className = 'floating-emoji';
+            
+            // Position emoji near the answer input
+            const inputRect = answerInput.getBoundingClientRect();
+            emojiEl.style.left = `${inputRect.left + inputRect.width / 2 - 28}px`; // 28px is ~half of 3.5rem
+            emojiEl.style.top = `${inputRect.top - 70}px`; // 70px is ~1.2x 3.5rem
+
+            // Randomize horizontal drift
+            const randomX = (Math.random() - 0.5) * 100; // -50px to +50px
+            emojiEl.style.setProperty('--x', `${randomX}px`);
+            
+            document.body.appendChild(emojiEl);
+            
+            // Remove emoji from DOM after animation
+            setTimeout(() => emojiEl.remove(), 1200);
+        }
+
+        function updateUI() {
+            // Update stats
+            scoreDisplay.textContent = gameState.score;
+            streakDisplay.textContent = gameState.streak;
+            timerDisplay.textContent = gameState.timeLeft;
+            highScoreDisplay.textContent = gameState.highScore;
+            
+            // Update Rank
+            const currentBadge = BADGES[gameState.currentBadgeIndex];
+            rankDisplay.textContent = currentBadge.name;
+
+            // Update Progress Bar & Next Rank
+            const nextBadgeIndex = gameState.currentBadgeIndex + 1;
+            if (nextBadgeIndex < BADGES.length) {
+                const nextBadge = BADGES[nextBadgeIndex];
+                const prevBadgeScore = currentBadge.score;
+                const scoreToNext = nextBadge.score - prevBadgeScore;
+                const progress = gameState.score - prevBadgeScore;
+                const progressPercent = Math.max(0, Math.min(100, (progress / scoreToNext) * 100));
+                
+                progressFill.style.width = `${progressPercent}%`;
+                nextRankDisplay.textContent = `${nextBadge.name} (${nextBadge.score})`;
+            } else {
+                // Max level reached
+                progressFill.style.width = `100%`;
+                nextRankDisplay.textContent = "Max Rank!";
+            }
+            
+            // Update timer color
+            if (gameState.timeLeft <= 10) {
+                timerDisplay.parentElement.classList.add('text-red-500', 'animate-pulse');
+            } else {
+                timerDisplay.parentElement.classList.remove('text-red-500', 'animate-pulse');
+            }
+        }
+        
+        function showModal(modal) {
+            modal.style.display = 'flex';
+            // Wait a frame for display to apply, then trigger transition
+            setTimeout(() => {
+                modal.firstElementChild.classList.remove('scale-90', 'opacity-0');
+                modal.firstElementChild.classList.add('scale-100', 'opacity-100');
+            }, 20);
+        }
+        
+        function closeModal(modal) {
+             modal.firstElementChild.classList.remove('scale-100', 'opacity-100');
+             modal.firstElementChild.classList.add('scale-90', 'opacity-0');
+             // Wait for transition to finish before hiding
+             setTimeout(() => {
+                modal.style.display = 'none';
+             }, 300);
+        }
+
+        // --- 3. Game Logic Functions ---
+        
+        function generateProblem() {
+            const diff = DIFFICULTY[gameState.difficulty];
+            const op = diff.ops[Math.floor(Math.random() * diff.ops.length)];
+            let num1, num2, answer;
+
+            if (op === '/') {
+                // Ensure integer division
+                num2 = Math.floor(Math.random() * (diff.max - 1)) + 1; // Divisor > 0
+                answer = Math.floor(Math.random() * diff.max);
+                num1 = num2 * answer;
+            } else if (op === '-') {
+                // Ensure non-negative answer
+                num1 = Math.floor(Math.random() * (diff.max - diff.min + 1)) + diff.min;
+                num2 = Math.floor(Math.random() * (num1 - diff.min + 1)) + diff.min; // num2 <= num1
+                answer = num1 - num2;
+            } else if (op === '*') {
+                num1 = Math.floor(Math.random() * (diff.max - diff.min + 1)) + diff.min;
+                num2 = Math.floor(Math.random() * (diff.max - diff.min + 1)) + diff.min;
+                answer = num1 * num2;
+            } else { // '+'
+                num1 = Math.floor(Math.random() * (diff.max - diff.min + 1)) + diff.min;
+                num2 = Math.floor(Math.random() * (diff.max - diff.min + 1)) + diff.min;
+                answer = num1 + num2;
+            }
+            
+            gameState.currentProblem = { num1, num2, op, answer };
+            problemDisplay.textContent = `${num1} ${op} ${num2} = ?`;
+        }
+
+        function checkAnswer() {
+            if (!gameState.active) return;
+            
+            const userAnswer = parseInt(answerInput.value);
+            const { num1, num2, op, answer } = gameState.currentProblem;
+            
+            if (isNaN(userAnswer)) {
+                gameMessage.textContent = "Please enter a number!";
+                return;
+            }
+
+            if (userAnswer === answer) {
+                // --- CORRECT ---
+                let points = 1;
+                if (gameState.powerUps.doublePoints > 0) {
+                    points = 2;
+                    gameState.powerUps.doublePoints--;
+                    createFloatingEmoji('✨');
+                }
+                
+                gameState.score += points;
+                gameState.streak++;
+                gameMessage.textContent = "Correct! 🎉";
+                
+                playSound('correct');
+                flashBackground('correct');
+                createFloatingEmoji('👏');
+
+                // Check for streak bonus
+                if (gameState.streak > 0 && gameState.streak % STREAK_GOAL === 0) {
+                    gameState.score += STREAK_BONUS_POINTS;
+                    gameMessage.textContent = `Streak Bonus! +${STREAK_BONUS_POINTS} points! 🔥`;
+                    createFloatingEmoji('🔥');
+                    grantRandomPowerUp();
+                }
+                
+                // Check for level up
+                levelUpCheck();
+
+            } else {
+                // --- WRONG ---
+                gameState.streak = 0;
+                gameMessage.textContent = `Oops! The answer was ${answer}.`;
+                
+                playSound('wrong');
+                flashBackground('wrong');
+                createFloatingEmoji('❌');
+                
+                // Add to review list
+                gameState.wrongAnswers.push({ 
+                    problem: `${num1} ${op} ${num2}`, 
+                    correct: answer, 
+                    yours: userAnswer 
+                });
+            }
+            
+            // Clear input and get next problem
+            answerInput.value = '';
+            generateProblem();
+            updateUI();
+            updatePowerUpUI();
+        }
+        
+        function levelUpCheck() {
+            const nextBadgeIndex = gameState.currentBadgeIndex + 1;
+            if (nextBadgeIndex < BADGES.length && gameState.score >= BADGES[nextBadgeIndex].score) {
+                gameState.currentBadgeIndex = nextBadgeIndex;
+                newRankDisplay.textContent = BADGES[nextBadgeIndex].name;
+                playSound('levelUp');
+                showModal(levelUpModal);
+                // Grant a power-up on level up
+                grantRandomPowerUp();
+            }
+        }
+
+        function startTimer() {
+            gameState.timerInterval = setInterval(() => {
+                if (gameState.powerUps.freezeTime > 0) {
+                    gameState.powerUps.freezeTime--;
+                    if (gameState.powerUps.freezeTime === 0) {
+                        gameMessage.textContent = "Time resumes!";
+                        updatePowerUpUI();
+                    }
+                    return; // Skip timer countdown
+                }
+                
+                gameState.timeLeft--;
+                timerDisplay.textContent = gameState.timeLeft;
+                
+                if (gameState.timeLeft <= 10 && gameState.timeLeft > 0) {
+                    playSound('tick');
+                }
+
+                if (gameState.timeLeft <= 0) {
+                    endGame();
+                }
+            }, 1000);
+        }
+
+        function startGame() {
+            // Reset game state
+            gameState.active = true;
+            gameState.score = 0;
+            gameState.streak = 0;
+            gameState.timeLeft = GAME_TIME;
+            gameState.powerUps = { freezeTime: 0, doublePoints: 0 };
+            gameState.wrongAnswers = [];
+            gameState.currentBadgeIndex = 0; // Reset badge
+            gameState.difficulty = difficultySelect.value;
+            
+            // Reset UI
+            gameMessage.textContent = "Go! Go! Go!";
+            startBtn.style.display = 'none'; // Hide start button
+            submitBtn.disabled = false;
+            answerInput.disabled = false;
+            answerInput.focus();
+            difficultySelect.disabled = true;
+            themeSelect.disabled = true;
+            
+            // Load high score
+            gameState.highScore = parseInt(localStorage.getItem('mathHighScore') || '0');
+            
+            updateUI();
+            updatePowerUpUI();
+            generateProblem();
+            startTimer();
+        }
+
+        function endGame() {
+            // Stop game
+            gameState.active = false;
+            clearInterval(gameState.timerInterval);
+            
+            // Update high score
+            if (gameState.score > gameState.highScore) {
+                gameState.highScore = gameState.score;
+                localStorage.setItem('mathHighScore', gameState.highScore);
+                highScoreMessage.textContent = "New High Score! 🏆";
+            } else {
+                highScoreMessage.textContent = "";
+            }
+
+            // Show Game Over Modal
+            finalScoreDisplay.textContent = gameState.score;
+            renderReviewScreen();
+            showModal(gameOverModal);
+
+            // Reset UI elements
+            problemDisplay.textContent = "Time's Up!";
+            startBtn.style.display = 'block'; // Show start button
+            startBtn.textContent = 'Play Again?';
+            submitBtn.disabled = true;
+            answerInput.disabled = true;
+            difficultySelect.disabled = false;
+            themeSelect.disabled = false;
+        }
+
+        function renderReviewScreen() {
+            // 1. Wrong Answers
+            if (gameState.wrongAnswers.length === 0) {
+                reviewList.innerHTML = '<li>No mistakes! Great job! 🌟</li>';
+            } else {
+                reviewList.innerHTML = gameState.wrongAnswers
+                    .map(item => `<li>
+                                    <strong>${item.problem}</strong> = 
+                                    <span class="text-green-500">${item.correct}</span> 
+                                    (You said: <span class="text-red-500">${item.yours}</span>)
+                                 </li>`)
+                    .join('');
+            }
+            
+            // 2. Math Fact (non-repeating)
+            if (gameState.usedMathFacts.length === MATH_FACTS.length) {
+                gameState.usedMathFacts = []; // Reset if all facts are used
+            }
+            
+            let fact;
+            do {
+                fact = MATH_FACTS[Math.floor(Math.random() * MATH_FACTS.length)];
+            } while (gameState.usedMathFacts.includes(fact));
+            
+            gameState.usedMathFacts.push(fact);
+            mathFactDisplay.textContent = fact;
+        }
+
+        // --- 4. Power-Up System ---
+
+        function grantRandomPowerUp() {
+            if (Math.random() < 0.5) {
+                // Grant Freeze Time (lasts 5 seconds)
+                gameState.powerUps.freezeTime += 5;
+                gameMessage.textContent = "Time Freeze (5s) gained! ❄️";
+                createFloatingEmoji('❄️');
+            } else {
+                // Grant Double Points (lasts 3 answers)
+                gameState.powerUps.doublePoints += 3;
+                gameMessage.textContent = "Double Points (3x) gained! ✨";
+                createFloatingEmoji('✨');
+            }
+            updatePowerUpUI();
+        }
+
+        function updatePowerUpUI() {
+            powerupContainer.innerHTML = ''; // Clear existing
+            
+            if (gameState.powerUps.freezeTime > 0) {
+                powerupContainer.innerHTML += `
+                    <div class="p-2 rounded-lg bg-blue-100 text-blue-800 font-bold shadow">
+                        <i class="fas fa-snowflake"></i> Freeze: ${gameState.powerUps.freezeTime}s
+                    </div>
+                `;
+            }
+            if (gameState.powerUps.doublePoints > 0) {
+                powerupContainer.innerHTML += `
+                    <div class="p-2 rounded-lg bg-yellow-100 text-yellow-800 font-bold shadow">
+                        <i class="fas fa-star"></i> 2x Points: ${gameState.powerUps.doublePoints}x
+                    </div>
+                `;
+            }
+        }
+        
+        // Note: Power-ups are passive (auto-used) in this version for simplicity.
+        // 'Freeze Time' is checked in startTimer()
+        // 'Double Points' is checked in checkAnswer()
+
+        // --- 5. Event Listeners & Init ---
+
+        // Start button
+        startBtn.addEventListener('click', startGame);
+        
+        // Play Again button (from modal)
+        playAgainBtn.addEventListener('click', () => {
+            closeModal(gameOverModal);
+            // Wait for modal to close before starting
+            setTimeout(startGame, 300);
+        });
+        
+        // Submit on Enter key
+        answerInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !submitBtn.disabled) {
+                checkAnswer();
+            }
+        });
+        
+        // Submit on button click
+        submitBtn.addEventListener('click', checkAnswer);
+        
+        // Modal close button
+        levelUpCloseBtn.addEventListener('click', () => closeModal(levelUpModal));
+        
+        // Theme selector
+        themeSelect.addEventListener('change', (e) => {
+            updateTheme(e.target.value === 'default' ? '' : e.target.value);
+        });
+
+        // Initial Load
+        window.onload = () => {
+            initAudio();
+            // Load high score from local storage
+            gameState.highScore = parseInt(localStorage.getItem('mathHighScore') || '0');
+            updateUI(); // Set initial high score and rank
+        };
+
+    </script>
+</body>
+</html>

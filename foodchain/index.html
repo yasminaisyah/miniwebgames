@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eco-Builder: Food Web</title>
+    <!-- Load Tailwind CSS --><script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Tone.js for sound effects --><script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <style>
+        /* Use Inter font */
+        body {
+            font-family: 'Inter', sans-serif;
+            user-select: none; /* Prevent text selection */
+            touch-action: none; /* Disable default touch behaviors */
+            /* New Jungle Background for the whole page */
+            background-color: #1a431a; /* Dark jungle green */
+            background-image: radial-gradient(circle, rgba(67, 124, 67, 0.6) 0%, #1a431a 70%);
+        }
+        
+        /* The main biome area - JUNGLE THEME */
+        #biome-area {
+            background-color: #38761d; /* Dark green base */
+            border: 4px dashed #6b9a4f; /* Lighter green border */
+            background-image: 
+                url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path fill="%232b5f16" d="M0,100 L25,75 L50,100 L75,75 L100,100 Z" opacity="0.4"/><path fill="%232b5f16" d="M0,90 L20,70 L40,90 L60,70 L80,90 L100,70 L100,100 L0,100 Z" opacity="0.6"/></svg>'), /* Ground texture */
+                linear-gradient(to top, rgba(56,118,29,0.8) 0%, rgba(56,118,29,0.5) 40%, rgba(135,206,235,0.1) 100%), /* Sky fading into jungle */
+                linear-gradient(to bottom, #4CAF50 0%, #6BA052 100%); /* Green gradient */
+            background-size: 100% 30px, 100% 100%, 100% 100%;
+            background-repeat: repeat-x, no-repeat, no-repeat;
+            background-position: bottom, center, center;
+
+            position: relative; /* For absolutely positioned children like river and detailed scenery */
+            overflow: hidden; /* Keep scenery within bounds */
+            touch-action: none;
+        }
+
+        /* River for jungle theme */
+        #biome-area::before {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 30%; /* Adjust river height */
+            background-color: #61A4DE; /* Blue water */
+            background-image: linear-gradient(to top, rgba(97,164,222,0.8) 0%, rgba(97,164,222,0.3) 100%);
+            border-top: 5px solid #4A90D4;
+            border-radius: 0 0 10px 10px; /* Slight rounding at bottom if biome is rounded */
+            z-index: 6; /* Above static scenery but below draggable organisms */
+            box-shadow: inset 0 5px 10px rgba(0,0,0,0.2);
+        }
+        
+        /* The organisms in the toolbox */
+        .organism-button {
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+            position: relative; /* For the info button */
+            /* Updated style for jungle theme */
+            background-color: rgba(20, 83, 45, 0.4); /* Darker semi-transparent green */
+            border: 1px solid rgba(134, 239, 172, 0.3); /* faint green border */
+        }
+        .organism-button:hover {
+            background-color: rgba(20, 83, 45, 0.7); /* Darker on hover */
+        }
+        .organism-button:active {
+            transform: scale(0.95);
+        }
+
+        /* Style for locked/added buttons */
+        .organism-button.locked {
+            opacity: 0.7;
+            cursor: not-allowed;
+            background-color: rgba(10, 40, 20, 0.4);
+        }
+        .organism-button.locked:hover {
+            background-color: rgba(10, 40, 20, 0.4);
+        }
+        
+        /* New Info Button on Toolbox items */
+        .info-btn {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            background-color: #3b82f6; /* blue-500 */
+            color: white;
+            border-radius: 9999px; /* full */
+            width: 1.5rem; /* w-6 */
+            height: 1.5rem; /* h-6 */
+            font-weight: bold;
+            border: none;
+            cursor: pointer;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .info-btn:hover {
+            background-color: #2563eb; /* blue-600 */
+        }
+
+        /* The draggable organisms in the biome */
+        .organism-in-biome {
+            font-size: 3rem; /* 48px */
+            cursor: grab;
+            position: absolute;
+            transition: transform 0.1s ease-out, box-shadow 0.1s ease-out;
+            z-index: 10; /* Above scenery */
+        }
+        .organism-in-biome.dragging {
+            cursor: grabbing;
+            transform: scale(1.1);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+        
+        /* New Scenery elements - Jungle themed */
+        .scenery {
+            position: absolute;
+            z-index: 5; /* Behind draggable organisms but above background/river */
+            opacity: 0.85;
+            pointer-events: none; /* Click through */
+            filter: drop-shadow(0 2px 2px rgba(0,0,0,0.2));
+        }
+
+        /* Specific styles for jungle scenery elements */
+        .scenery.vine {
+            font-size: 5rem;
+            transform: rotate(20deg);
+        }
+        .scenery.palm {
+            font-size: 7rem;
+        }
+        .scenery.flower {
+            font-size: 3rem;
+        }
+        .scenery.rock {
+            font-size: 3.5rem;
+            opacity: 0.7;
+        }
+        .scenery.bush {
+            font-size: 4rem;
+        }
+
+        /* Feedback modal */
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.4);
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            animation: zoomIn 0.3s;
+        }
+        @keyframes zoomIn {
+            from { transform: scale(0.5); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body class=" min-h-screen flex flex-col items-center justify-center p-4">
+
+    <div class="w-full max-w-5xl mx-auto">
+        <!-- Header --><header class="text-center mb-4">
+            <h1 class="text-4xl font-bold text-white">Eco-Builder: Food Web</h1>
+            <p class="text-lg text-gray-300 mt-2">Build a stable food web by adding organisms to the biome.</p>
+        </header>
+
+        <!-- Level Display --><div class="flex justify-between items-center mb-4">
+            <div id="level-display" class="text-2xl font-bold text-blue-300">
+                Level: <span id="level-number">1</span>
+            </div>
+            <button id="reset-btn" class="px-5 py-2 bg-gray-500 text-white font-semibold rounded-lg shadow-md hover:bg-gray-600 transition-all text-lg">
+                Reset 🔄
+            </button>
+        </div>
+
+        <!-- Game Area --><main class="flex flex-col md:flex-row gap-6">
+            
+            <!-- Toolbox --><aside class="md:w-1/4 w-full bg-green-900/70 backdrop-blur-sm border border-green-600/50 p-4 rounded-lg shadow-lg">
+                <h2 class="text-2xl font-semibold text-center text-white mb-4">Toolbox</h2>
+                <div id="toolbox-container" class="grid grid-cols-3 md:grid-cols-2 gap-4">
+                    <!-- Organism buttons will be injected here by JS --></div>
+            </aside>
+
+            <!-- Biome --><section class="md:w-3/4 w-full">
+                <!-- Message Area --><div id="message-area" class="h-16 bg-green-900/70 backdrop-blur-sm border border-green-600/50 p-3 rounded-lg shadow-inner text-center flex items-center justify-center mb-4">
+                    <p id="message-text" class="text-lg text-gray-200">Select a level to start!</p>
+                </div>
+
+                <!-- Biome "Canvas" --><div id="biome-area" class="w-full h-[500px] rounded-lg shadow-lg relative overflow-hidden">
+                    <!-- Detailed Jungle Scenery --><div class="scenery vine" style="top: 5%; left: 5%;">🌿</div>
+                    <div class="scenery palm" style="top: 15%; right: 10%;">🌴</div>
+                    <div class="scenery flower" style="top: 40%; left: 25%;">🌺</div>
+                    <div class="scenery rock" style="bottom: 10%; left: 15%;">🪨</div>
+                    <div class="scenery bush" style="top: 60%; right: 20%;">🌳</div>
+                    <div class="scenery vine" style="top: 0%; right: 25%; transform: rotate(-10deg);">🌿</div>
+                    <div class="scenery flower" style="bottom: 35%; right: 5%;">🌸</div>
+                    <div class="scenery palm" style="bottom: 25%; left: 50%;">🌴</div>
+
+                    
+                    <!-- Draggable organisms will be added here --></div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Win/Loss Feedback Modal --><div id="feedback-modal" class="modal">
+        <div class="modal-content bg-white w-11/12 max-w-sm p-6 rounded-lg shadow-xl text-center">
+            <h2 id="modal-title" class="text-3xl font-bold mb-4"></h2>
+            <p id="modal-message" class="text-gray-700 mb-6"></p>
+            <button id="modal-close-btn" class="px-6 py-2 rounded-md font-semibold text-white bg-green-500 hover:bg-green-600">
+                Next Level
+            </button>
+        </div>
+    </div>
+    
+    <!-- Organism Info Modal --><div id="info-modal" class="modal">
+        <div class="modal-content bg-white w-11/12 max-w-sm p-6 rounded-lg shadow-xl text-center">
+            <div class="flex justify-between items-center mb-4">
+                <h2 id="info-modal-title" class="text-3xl font-bold">Info</h2>
+                <button id="info-modal-close-btn" class="text-3xl text-gray-400 hover:text-gray-600">&times;</button>
+            </div>
+            <div id="info-modal-body" class="text-left">
+                <!-- Info content injected by JS --></div>
+        </div>
+    </div>
+    
+    <!-- Instructions Modal (shows on start) --><div id="instructions-modal" class="modal" style="display: flex;">
+        <div class="modal-content bg-white w-11/12 max-w-sm p-6 rounded-lg shadow-xl text-center">
+            <h2 class="text-3xl font-bold mb-4">How to Play</h2>
+            <p class="text-gray-700 mb-6">
+                Click an organism in the **Toolbox** to add it to the biome.
+                <br><br>
+                **Locked** 🔒 animals cannot be added until their food is in the biome.
+                <br><br>
+                Click the **ⓘ** button on any organism to learn about it.
+                <br><br>
+                Complete the food web for each level to win!
+            </p>
+            <button id="start-game-btn" class="px-6 py-2 rounded-md font-semibold text-white bg-blue-500 hover:bg-blue-600">
+                Start Game
+            </button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            
+            // --- ORGANISM DEFINITIONS ---
+            // Added Monkey and Jaguar
+            const ORGANISMS = {
+                'grass': { name: 'Grass', emoji: '🌿', type: 'producer', eats: [], eatenBy: ['rabbit', 'deer'] },
+                'berries': { name: 'Berries', emoji: '🍓', type: 'producer', eats: [], eatenBy: ['deer', 'bear', 'monkey'] },
+                'rabbit': { name: 'Rabbit', emoji: '🐰', type: 'herbivore', eats: ['grass'], eatenBy: ['fox', 'wolf', 'bear'] },
+                'deer': { name: 'Deer', emoji: '🦌', type: 'herbivore', eats: ['grass', 'berries'], eatenBy: ['wolf', 'bear', 'jaguar'] },
+                'monkey': { name: 'Monkey', emoji: '🐒', type: 'herbivore', eats: ['berries'], eatenBy: ['jaguar'] },
+                'fox': { name: 'Fox', emoji: '🦊', type: 'carnivore', eats: ['rabbit'], eatenBy: [] },
+                'wolf': { name: 'Wolf', emoji: '🐺', type: 'carnivore', eats: ['rabbit', 'deer'], eatenBy: [] },
+                'bear': { name: 'Bear', emoji: '🐻', type: 'omnivore', eats: ['berries', 'rabbit', 'deer'], eatenBy: [] },
+                'jaguar': { name: 'Jaguar', emoji: '🐆', type: 'carnivore', eats: ['monkey', 'deer'], eatenBy: [] }
+            };
+
+            // --- LEVEL DATA (Expanded to 10 levels) ---
+            const LEVELS = [
+                // Level 1: Simple Chain
+                {
+                    level: 1,
+                    toolbox: ['grass', 'rabbit', 'fox'],
+                    goal: ['grass', 'rabbit', 'fox'],
+                    message: 'Build a simple forest food chain.'
+                },
+                // Level 2: Another Simple Chain
+                {
+                    level: 2,
+                    toolbox: ['grass', 'berries', 'deer'],
+                    goal: ['grass', 'berries', 'deer'],
+                    message: 'Add a different herbivore.'
+                },
+                // Level 3: Branching Chain
+                {
+                    level: 3,
+                    toolbox: ['grass', 'rabbit', 'deer', 'wolf'],
+                    goal: ['grass', 'rabbit', 'deer', 'wolf'],
+                    message: 'A predator with two food sources.'
+                },
+                // Level 4: Introduce Omnivore
+                {
+                    level: 4,
+                    toolbox: ['grass', 'berries', 'rabbit', 'bear'],
+                    goal: ['grass', 'berries', 'rabbit', 'bear'],
+                    message: 'Introduce an omnivore!'
+                },
+                // Level 5: Introduce New Animals
+                {
+                    level: 5,
+                    toolbox: ['berries', 'monkey', 'jaguar'],
+                    goal: ['berries', 'monkey', 'jaguar'],
+                    message: 'Build a chain with the new animals.'
+                },
+                // Level 6: Medium Web
+                {
+                    level: 6,
+                    toolbox: ['grass', 'berries', 'rabbit', 'deer', 'fox', 'wolf'],
+                    goal: ['grass', 'berries', 'rabbit', 'deer', 'fox', 'wolf'],
+                    message: 'Build a more complex food web.'
+                },
+                // Level 7 (Hard): Apex Predators
+                {
+                    level: 7,
+                    toolbox: ['grass', 'berries', 'rabbit', 'deer', 'wolf', 'bear'],
+                    goal: ['wolf', 'bear'], // Goal is just the apex predators
+                    message: 'Build a web that supports two apex predators.'
+                },
+                // Level 8 (Harder): New Animals in Web
+                {
+                    level: 8,
+                    toolbox: ['berries', 'deer', 'monkey', 'jaguar', 'bear'],
+                    goal: ['berries', 'deer', 'monkey', 'jaguar', 'bear'],
+                    message: 'Combine omnivores and new predators.'
+                },
+                // Level 9: Fox & Bear
+                {
+                    level: 9,
+                    toolbox: ['grass', 'berries', 'rabbit', 'fox', 'bear'],
+                    goal: ['fox', 'bear'],
+                    message: 'Build a web that supports the Fox and Bear.'
+                },
+                // Level 10 (Master): The Full Ecosystem
+                {
+                    level: 10,
+                    toolbox: ['grass', 'berries', 'rabbit', 'deer', 'monkey', 'fox', 'wolf', 'bear', 'jaguar'],
+                    goal: ['grass', 'berries', 'rabbit', 'deer', 'monkey', 'fox', 'wolf', 'bear', 'jaguar'],
+                    message: 'Complete the entire ecosystem!'
+                }
+            ];
+
+            // --- GAME STATE ---
+            let currentLevelIndex = 0;
+            let biomeContents = []; // Array of organism keys (e.g., ['grass', 'rabbit'])
+            let organismIdCounter = 0;
+            let currentLevelData = null; // NEW: Will hold data for the current level
+            let endlessLevelCounter = 0; // NEW: 0 = campaign, 1+ = endless mode
+            
+            // --- DRAG STATE ---
+            let draggedElement = null;
+            let offsetX, offsetY;
+            
+            // --- SOUND EFFECTS ---
+            let synth = null;
+            
+            // NEW: Shuffle function for randomizing endless levels
+            function shuffle(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+                return array;
+            }
+
+            function initializeAudio() {
+                if (!synth) {
+                    synth = new Tone.Synth().toDestination();
+                }
+            }
+            
+            function playAddSound() {
+                if (!synth) return;
+                synth.triggerAttackRelease("C4", "8n", Tone.now());
+            }
+            
+            function playErrorSound() {
+                if (!synth) return;
+                synth.triggerAttackRelease("E3", "8n", Tone.now());
+            }
+            
+            function playWinSound() {
+                if (!synth) return;
+                const now = Tone.now();
+                synth.triggerAttackRelease("C5", "8n", now);
+                synth.triggerAttackRelease("E5", "8n", now + 0.2);
+                synth.triggerAttackRelease("G5", "8n", now + 0.4);
+            }
+
+            // NEW: Generates a level for Endless Mode
+            function generateEndlessLevelData() {
+                const apexPredators = ['fox', 'wolf', 'bear', 'jaguar'];
+                // Difficulty increases every 2 levels, maxing at 4 predators
+                const numToPick = Math.min(1 + Math.floor(endlessLevelCounter / 2), 4);
+                
+                const pickedApex = shuffle([...apexPredators]).slice(0, numToPick);
+                
+                const toolboxSet = new Set(pickedApex);
+                const processed = new Set();
+
+                // Recursive function to build the food chain downwards
+                function addFoodChainFor(orgKey) {
+                    if (processed.has(orgKey)) return;
+                    processed.add(orgKey);
+                    
+                    const org = ORGANISMS[orgKey];
+                    if (org.type === 'producer') return;
+
+                    org.eats.forEach(foodKey => {
+                        toolboxSet.add(foodKey);
+                        addFoodChainFor(foodKey);
+                    });
+                }
+
+                pickedApex.forEach(key => addFoodChainFor(key));
+
+                const toolbox = Array.from(toolboxSet);
+                return {
+                    level: `Endless ${endlessLevelCounter}`,
+                    toolbox: toolbox,
+                    goal: toolbox, // Goal is to add everything
+                    message: "Build the complete food web!"
+                };
+            }
+
+            // --- DOM ELEMENTS ---
+            const levelNumberEl = document.getElementById('level-number');
+            const toolboxContainer = document.getElementById('toolbox-container');
+            const biomeArea = document.getElementById('biome-area');
+            const messageText = document.getElementById('message-text');
+            const resetBtn = document.getElementById('reset-btn');
+            
+            const instructionsModal = document.getElementById('instructions-modal');
+            const startGameBtn = document.getElementById('start-game-btn');
+            
+            const winModal = document.getElementById('feedback-modal');
+            const winModalTitle = document.getElementById('modal-title');
+            const winModalMessage = document.getElementById('modal-message');
+            const winModalCloseBtn = document.getElementById('modal-close-btn');
+            
+            const infoModal = document.getElementById('info-modal');
+            const infoModalTitle = document.getElementById('info-modal-title');
+            const infoModalBody = document.getElementById('info-modal-body');
+            const infoModalCloseBtn = document.getElementById('info-modal-close-btn');
+            
+            // --- GAME LOGIC ---
+
+            function loadLevel(levelIndex) {
+                currentLevelIndex = levelIndex;
+                endlessLevelCounter = 0; // Not in endless mode
+                const levelData = LEVELS[levelIndex];
+                levelNumberEl.textContent = levelData.level;
+                setupLevel(levelData);
+            }
+
+            // NEW: Loads an endless level
+            function loadEndlessLevel() {
+                levelNumberEl.textContent = `Endless ${endlessLevelCounter}`;
+                const levelData = generateEndlessLevelData();
+                setupLevel(levelData);
+            }
+
+            // NEW: Generic function to set up any level
+            function setupLevel(levelData) {
+                currentLevelData = levelData; // Store current level data
+                biomeContents = [];
+                organismIdCounter = 0;
+                
+                // Clear biome (but not scenery)
+                biomeArea.querySelectorAll('.organism-in-biome').forEach(el => el.remove());
+                
+                updateToolbox(); // Load toolbox based on new logic
+                
+                showMessage('info', currentLevelData.message);
+            }
+            
+            // --- NEW: Function to render the toolbox based on game state ---
+            function updateToolbox() {
+                if (!currentLevelData) return; // Guard clause
+                
+                toolboxContainer.innerHTML = '';
+                const levelToolbox = currentLevelData.toolbox;
+
+                levelToolbox.forEach(orgKey => {
+                    const org = ORGANISMS[orgKey];
+                    const button = document.createElement('div');
+                    button.className = 'organism-button p-4 rounded-lg shadow flex flex-col items-center';
+
+                    let isUnlocked = false;
+                    // Producers are always unlocked (unless already "added", but we allow multiple)
+                    if (org.type === 'producer') {
+                        isUnlocked = true;
+                    } else {
+                        // Consumers are unlocked if *any* of their food is in the biome
+                        isUnlocked = org.eats.some(food => biomeContents.includes(food));
+                    }
+
+                    // Only non-producers can be "added" (greyed out)
+                    const isAdded = biomeContents.includes(orgKey) && org.type !== 'producer';
+
+                    let overlay = '';
+                    if (isAdded) {
+                        isUnlocked = false; // Can't add again
+                        overlay = '<div class="absolute inset-0 flex items-center justify-center text-white text-4xl bg-black/50 rounded-lg">✓</div>';
+                    } else if (!isUnlocked) {
+                        overlay = '<div class="absolute inset-0 flex items-center justify-center text-white text-4xl bg-black/50 rounded-lg">🔒</div>';
+                    }
+
+                    button.innerHTML = `
+                        <button class="info-btn">ⓘ</button>
+                        <span class="text-4xl">${org.emoji}</span>
+                        <span class="text-md font-semibold text-gray-200">${org.name}</span>
+                        ${overlay}
+                    `;
+
+                    if (isUnlocked) {
+                        button.addEventListener('click', () => addOrganismToBiome(orgKey));
+                    } else {
+                        button.classList.add('locked'); // Use .locked class
+                    }
+
+                    // Info button is always clickable
+                    const infoBtn = button.querySelector('.info-btn');
+                    infoBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        showInfoModal(orgKey);
+                    });
+                    
+                    toolboxContainer.appendChild(button);
+                });
+            }
+            
+            function addOrganismToBiome(orgKey) {
+                const org = ORGANISMS[orgKey];
+                
+                // Add to biome contents array
+                if (!biomeContents.includes(orgKey)) {
+                    biomeContents.push(orgKey);
+                }
+                
+                // Add to biome visual area
+                createDraggableOrganism(org);
+                showMessage('success', `${org.name} added to the biome!`);
+                playAddSound();
+                
+                // Update toolbox to show new state (locks/unlocks)
+                updateToolbox(); 
+                
+                // Check for win
+                checkWinCondition();
+            }
+            
+            function createDraggableOrganism(org) {
+                const el = document.createElement('div');
+                el.id = `org-${organismIdCounter++}`;
+                el.className = 'organism-in-biome';
+                el.textContent = org.emoji;
+                
+                // Place randomly within the biome
+                const biomeRect = biomeArea.getBoundingClientRect();
+                const x = Math.random() * (biomeRect.width - 60) + 10; // 60 is el width, 10 is padding
+                const y = Math.random() * (biomeRect.height - 60) + 10;
+                el.style.left = `${x}px`;
+                el.style.top = `${y}px`;
+                
+                // Add drag listeners
+                el.addEventListener('mousedown', onDragStart);
+                el.addEventListener('touchstart', onDragStart, { passive: false });
+                
+                biomeArea.appendChild(el);
+            }
+            
+            function checkWinCondition() {
+                if (!currentLevelData) return;
+                const allGoalsMet = currentLevelData.goal.every(orgKey => biomeContents.includes(orgKey));
+                
+                if (allGoalsMet) {
+                    // Show Win Modal after a short delay
+                    setTimeout(showWinModal, 500);
+                }
+            }
+            
+            function showWinModal() {
+                playWinSound();
+                if (endlessLevelCounter > 0) {
+                    // In Endless Mode
+                    winModalTitle.textContent = `Endless Level ${endlessLevelCounter} Complete!`;
+                    winModalMessage.textContent = 'Great job! The ecosystem is stable!';
+                    winModalCloseBtn.textContent = 'Next Challenge';
+
+                } else if (currentLevelIndex === LEVELS.length - 1) {
+                    // Last level of campaign
+                    winModalTitle.textContent = 'All Levels Complete!';
+                    winModalMessage.textContent = "You're a master ecologist! Ready for a real challenge?";
+                    winModalCloseBtn.textContent = 'Start Endless Mode!';
+                } else {
+                    // Normal campaign level
+                    winModalTitle.textContent = `Level ${currentLevelIndex + 1} Complete!`;
+                    winModalMessage.textContent = 'Great job! You built a stable food web!';
+                    winModalCloseBtn.textContent = 'Next Level';
+                }
+                winModal.style.display = 'flex';
+            }
+            
+            function nextLevel() {
+                winModal.style.display = 'none';
+                
+                if (endlessLevelCounter > 0) {
+                    // Already in endless mode
+                    endlessLevelCounter++;
+                    loadEndlessLevel();
+                } else if (currentLevelIndex === LEVELS.length - 1) {
+                    // Transitioning from campaign to endless
+                    endlessLevelCounter = 1;
+                    loadEndlessLevel();
+                } else {
+                    // Still in campaign
+                    currentLevelIndex++;
+                    loadLevel(currentLevelIndex);
+                }
+            }
+
+            // New function to show the info modal
+            function showInfoModal(orgKey) {
+                const org = ORGANISMS[orgKey];
+                
+                // Title
+                infoModalTitle.innerHTML = `<span class="text-4xl mr-2">${org.emoji}</span>${org.name}`;
+                
+                // Body
+                const eatsList = org.eats.length > 0 
+                    ? org.eats.map(key => `${ORGANISMS[key].emoji} ${ORGANISMS[key].name}`).join('<br>')
+                    : 'Nothing (it\'s a producer)';
+                    
+                const eatenByList = org.eatenBy.length > 0
+                    ? org.eatenBy.map(key => `${ORGANISMS[key].emoji} ${ORGANISMS[key].name}`).join('<br>')
+                    : 'Nothing (it\'s an apex predator)';
+
+                infoModalBody.innerHTML = `
+                    <p class="mb-4"><strong class="text-blue-600">Type:</strong> <span class="capitalize">${org.type}</span></p>
+                    <div class="mb-4">
+                        <strong class="text-green-600">Eats:</strong>
+                        <div class="pl-4 mt-2">${eatsList}</div>
+                    </div>
+                    <div>
+                        <strong class="text-red-600">Eaten By:</strong>
+                        <div class="pl-4 mt-2">${eatenByList}</div>
+                    </div>
+                `;
+                
+                infoModal.style.display = 'flex';
+            }
+
+            function showMessage(type, message) {
+                messageText.textContent = message;
+                const area = messageText.parentElement;
+                area.classList.remove('bg-red-100', 'text-red-900', 'bg-yellow-100', 'text-yellow-900', 'bg-green-100', 'text-green-900', 'bg-green-900/70');
+                messageText.classList.remove('text-red-700', 'text-yellow-700', 'text-green-700', 'text-gray-200');
+
+                
+                if (type === 'error') {
+                    area.classList.add('bg-red-100');
+                    messageText.classList.add('text-red-700');
+                    playErrorSound(); // Play error sound on message
+                } else if (type === 'warn') {
+                    area.classList.add('bg-yellow-100');
+                    messageText.classList.add('text-yellow-700');
+                } else if (type === 'success') {
+                    area.classList.add('bg-green-100');
+                    messageText.classList.add('text-green-700');
+                } else {
+                    area.classList.add('bg-green-900/70');
+                    messageText.classList.add('text-gray-200');
+                }
+            }
+
+            // --- DRAG AND DROP HANDLERS ---
+            
+            function onDragStart(e) {
+                draggedElement = e.target;
+                draggedElement.classList.add('dragging');
+                
+                const biomeRect = biomeArea.getBoundingClientRect();
+                
+                let clientX, clientY;
+                if (e.type === 'touchstart') {
+                    clientX = e.touches[0].clientX;
+                    clientY = e.touches[0].clientY;
+                } else {
+                    e.preventDefault(); // Prevent default browser drag
+                    clientX = e.clientX;
+                    clientY = e.clientY;
+                }
+                
+                // Calculate offset from top-left of the element
+                const rect = draggedElement.getBoundingClientRect();
+                offsetX = clientX - rect.left;
+                offsetY = clientY - rect.top;
+                
+                // Recalculate offset relative to the biome area's padding-box
+                offsetX += biomeRect.left;
+                offsetY += biomeRect.top;
+                
+                document.addEventListener('mousemove', onDragMove);
+                document.addEventListener('mouseup', onDragEnd);
+                document.addEventListener('touchmove', onDragMove, { passive: false });
+                document.addEventListener('touchend', onDragEnd);
+            }
+            
+            function onDragMove(e) {
+                if (!draggedElement) return;
+                
+                e.preventDefault(); // Prevent scrolling
+                
+                let clientX, clientY;
+                if (e.type === 'touchmove') {
+                    clientX = e.touches[0].clientX;
+                    clientY = e.touches[0].clientY;
+                } else {
+                    clientX = e.clientX;
+                    clientY = e.clientY;
+                }
+
+                const biomeRect = biomeArea.getBoundingClientRect();
+                
+                let newX = clientX - offsetX;
+                let newY = (e.type === 'touchmove' ? e.touches[0].clientY : e.clientY) - offsetY;
+                
+                // Constrain to biome boundaries
+                newX = Math.max(0, Math.min(newX, biomeRect.width - draggedElement.offsetWidth));
+                newY = Math.max(0, Math.min(newY, biomeRect.height - draggedElement.offsetHeight));
+                
+                draggedElement.style.left = `${newX}px`;
+                draggedElement.style.top = `${newY}px`;
+            }
+            
+            function onDragEnd() {
+                if (!draggedElement) return;
+                
+                draggedElement.classList.remove('dragging');
+                draggedElement = null;
+                
+                document.removeEventListener('mousemove', onDragMove);
+                document.removeEventListener('mouseup', onDragEnd);
+                document.removeEventListener('touchmove', onDragMove);
+                document.removeEventListener('touchend', onDragEnd);
+            }
+            
+            // Prevent scrolling on biome area on mobile
+            biomeArea.addEventListener('touchmove', e => {
+                if (draggedElement) {
+                     e.preventDefault();
+                }
+            }, { passive: false });
+
+            // --- EVENT LISTENERS ---
+            resetBtn.addEventListener('click', () => {
+                if (endlessLevelCounter > 0) {
+                    loadEndlessLevel(); // Reset the current endless level
+                } else {
+                    loadLevel(currentLevelIndex); // Reset the current campaign level
+                }
+            });
+            
+            startGameBtn.addEventListener('click', async () => {
+                // Start audio context on user interaction
+                await Tone.start();
+                initializeAudio();
+                console.log("Audio context started");
+                
+                instructionsModal.style.display = 'none';
+                loadLevel(0); // Load first level
+            });
+            
+            winModalCloseBtn.addEventListener('click', nextLevel);
+            
+            infoModalCloseBtn.addEventListener('click', () => {
+                infoModal.style.display = 'none';
+            });
+
+            // --- START THE GAME ---
+            // Game starts when user clicks "Start Game" on instructions
+        });
+    </script>
+</body>
+</html>

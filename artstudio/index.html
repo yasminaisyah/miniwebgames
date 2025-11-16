@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chroma's Infinite Art Studio</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #FFF5E1;
+            --panel-color: #ffffff;
+            --accent-color: #FF6B6B;
+            --text-color: #2d3436;
+        }
+
+        body {
+            font-family: 'Fredoka', sans-serif;
+            background-color: var(--bg-color);
+            background-image: radial-gradient(#ffe0b2 15%, transparent 16%), radial-gradient(#ffe0b2 15%, transparent 16%);
+            background-size: 60px 60px;
+            background-position: 0 0, 30px 30px;
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            overflow-x: hidden;
+            user-select: none;
+        }
+
+        /* HEADER */
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+            animation: float 6s ease-in-out infinite;
+        }
+
+        h1 {
+            color: #FF6B6B;
+            font-size: 3em;
+            margin: 0;
+            text-shadow: 3px 3px 0px #ffeaa7;
+        }
+
+        .stats-bar {
+            background: white;
+            padding: 10px 30px;
+            border-radius: 50px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+            display: inline-flex;
+            gap: 30px;
+            font-size: 1.2em;
+            font-weight: 600;
+            margin-top: 10px;
+            border: 2px solid #eee;
+        }
+
+        /* MAIN GAME AREA */
+        .game-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 30px;
+            justify-content: center;
+            max-width: 900px;
+            width: 100%;
+            position: relative;
+            z-index: 2;
+        }
+
+        .panel {
+            background: var(--panel-color);
+            border-radius: 30px;
+            padding: 25px;
+            box-shadow: 0 15px 35px rgba(139, 69, 19, 0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 280px;
+            flex: 1;
+            border-bottom: 8px solid #eee;
+            transition: transform 0.3s;
+        }
+
+        .panel:hover {
+            transform: translateY(-5px);
+        }
+
+        h3 { margin: 0 0 15px 0; color: #b2bec3; text-transform: uppercase; letter-spacing: 2px; font-size: 0.9em; }
+
+        .color-circle {
+            width: 160px;
+            height: 160px;
+            border-radius: 50%;
+            border: 8px solid #f0f0f0;
+            box-shadow: inset 0 0 40px rgba(0,0,0,0.15);
+            margin-bottom: 15px;
+            transition: background-color 0.2s ease-out, transform 0.2s;
+            position: relative;
+        }
+        
+        .color-circle::after {
+            content: '';
+            position: absolute;
+            top: 20px; left: 20px;
+            width: 40px; height: 20px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.4);
+            transform: rotate(-45deg);
+        }
+
+        .bounce { animation: bounce 0.3s; }
+
+        @keyframes bounce {
+            0% { transform: scale(1); }
+            50% { transform: scale(0.85); }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+
+        .target-label { font-size: 1.8em; font-weight: 700; color: #636e72; }
+
+        /* CONTROLS */
+        .controls-area {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+            justify-content: center;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 20px;
+        }
+
+        .paint-tube {
+            width: 50px;
+            height: 90px;
+            border: none;
+            border-radius: 5px 5px 25px 25px;
+            cursor: pointer;
+            position: relative;
+            transition: transform 0.1s, height 0.1s;
+            box-shadow: 0 6px 0 rgba(0,0,0,0.2);
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            padding-bottom: 10px;
+            font-weight: bold;
+            color: rgba(0,0,0,0.3);
+            font-size: 0.8em;
+        }
+
+        .paint-tube::before {
+            content: '';
+            position: absolute;
+            top: -12px; left: 10%;
+            width: 80%; height: 12px;
+            background: #555; /* Cap */
+            border-radius: 4px 4px 0 0;
+        }
+
+        .paint-tube:active {
+            transform: translateY(6px);
+            box-shadow: none;
+            height: 84px;
+        }
+
+        .tube-red { background: #ff4757; }
+        .tube-yellow { background: #ffa502; }
+        .tube-blue { background: #1e90ff; }
+        .tube-white { background: #ffffff; border: 1px solid #dfe6e9; }
+        .tube-black { background: #2f3542; color: white; }
+
+        /* ACTIONS */
+        .actions {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            margin-top: 25px;
+        }
+
+        .btn-action {
+            padding: 12px 25px;
+            font-family: 'Fredoka', sans-serif;
+            font-size: 1.1em;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.1s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-reset {
+            background-color: #ff7675;
+            color: white;
+            box-shadow: 0 5px 0 #d63031;
+        }
+
+        .btn-check {
+            background-color: #55efc4;
+            color: #00b894;
+            color: #2d3436;
+            box-shadow: 0 5px 0 #00b894;
+            flex-grow: 1;
+            margin-left: 20px;
+        }
+
+        .btn-action:active { transform: translateY(5px); box-shadow: none; }
+
+        /* FEEDBACK AREA */
+        #feedback-container {
+            height: 60px;
+            margin-top: 20px;
+            text-align: center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .msg { font-size: 1.4em; font-weight: bold; }
+        .msg-bad { color: #d63031; animation: shake 0.5s; }
+        .msg-good { color: #00b894; font-size: 1.6em; }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+
+        /* CONFETTI CANVAS */
+        #confetti-canvas {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 99;
+        }
+        
+        /* MUTE BUTTON */
+        #mute-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: white;
+            border: 2px solid #eee;
+            border-radius: 50%;
+            width: 40px; height: 40px;
+            cursor: pointer;
+            font-size: 1.2em;
+            z-index: 100;
+        }
+
+    </style>
+</head>
+<body>
+
+    <button id="mute-btn" onclick="toggleMute()">🔊</button>
+
+    <header>
+        <h1>🎨 Chroma's Studio</h1>
+        <div class="stats-bar">
+            <span>Level: <span id="level-val">1</span></span>
+            <span>Score: <span id="score-val">0</span></span>
+        </div>
+    </header>
+
+    <div class="game-container">
+        <div class="panel">
+            <h3>Client Order</h3>
+            <div class="color-circle" id="target-circle"></div>
+            <div class="target-label" id="target-name">Loading...</div>
+            <p style="color: #aaa; margin-top:5px; font-size: 0.9em;">Match this color!</p>
+        </div>
+
+        <div class="panel">
+            <h3>Your Canvas</h3>
+            <div class="color-circle" id="mix-circle" style="background-color: white;"></div>
+            
+            <div class="controls-area">
+                <button class="paint-tube tube-red" onclick="addPaint('red')">R</button>
+                <button class="paint-tube tube-yellow" onclick="addPaint('yellow')">Y</button>
+                <button class="paint-tube tube-blue" onclick="addPaint('blue')">B</button>
+                <button class="paint-tube tube-white" onclick="addPaint('white')">W</button>
+                <button class="paint-tube tube-black" onclick="addPaint('black')">Bk</button>
+            </div>
+            
+            <div class="actions">
+                <button class="btn-action btn-reset" onclick="resetMix()">Clear 🗑️</button>
+                <button class="btn-action btn-check" onclick="checkResult()">Deliver! 🚚</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="feedback-container"></div>
+    <canvas id="confetti-canvas"></canvas>
+
+    <script>
+        // --- AUDIO ENGINE (Synthesizer) ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = new AudioContext();
+        let isMuted = false;
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            document.getElementById('mute-btn').innerText = isMuted ? "🔇" : "🔊";
+        }
+
+        function playSound(type) {
+            if (isMuted) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume(); // Browser policy requirement
+
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'drop') {
+                // Liquid "Bloop" sound
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, now);
+                osc.frequency.exponentialRampToValueAtTime(300, now + 0.1);
+                gainNode.gain.setValueAtTime(0.3, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } 
+            else if (type === 'clear') {
+                // Whoosh sound
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(100, now);
+                osc.frequency.linearRampToValueAtTime(300, now + 0.2);
+                gainNode.gain.setValueAtTime(0.2, now);
+                gainNode.gain.linearRampToValueAtTime(0.01, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            }
+            else if (type === 'win') {
+                // Major Arpeggio (C - E - G)
+                playNote(523.25, now, 0.1); // C5
+                playNote(659.25, now + 0.1, 0.1); // E5
+                playNote(783.99, now + 0.2, 0.3); // G5
+            }
+            else if (type === 'error') {
+                // Buzzer
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.linearRampToValueAtTime(100, now + 0.3);
+                gainNode.gain.setValueAtTime(0.1, now);
+                gainNode.gain.linearRampToValueAtTime(0.01, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            }
+        }
+
+        // Helper for chords
+        function playNote(freq, time, duration) {
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            
+            gainNode.gain.setValueAtTime(0.1, time);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, time + duration);
+            
+            osc.start(time);
+            osc.stop(time + duration);
+        }
+
+
+        // --- GAME DATA ---
+        const masterColorList = [
+            { name: "Orange", r: 255, g: 140, b: 0 },
+            { name: "Green", r: 0, g: 160, b: 0 },
+            { name: "Purple", r: 128, g: 0, b: 128 },
+            { name: "Pink", r: 255, g: 182, b: 193 },
+            { name: "Sky Blue", r: 135, g: 206, b: 235 },
+            { name: "Grey", r: 128, g: 128, b: 128 },
+            { name: "Lime", r: 160, g: 210, b: 50 },
+            { name: "Turquoise", r: 64, g: 224, b: 208 },
+            { name: "Brown", r: 139, g: 69, b: 19 },
+            { name: "Maroon", r: 128, g: 0, b: 0 },
+            { name: "Navy", r: 0, g: 0, b: 128 },
+            { name: "Olive", r: 128, g: 128, b: 0 },
+            { name: "Coral", r: 255, g: 127, b: 80 },
+            { name: "Lavender", r: 230, g: 230, b: 250 },
+            { name: "Mint", r: 152, g: 255, b: 152 },
+            { name: "Peach", r: 255, g: 218, b: 185 },
+            { name: "Teal", r: 0, g: 128, b: 128 },
+            { name: "Cream", r: 255, g: 253, b: 208 },
+            { name: "Dark Green", r: 0, g: 100, b: 0 },
+            { name: "Hot Pink", r: 255, g: 105, b: 180 },
+            { name: "Mustard", r: 255, g: 219, b: 88 },
+            { name: "Indigo", r: 75, g: 0, b: 130 }
+        ];
+
+        const paints = {
+            red:    { r: 255, g: 0, b: 0 },
+            yellow: { r: 255, g: 240, b: 0 },
+            blue:   { r: 0, g: 0, b: 255 },
+            white:  { r: 255, g: 255, b: 255 },
+            black:  { r: 30, g: 30, b: 30 }
+        };
+
+        let level = 1;
+        let score = 0;
+        let drops = [];
+        let currentMix = { r: 255, g: 255, b: 255 };
+        let target = {};
+        let availableColors = [];
+
+        function initGame() {
+            refillBag();
+            nextLevel();
+            animateLoop(); 
+        }
+
+        function refillBag() {
+            availableColors = [...masterColorList];
+        }
+
+        function nextLevel() {
+            if (availableColors.length === 0) refillBag();
+            const randomIndex = Math.floor(Math.random() * availableColors.length);
+            target = availableColors.splice(randomIndex, 1)[0];
+
+            document.getElementById('level-val').innerText = level;
+            document.getElementById('target-name').innerText = target.name;
+            document.getElementById('target-circle').style.backgroundColor = `rgb(${target.r},${target.g},${target.b})`;
+            
+            resetMix();
+            clearFeedback();
+        }
+
+        function addPaint(color) {
+            playSound('drop'); // AUDIO TRIGGER
+            drops.push(paints[color]);
+            calculateMix();
+            
+            const circle = document.getElementById('mix-circle');
+            circle.classList.remove('bounce');
+            void circle.offsetWidth;
+            circle.classList.add('bounce');
+        }
+
+        function resetMix() {
+            if (drops.length > 0) playSound('clear'); // AUDIO TRIGGER if not already empty
+            drops = [];
+            currentMix = { r: 255, g: 255, b: 255 };
+            document.getElementById('mix-circle').style.backgroundColor = 'white';
+        }
+
+        function calculateMix() {
+            if (drops.length === 0) return;
+
+            let totalR = 255 * 2, totalG = 255 * 2, totalB = 255 * 2;
+            let count = 2;
+
+            drops.forEach(d => {
+                totalR += d.r;
+                totalG += d.g;
+                totalB += d.b;
+                count++;
+            });
+
+            let avgR = Math.floor(totalR / count);
+            let avgG = Math.floor(totalG / count);
+            let avgB = Math.floor(totalB / count);
+
+            let hasYellow = drops.includes(paints.yellow);
+            let hasBlue = drops.includes(paints.blue);
+            let hasRed = drops.includes(paints.red);
+
+            if (hasYellow && hasBlue && !hasRed) {
+                avgR = Math.max(0, avgR - 60);
+                avgG = Math.min(255, avgG + 60);
+                avgB = Math.max(0, avgB - 60);
+            }
+            
+            if (drops.length > 5) {
+                avgR -= 5; avgG -= 5; avgB -= 5;
+            }
+
+            currentMix = { r: avgR, g: avgG, b: avgB };
+            document.getElementById('mix-circle').style.backgroundColor = `rgb(${currentMix.r},${currentMix.g},${currentMix.b})`;
+        }
+
+        function checkResult() {
+            let dist = Math.sqrt(
+                Math.pow(currentMix.r - target.r, 2) +
+                Math.pow(currentMix.g - target.g, 2) +
+                Math.pow(currentMix.b - target.b, 2)
+            );
+
+            let tolerance = Math.max(50, 85 - (level * 0.5));
+
+            if (dist < tolerance) {
+                playSound('win'); // AUDIO TRIGGER
+                score += 100 + (drops.length * 5); 
+                document.getElementById('score-val').innerText = score;
+                level++;
+                showFeedback("Perfect! 🎨", true);
+                triggerConfetti();
+                
+                setTimeout(() => {
+                    nextLevel();
+                }, 1500);
+            } else {
+                playSound('error'); // AUDIO TRIGGER
+                let hint = "";
+                if (currentMix.r > target.r + 40) hint = "Too Red!";
+                else if (currentMix.b > target.b + 40) hint = "Too Blue!";
+                else if (currentMix.g > target.g + 40) hint = "Too Green/Yellow!";
+                else if ((currentMix.r + currentMix.g + currentMix.b) > (target.r + target.g + target.b + 60)) hint = "Too Light! Add darker colors.";
+                else if ((currentMix.r + currentMix.g + currentMix.b) < (target.r + target.g + target.b - 60)) hint = "Too Dark! Add White.";
+                else hint = "Not quite... Reset and try again!";
+                
+                showFeedback(hint, false);
+            }
+        }
+
+        function showFeedback(text, isGood) {
+            const container = document.getElementById('feedback-container');
+            container.innerHTML = `<div class="msg ${isGood ? 'msg-good' : 'msg-bad'}">${text}</div>`;
+        }
+
+        function clearFeedback() {
+            document.getElementById('feedback-container').innerHTML = '';
+        }
+
+        // --- CONFETTI SYSTEM ---
+        const canvas = document.getElementById("confetti-canvas");
+        const ctx = canvas.getContext("2d");
+        let particles = [];
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function triggerConfetti() {
+            for (let i = 0; i < 100; i++) {
+                particles.push({
+                    x: window.innerWidth / 2,
+                    y: window.innerHeight / 2,
+                    vx: (Math.random() - 0.5) * 20,
+                    vy: (Math.random() - 0.5) * 20,
+                    color: `hsl(${Math.random() * 360}, 100%, 50%)`,
+                    size: Math.random() * 10 + 5,
+                    life: 100
+                });
+            }
+        }
+
+        function animateLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            for (let i = 0; i < particles.length; i++) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.5; 
+                p.life--;
+                
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x, p.y, p.size, p.size);
+                
+                if (p.life <= 0) {
+                    particles.splice(i, 1);
+                    i--;
+                }
+            }
+            requestAnimationFrame(animateLoop);
+        }
+
+        // Init
+        initGame();
+
+        // Browser Audio Policy Hack
+        // AudioContext cannot start until user interacts with the page.
+        // We add a listener to the first click anywhere to ensure audio is ready.
+        document.body.addEventListener('click', function() {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }, { once: true });
+
+    </script>
+</body>
+</html>

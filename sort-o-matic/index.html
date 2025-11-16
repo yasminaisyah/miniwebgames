@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sort-O-Matic: Ultimate Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #2d3436;
+            --belt-color: #636e72;
+            --accent: #fab1a0;
+            --bin-left: #0984e3;
+            --bin-right: #d63031;
+            --text-color: #dfe6e9;
+        }
+
+        body {
+            font-family: 'Chakra Petch', sans-serif;
+            background-color: var(--bg-color);
+            /* Industrial striped background */
+            background-image: repeating-linear-gradient(
+                45deg,
+                #2d3436,
+                #2d3436 20px,
+                #353b48 20px,
+                #353b48 40px
+            );
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh; /* Allow growing */
+            margin: 0;
+            /* FIXED: Removed overflow:hidden to allow scrolling */
+            overflow-y: auto; 
+            user-select: none;
+            transition: background-color 0.5s;
+            padding-bottom: 50px; /* Space for scrolling */
+        }
+
+        /* PANIC MODE STYLE */
+        body.panic {
+            background-image: repeating-linear-gradient(
+                45deg,
+                #4a0000,
+                #4a0000 20px,
+                #2d0000 20px,
+                #2d0000 40px
+            );
+        }
+
+        /* HUD - NOW STICKY */
+        header {
+            width: 100%;
+            padding: 15px 20px;
+            background: rgba(0,0,0,0.9); /* Darker bg for readability */
+            display: flex;
+            justify-content: center; /* Center the stats */
+            gap: 40px;
+            align-items: center;
+            border-bottom: 4px solid #555;
+            z-index: 100; /* Above everything */
+            box-sizing: border-box;
+            
+            /* FIXED: Sticky positioning */
+            position: sticky;
+            top: 0;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.5);
+        }
+        
+        .stat-group { display: flex; gap: 40px; }
+        .stat-box { 
+            text-align: center; 
+            background: #222;
+            padding: 5px 15px;
+            border-radius: 10px;
+            border: 1px solid #444;
+        }
+        .label { font-size: 0.7em; color: #b2bec3; display: block; letter-spacing: 1px; margin-bottom: 2px;}
+        .val { color: var(--accent); font-size: 1.5em; font-weight: 900; font-family: monospace;}
+        
+        /* Highlighting the score */
+        #score { color: #ffd700; text-shadow: 0 0 10px rgba(255, 215, 0, 0.5); }
+
+        /* GAME AREA */
+        #factory-floor {
+            position: relative;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            max-width: 900px;
+            margin-top: 20px;
+        }
+
+        /* CATEGORY SIGNS */
+        .signs-container {
+            display: flex;
+            justify-content: space-between;
+            width: 90%;
+            margin-bottom: 10px;
+        }
+        .sign {
+            background: #f1c40f;
+            color: #2d3436;
+            padding: 15px 10px;
+            border-radius: 12px;
+            font-size: 1.4em;
+            font-weight: 900;
+            border: 5px solid rgba(0,0,0,0.2);
+            box-shadow: 0 10px 0 rgba(0,0,0,0.3);
+            width: 45%;
+            text-align: center;
+            position: relative;
+            transition: transform 0.2s;
+            text-transform: uppercase;
+        }
+        .sign-left { background: var(--bin-left); color: white; }
+        .sign-right { background: var(--bin-right); color: white; }
+
+        /* CONVEYOR BELT */
+        .conveyor-wrapper {
+            position: relative;
+            width: 100%;
+            height: 220px; 
+            background: #111;
+            border-top: 8px solid #555;
+            border-bottom: 8px solid #555;
+            display: flex;
+            align-items: center;
+            overflow: hidden;
+            margin: 20px 0;
+            box-shadow: inset 0 0 50px black;
+        }
+        
+        .conveyor-belt {
+            position: absolute;
+            top: 0; left: 0;
+            width: 200%;
+            height: 100%;
+            background-image: linear-gradient(90deg, transparent 50%, rgba(255,255,255,0.1) 50%);
+            background-size: 100px 100%;
+            animation: scrollBelt 0.5s linear infinite;
+        }
+
+        @keyframes scrollBelt {
+            from { background-position: 0 0; }
+            to { background-position: -100px 0; }
+        }
+
+        /* THE ITEM */
+        #active-item {
+            position: absolute;
+            left: -20%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 180px;
+        }
+
+        .emoji-display {
+            font-size: 6em; 
+            filter: drop-shadow(0 10px 10px rgba(0,0,0,0.5));
+            margin-bottom: 10px;
+        }
+
+        .item-label {
+            background: white;
+            color: black;
+            padding: 8px 16px;
+            border-radius: 50px;
+            font-size: 1.4em; 
+            font-weight: 800;
+            white-space: nowrap;
+            box-shadow: 0 4px 0 rgba(0,0,0,0.2);
+            border: 3px solid #333;
+        }
+
+        /* BINS */
+        .bins-area {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            padding: 0 20px;
+            height: 40px;
+        }
+        .bin {
+            width: 45%;
+            height: 100%;
+            border-radius: 20px 20px 0 0;
+            opacity: 0.4;
+            background: white;
+        }
+
+        /* CONTROLS */
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 30px;
+            width: 90%;
+            max-width: 600px;
+        }
+        .btn-control {
+            flex: 1;
+            height: 120px;
+            border-radius: 20px;
+            border: none;
+            font-size: 3em;
+            cursor: pointer;
+            box-shadow: 0 10px 0 rgba(0,0,0,0.4);
+            transition: transform 0.1s;
+            font-family: 'Chakra Petch';
+            font-weight: 900;
+            text-transform: uppercase;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .btn-control span { font-size: 0.4em; margin-top: 5px; opacity: 0.8; }
+        .btn-control:active { transform: translateY(6px); box-shadow: none; }
+        
+        .btn-left { background: var(--bin-left); color: white; border: 4px solid #0c6cb6; }
+        .btn-right { background: var(--bin-right); color: white; border: 4px solid #a31819; }
+
+        /* OVERLAY */
+        #overlay {
+            position: fixed; top:0; left:0; width:100%; height:100%;
+            background: rgba(0,0,0,0.95);
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            z-index: 200;
+            text-align: center;
+            padding: 20px;
+        }
+        #overlay h2 { font-size: 4em; color: var(--accent); margin: 0 0 10px 0; text-shadow: 0 0 20px var(--accent); }
+        
+        .final-score-box {
+            background: #333;
+            padding: 20px 40px;
+            border-radius: 20px;
+            border: 2px solid #555;
+            margin: 20px 0;
+        }
+        .final-score-label { color: #aaa; font-size: 1em; text-transform: uppercase; letter-spacing: 2px;}
+        .final-score-val { color: #ffd700; font-size: 4em; font-weight: 900; text-shadow: 0 0 10px #d4b100;}
+
+        .btn-start {
+            padding: 25px 60px; font-size: 2em; font-family: 'Chakra Petch'; font-weight: 900;
+            background: #2ecc71; border: none; color: white; border-radius: 15px; cursor: pointer;
+            box-shadow: 0 8px 0 #27ae60; margin-top: 30px;
+            animation: pulseBtn 1s infinite;
+        }
+        @keyframes pulseBtn { 0%{transform:scale(1);} 50%{transform:scale(1.05);} 100%{transform:scale(1);} }
+
+        /* FEEDBACK ANIMATION */
+        .feedback {
+            position: absolute;
+            font-size: 5em;
+            font-weight: 900;
+            animation: popFade 0.6s forwards;
+            z-index: 50;
+            text-shadow: 2px 2px 0 #000;
+        }
+        @keyframes popFade {
+            0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+            50% { transform: translate(-50%, -150%) scale(1.2); opacity: 1; }
+            100% { transform: translate(-50%, -200%) scale(1.5); opacity: 0; }
+        }
+
+        #mute-btn {
+            background: rgba(255,255,255,0.1); border: 2px solid #777; color: white;
+            padding: 10px; border-radius: 50%; cursor: pointer; font-size: 1.2em;
+            position: absolute; right: 20px;
+        }
+
+        /* --- RESPONSIVE SCALING (FIXES SCROLLING ISSUES) --- */
+        /* If screen is short (like a phone in landscape or laptop), shrink elements */
+        @media (max-height: 800px) {
+            .conveyor-wrapper { height: 160px; }
+            .emoji-display { font-size: 4em; }
+            .item-label { font-size: 1em; padding: 5px 10px; }
+            .btn-control { height: 90px; font-size: 2em; }
+            .sign { font-size: 1em; padding: 10px; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="stat-group">
+            <div class="stat-box">
+                <span class="label">CURRENT SCORE</span>
+                <span class="val" id="score">0</span>
+            </div>
+            <div class="stat-box">
+                <span class="label">BELT SPEED</span>
+                <span class="val" id="speed-display">1.0x</span>
+            </div>
+        </div>
+        <button id="mute-btn" onclick="toggleMute()">🔊</button>
+    </header>
+
+    <div id="factory-floor">
+        <div class="signs-container">
+            <div class="sign sign-left">
+                <div id="cat-left-name">loading...</div>
+            </div>
+            <div class="sign sign-right">
+                <div id="cat-right-name">loading...</div>
+            </div>
+        </div>
+
+        <div class="conveyor-wrapper">
+            <div class="conveyor-belt"></div>
+            <div id="active-item" style="display:none;">
+                <div class="emoji-display">❓</div>
+                <div class="item-label">Item</div>
+            </div>
+        </div>
+
+        <div class="bins-area">
+            <div class="bin" style="background: linear-gradient(to bottom, var(--bin-left), transparent);"></div>
+            <div class="bin" style="background: linear-gradient(to bottom, var(--bin-right), transparent);"></div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button class="btn-control btn-left" onclick="sort('left')">⬅ <span>LEFT</span></button>
+        <button class="btn-control btn-right" onclick="sort('right')">➡ <span>RIGHT</span></button>
+    </div>
+
+    <div id="overlay">
+        <h2>SYSTEM READY</h2>
+        <div style="color:#ccc; margin-bottom:20px;">Press Start to begin sorting</div>
+        <button class="btn-start" onclick="startGame()">START ENGINE</button>
+    </div>
+
+    <script>
+        // --- MASSIVE GAME DATABASE ---
+        const allData = {
+            animals: { name: "Animal", items: [
+                {t:"🦁", n:"Lion"}, {t:"🐘", n:"Elephant"}, {t:"🐶", n:"Dog"}, {t:"🐱", n:"Cat"}, {t:"🦒", n:"Giraffe"}, {t:"🐸", n:"Frog"}, {t:"🐼", n:"Panda"}, {t:"🦊", n:"Fox"}
+            ]},
+            vehicles: { name: "Vehicle", items: [
+                {t:"🚗", n:"Car"}, {t:"🚌", n:"Bus"}, {t:"✈️", n:"Airplane"}, {t:"🚀", n:"Rocket"}, {t:"🚲", n:"Bicycle"}, {t:"🚤", n:"Boat"}, {t:"🚒", n:"Fire Truck"}, {t:"🚜", n:"Tractor"}
+            ]},
+            food: { name: "Food", items: [
+                {t:"🍔", n:"Burger"}, {t:"🍕", n:"Pizza"}, {t:"🍎", n:"Apple"}, {t:"🥦", n:"Broccoli"}, {t:"🍞", n:"Bread"}, {t:"🧀", n:"Cheese"}, {t:"🍗", n:"Chicken"}, {t:"🌮", n:"Taco"}
+            ]},
+            tools: { name: "Tool", items: [
+                {t:"🔨", n:"Hammer"}, {t:"🔧", n:"Wrench"}, {t:"🪛", n:"Screwdriver"}, {t:"✂️", n:"Scissors"}, {t:"🪚", n:"Saw"}, {t:"🪜", n:"Ladder"}, {t:"🔦", n:"Flashlight"}
+            ]},
+            clothes: { name: "Clothing", items: [
+                {t:"👕", n:"Shirt"}, {t:"👖", n:"Jeans"}, {t:"👗", n:"Dress"}, {t:"👟", n:"Shoe"}, {t:"🧢", n:"Hat"}, {t:"🧤", n:"Glove"}, {t:"🧦", n:"Socks"}, {t:"🧥", n:"Coat"}
+            ]},
+            ocean: { name: "Ocean Life", items: [
+                {t:"🐳", n:"Whale"}, {t:"🐙", n:"Octopus"}, {t:"🐠", n:"Fish"}, {t:"🦈", n:"Shark"}, {t:"🦀", n:"Crab"}, {t:"🐬", n:"Dolphin"}, {t:"🦞", n:"Lobster"}
+            ]},
+            space: { name: "Space", items: [
+                {t:"🪐", n:"Saturn"}, {t:"🌕", n:"Moon"}, {t:"☀️", n:"Sun"}, {t:"⭐", n:"Star"}, {t:"🛸", n:"UFO"}, {t:"👨‍🚀", n:"Astronaut"}, {t:"☄️", n:"Comet"}
+            ]},
+            red: { name: "Red Thing", items: [
+                {t:"🍎", n:"Apple"}, {t:"❤️", n:"Heart"}, {t:"🌹", n:"Rose"}, {t:"🍓", n:"Strawberry"}, {t:"🚒", n:"Fire Truck"}, {t:"🎈", n:"Red Balloon"}, {t:"🐞", n:"Ladybug"}
+            ]},
+            blue: { name: "Blue Thing", items: [
+                {t:"🫐", n:"Blueberry"}, {t:"💎", n:"Diamond"}, {t:"👖", n:"Jeans"}, {t:"🚙", n:"Blue Car"}, {t:"🧢", n:"Blue Hat"}, {t:"🌊", n:"Wave"}, {t:"🐳", n:"Whale"}
+            ]},
+            hot: { name: "Hot", items: [
+                {t:"🔥", n:"Fire"}, {t:"☀️", n:"Sun"}, {t:"☕", n:"Coffee"}, {t:"🌋", n:"Volcano"}, {t:"🕯️", n:"Candle"}, {t:"🌶️", n:"Chili"}
+            ]},
+            cold: { name: "Cold", items: [
+                {t:"🧊", n:"Ice Cube"}, {t:"🍦", n:"Ice Cream"}, {t:"⛄", n:"Snowman"}, {t:"❄️", n:"Snowflake"}, {t:"🐧", n:"Penguin"}, {t:"🥤", n:"Iced Drink"}
+            ]},
+            round: { name: "Round", items: [
+                {t:"⚽", n:"Soccer Ball"}, {t:"🍊", n:"Orange"}, {t:"🍩", n:"Donut"}, {t:"🌍", n:"Earth"}, {t:"💿", n:"CD"}, {t:"🍪", n:"Cookie"}, {t:"🕰️", n:"Clock"}
+            ]},
+            square: { name: "Square/Boxy", items: [
+                {t:"📦", n:"Box"}, {t:"🧊", n:"Ice Cube"}, {t:"🧱", n:"Brick"}, {t:"📺", n:"TV"}, {t:"🖼️", n:"Picture Frame"}, {t:"🎁", n:"Gift"}, {t:"🎲", n:"Dice"}
+            ]},
+            soft: { name: "Soft", items: [
+                {t:"🧸", n:"Teddy Bear"}, {t:"🪶", n:"Feather"}, {t:"☁️", n:"Cloud"}, {t:"🧶", n:"Yarn"}, {t:"🐑", n:"Sheep"}, {t:"🧣", n:"Scarf"}, {t:"🐇", n:"Bunny"}
+            ]},
+            hard: { name: "Hard", items: [
+                {t:"🪨", n:"Rock"}, {t:"💎", n:"Diamond"}, {t:"🔨", n:"Hammer"}, {t:"🥥", n:"Coconut"}, {t:"🧱", n:"Brick"}, {t:"🏎️", n:"Car"}, {t:"🪵", n:"Wood"}
+            ]}
+        };
+
+        const validPairs = [
+            ['animals', 'vehicles'],
+            ['food', 'tools'],
+            ['ocean', 'space'],
+            ['clothes', 'animals'],
+            ['red', 'blue'],
+            ['hot', 'cold'],
+            ['round', 'square'],
+            ['soft', 'hard'],
+            ['food', 'clothes'],
+            ['vehicles', 'tools']
+        ];
+
+        let score = 0;
+        let gameActive = false;
+        let baseSpeed = 0.4; 
+        let currentSpeed = baseSpeed;
+        let itemPos = -20;
+        let currentLeftCat = '';
+        let currentRightCat = '';
+        let currentItem = null;
+        let animationFrame;
+        let itemsSortedCount = 0;
+        let swapThreshold = 10;
+
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = new AudioContext();
+        let isMuted = false;
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            document.getElementById('mute-btn').innerText = isMuted ? "🔇" : "🔊";
+        }
+
+        function playSound(type) {
+            if (isMuted) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+
+            if (type === 'sort') { 
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(200, now);
+                osc.frequency.exponentialRampToValueAtTime(600, now + 0.1);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'correct') { 
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, now);
+                osc.frequency.exponentialRampToValueAtTime(1200, now + 0.1);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            } else if (type === 'wrong') { 
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(100, now);
+                osc.frequency.linearRampToValueAtTime(50, now + 0.4);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.4);
+                osc.start(now);
+                osc.stop(now + 0.4);
+            } else if (type === 'level') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(440, now);
+                osc.frequency.setValueAtTime(660, now + 0.1);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            }
+        }
+
+        function startGame() {
+            document.getElementById('overlay').style.display = 'none';
+            score = 0;
+            currentSpeed = 0.4;
+            itemsSortedCount = 0;
+            updateHUD();
+            
+            document.body.classList.remove('panic');
+            pickNewCategories();
+            spawnItem();
+            
+            gameActive = true;
+            gameLoop();
+        }
+
+        function pickNewCategories() {
+            const pair = validPairs[Math.floor(Math.random() * validPairs.length)];
+            if(Math.random() > 0.5) {
+                currentLeftCat = pair[0];
+                currentRightCat = pair[1];
+            } else {
+                currentLeftCat = pair[1];
+                currentRightCat = pair[0];
+            }
+            document.getElementById('cat-left-name').innerText = allData[currentLeftCat].name;
+            document.getElementById('cat-right-name').innerText = allData[currentRightCat].name;
+
+            const signs = document.querySelectorAll('.sign');
+            signs.forEach(s => {
+                s.style.transform = "scale(1.2)";
+                setTimeout(() => s.style.transform = "scale(1)", 300);
+            });
+            playSound('level');
+        }
+
+        function spawnItem() {
+            const isLeft = Math.random() > 0.5;
+            const catKey = isLeft ? currentLeftCat : currentRightCat;
+            const categoryData = allData[catKey];
+            const itemData = categoryData.items[Math.floor(Math.random() * categoryData.items.length)];
+
+            currentItem = { ...itemData, targetCat: catKey };
+            itemPos = -20; 
+            
+            const itemEl = document.getElementById('active-item');
+            itemEl.querySelector('.emoji-display').innerText = currentItem.t;
+            itemEl.querySelector('.item-label').innerText = currentItem.n;
+            itemEl.style.left = itemPos + '%';
+            itemEl.style.top = '50%';
+            itemEl.style.transform = 'translate(-50%, -50%) scale(1)';
+            itemEl.style.display = 'flex';
+        }
+
+        function gameLoop() {
+            if (!gameActive) return;
+            itemPos += currentSpeed;
+            document.getElementById('active-item').style.left = itemPos + '%';
+
+            if (currentSpeed > 1.0 && !document.body.classList.contains('panic')) {
+                document.body.classList.add('panic');
+            }
+
+            if (itemPos > 110) {
+                gameOver();
+                return;
+            }
+            animationFrame = requestAnimationFrame(gameLoop);
+        }
+
+        function sort(direction) {
+            if(!gameActive) return;
+            const chosenCat = direction === 'left' ? currentLeftCat : currentRightCat;
+
+            if (chosenCat === currentItem.targetCat) {
+                score += 10;
+                itemsSortedCount++;
+                playSound('correct');
+                showFeedback("✅", true);
+
+                const itemEl = document.getElementById('active-item');
+                itemEl.style.transition = "all 0.3s ease-in";
+                
+                if (direction === 'left') {
+                    itemEl.style.left = '10%';
+                    itemEl.style.top = '150%';
+                    itemEl.style.transform = 'translate(-50%, -50%) rotate(-45deg) scale(0.5)';
+                } else {
+                    itemEl.style.left = '90%';
+                    itemEl.style.top = '150%';
+                    itemEl.style.transform = 'translate(-50%, -50%) rotate(45deg) scale(0.5)';
+                }
+
+                if (itemsSortedCount % 5 === 0) {
+                    currentSpeed += 0.15;
+                    showFeedback("SPEED UP!", true);
+                }
+
+                if (itemsSortedCount % swapThreshold === 0) {
+                    gameActive = false;
+                    setTimeout(() => {
+                        pickNewCategories();
+                        resetForNext();
+                    }, 800);
+                } else {
+                    setTimeout(resetForNext, 300);
+                }
+
+            } else {
+                playSound('wrong');
+                showFeedback("WRONG!", false);
+                score = Math.max(0, score - 5);
+                document.body.style.transform = "translateX(15px)";
+                setTimeout(()=> document.body.style.transform = "translateX(0)", 100);
+            }
+            updateHUD();
+        }
+
+        function resetForNext() {
+            const itemEl = document.getElementById('active-item');
+            itemEl.style.transition = "none";
+            itemEl.style.display = 'none';
+            spawnItem();
+            if(!gameActive) {
+                gameActive = true;
+                gameLoop();
+            }
+        }
+
+        function showFeedback(text, good) {
+            const el = document.createElement('div');
+            el.className = 'feedback';
+            el.innerText = text;
+            el.style.color = good ? '#2ecc71' : '#e74c3c';
+            el.style.left = '50%';
+            el.style.top = '40%';
+            document.getElementById('factory-floor').appendChild(el);
+            setTimeout(() => el.remove(), 800);
+        }
+
+        function updateHUD() {
+            document.getElementById('score').innerText = score;
+            document.getElementById('speed-display').innerText = currentSpeed.toFixed(1) + "x";
+        }
+
+        function gameOver() {
+            gameActive = false;
+            cancelAnimationFrame(animationFrame);
+            playSound('wrong');
+            
+            const overlay = document.getElementById('overlay');
+            overlay.innerHTML = `
+                <h2>SYSTEM OVERLOAD</h2>
+                <div style="color:#ccc;">The factory shut down!</div>
+                <div class="final-score-box">
+                    <div class="final-score-label">FINAL SCORE</div>
+                    <div class="final-score-val">${score}</div>
+                </div>
+                <button class="btn-start" onclick="startGame()">REBOOT SYSTEM</button>
+            `;
+            overlay.style.display = 'flex';
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if(gameActive) {
+                if(e.key === "ArrowLeft") sort('left');
+                if(e.key === "ArrowRight") sort('right');
+            }
+        });
+
+        document.body.addEventListener('click', function() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }, { once: true });
+
+    </script>
+</body>
+</html>

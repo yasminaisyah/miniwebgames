@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Shape Rush: Evolution</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #050510;
+            --text-color: #fff;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Orbitron', sans-serif;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            user-select: none;
+            touch-action: manipulation;
+        }
+
+        /* --- HUD --- */
+        #hud {
+            position: absolute;
+            top: 0;
+            width: 100%;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            box-sizing: border-box;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .score-box { text-align: left; }
+        .label { font-size: 0.8em; color: #888; letter-spacing: 2px; }
+        #score-val { font-size: 2.5em; font-weight: 900; color: #fff; text-shadow: 0 0 10px #fff; }
+        
+        #level-box { text-align: right; }
+        #level-display { font-size: 1.5em; color: #ffea00; font-weight: bold; }
+
+        /* --- GAME CANVAS --- */
+        #game-canvas {
+            background: radial-gradient(circle at center, #1a1a2e 0%, #050510 100%);
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* --- CONTROLS --- */
+        #controls-container {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            z-index: 20;
+            padding: 0 10px;
+        }
+
+        #controls {
+            display: flex;
+            gap: 10px;
+            background: rgba(0,0,0,0.6);
+            padding: 15px;
+            border-radius: 20px;
+            border: 1px solid #333;
+            transition: all 0.3s ease;
+        }
+
+        .shape-btn {
+            width: 70px;
+            height: 70px;
+            background: rgba(255,255,255,0.05);
+            border: 2px solid #555;
+            border-radius: 10px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.2s;
+            position: relative;
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        
+        @keyframes popIn {
+            0% { transform: scale(0); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .shape-btn:active { transform: scale(0.9); }
+        .shape-btn.active { background: rgba(255,255,255,0.2); border-width: 3px; transform: translateY(-5px); }
+
+        /* Canvas inside button to draw the shape icon */
+        .btn-canvas {
+            pointer-events: none;
+        }
+
+        .key-hint {
+            font-size: 10px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        /* --- OVERLAYS --- */
+        #overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+        }
+
+        h1 { 
+            font-size: 3.5em; margin: 0; 
+            background: linear-gradient(to right, #00f3ff, #ff0055);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-align: center;
+            line-height: 1.2;
+        }
+
+        .btn-start {
+            margin-top: 40px;
+            padding: 20px 60px;
+            font-size: 1.5em;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: bold;
+            background: transparent;
+            color: white;
+            border: 2px solid white;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-start:hover { background: white; color: black; box-shadow: 0 0 30px white; }
+
+        /* Level Up Notification */
+        #levelup-msg {
+            position: absolute;
+            top: 20%;
+            width: 100%;
+            text-align: center;
+            font-size: 3em;
+            font-weight: 900;
+            color: #ffea00;
+            text-shadow: 0 0 20px #ffea00;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 40;
+            transform: scale(0.5);
+        }
+        .levelup-anim { animation: levelUp 2s forwards; }
+
+        @keyframes levelUp {
+            0% { opacity: 0; transform: scale(0.5); }
+            20% { opacity: 1; transform: scale(1.2); }
+            80% { opacity: 1; transform: scale(1); }
+            100% { opacity: 0; transform: scale(1.5); }
+        }
+
+        #mute-btn {
+            position: absolute; top: 20px; right: 20px; z-index: 100;
+            background: transparent; border: 1px solid #555; color: #aaa;
+            padding: 5px 10px; cursor: pointer; border-radius: 5px; font-family: 'Orbitron';
+        }
+
+    </style>
+</head>
+<body>
+
+    <button id="mute-btn" onclick="toggleMute()">🔊</button>
+
+    <div id="hud">
+        <div class="score-box">
+            <div class="label">SCORE</div>
+            <div id="score-val">0</div>
+        </div>
+        <div id="level-box">
+            <div class="label">SHAPES UNLOCKED</div>
+            <div id="level-display">3 / 6</div>
+        </div>
+    </div>
+
+    <div id="levelup-msg">NEW SHAPE UNLOCKED!</div>
+    <canvas id="game-canvas"></canvas>
+
+    <div id="controls-container">
+        <div id="controls">
+            </div>
+    </div>
+
+    <div id="overlay">
+        <h1>SHAPE RUSH<br><span style="font-size:0.5em; letter-spacing:5px; color:white;">EVOLUTION</span></h1>
+        <p style="color:#aaa; margin-top:10px; text-align:center; max-width:400px;">
+            Match your shape to the gate.<br>
+            Unlock complex shapes as you survive!
+        </p>
+        <button class="btn-start" onclick="initGame()">START</button>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const CANVAS = document.getElementById('game-canvas');
+        const CTX = CANVAS.getContext('2d');
+        
+        // The Shape Database
+        const SHAPES = [
+            { name: "SQUARE", sides: 4, color: "#00f3ff", unlockScore: 0 },    // Index 0
+            { name: "TRIANGLE", sides: 3, color: "#ff0055", unlockScore: 0 },  // Index 1
+            { name: "CIRCLE", sides: 0, color: "#ffea00", unlockScore: 0 },    // Index 2
+            { name: "PENTAGON", sides: 5, color: "#00ff00", unlockScore: 500 }, // Index 3
+            { name: "HEXAGON", sides: 6, color: "#aa00ff", unlockScore: 1500 },// Index 4
+            { name: "OCTAGON", sides: 8, color: "#ff5500", unlockScore: 3000 } // Index 5
+        ];
+
+        // --- STATE ---
+        let isPlaying = false;
+        let score = 0;
+        let speed = 6;
+        let frames = 0;
+        let playerShapeIdx = 0; 
+        let activeShapeIndices = [0, 1, 2]; // Starts with first 3
+        let obstacles = []; 
+        let particles = []; 
+        let roadY = 0;
+        let nextUnlockIndex = 3; // The next shape to unlock
+
+        // --- AUDIO ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = new AudioContext();
+        let isMuted = false;
+
+        function toggleMute() { isMuted = !isMuted; document.getElementById('mute-btn').style.opacity = isMuted ? 0.5 : 1; }
+
+        function playSound(type) {
+            if (isMuted) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+
+            if (type === 'switch') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, now);
+                osc.frequency.exponentialRampToValueAtTime(300, now + 0.05);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.05);
+                osc.start(now);
+                osc.stop(now + 0.05);
+            } else if (type === 'score') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(800, now);
+                osc.frequency.exponentialRampToValueAtTime(1200, now + 0.1);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'crash') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(100, now);
+                osc.frequency.linearRampToValueAtTime(20, now + 0.4);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.4);
+                osc.start(now);
+                osc.stop(now + 0.4);
+            } else if (type === 'levelup') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.linearRampToValueAtTime(800, now + 0.3);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.5);
+                osc.start(now);
+                osc.stop(now + 0.5);
+            }
+        }
+
+        // --- SETUP ---
+        function resize() {
+            CANVAS.width = window.innerWidth;
+            CANVAS.height = window.innerHeight;
+            roadY = CANVAS.height / 2 - 50;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // --- GAME LOOP ---
+
+        function initGame() {
+            document.getElementById('overlay').style.display = 'none';
+            score = 0;
+            speed = 6;
+            playerShapeIdx = 0;
+            obstacles = [];
+            particles = [];
+            frames = 0;
+            
+            // Reset Progression
+            activeShapeIndices = [0, 1, 2];
+            nextUnlockIndex = 3;
+
+            buildControls();
+            setPlayerShape(0);
+            updateHUD();
+            
+            isPlaying = true;
+            loop();
+        }
+
+        function loop() {
+            if (!isPlaying) return;
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        function update() {
+            frames++;
+            
+            // Speed Ramp
+            if (frames % 600 === 0) speed += 0.5;
+
+            // Check Unlocks
+            if (nextUnlockIndex < SHAPES.length) {
+                if (score >= SHAPES[nextUnlockIndex].unlockScore) {
+                    unlockNewShape(nextUnlockIndex);
+                    nextUnlockIndex++;
+                }
+            }
+
+            // Spawn Obstacles
+            let lastX = obstacles.length > 0 ? obstacles[obstacles.length - 1].x : CANVAS.width;
+            let gap = 450 + (Math.random() * 200); 
+            
+            if (CANVAS.width - lastX > gap || obstacles.length === 0) {
+                // Pick a random shape from currently UNLOCKED shapes
+                let randIdx = activeShapeIndices[Math.floor(Math.random() * activeShapeIndices.length)];
+                obstacles.push({
+                    x: CANVAS.width + 100,
+                    shapeIdx: randIdx,
+                    passed: false
+                });
+            }
+
+            // Move Obstacles
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                let obs = obstacles[i];
+                obs.x -= speed;
+
+                // Collision Logic
+                if (!obs.passed && obs.x < 150 && obs.x > 50) {
+                    // Check alignment (center is 100)
+                    if (Math.abs(obs.x - 100) < speed * 1.5) {
+                        if (obs.shapeIdx === playerShapeIdx) {
+                            // Pass
+                            obs.passed = true;
+                            score += 50;
+                            playSound('score');
+                            createParticles(obs.x, roadY, SHAPES[obs.shapeIdx].color, 12);
+                            updateHUD();
+                        } else {
+                            // Fail
+                            gameOver();
+                        }
+                    }
+                }
+                if (obs.x < -150) obstacles.splice(i, 1);
+            }
+
+            // Particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life--;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+        }
+
+        // --- LOGIC HELPERS ---
+
+        function unlockNewShape(idx) {
+            activeShapeIndices.push(idx);
+            buildControls(); // Rebuild UI to show new button
+            
+            // Feedback
+            playSound('levelup');
+            const msg = document.getElementById('levelup-msg');
+            msg.innerText = `UNLOCKED: ${SHAPES[idx].name}!`;
+            msg.style.color = SHAPES[idx].color;
+            msg.classList.remove('levelup-anim');
+            void msg.offsetWidth; // Trigger reflow
+            msg.classList.add('levelup-anim');
+            
+            // Slow down briefly to let player adjust
+            speed = Math.max(6, speed - 1); 
+            updateHUD();
+        }
+
+        function buildControls() {
+            const container = document.getElementById('controls');
+            container.innerHTML = '';
+
+            activeShapeIndices.forEach((shapeIdx, i) => {
+                let shapeData = SHAPES[shapeIdx];
+                let btn = document.createElement('div');
+                btn.className = 'shape-btn';
+                btn.id = `btn-${shapeIdx}`;
+                btn.onclick = () => setPlayerShape(shapeIdx);
+                btn.style.borderColor = shapeData.color;
+                
+                // Mini Canvas for Icon
+                let cvs = document.createElement('canvas');
+                cvs.width = 40; cvs.height = 40;
+                cvs.className = 'btn-canvas';
+                let ctx = cvs.getContext('2d');
+                
+                // Draw icon
+                ctx.translate(20, 20);
+                ctx.fillStyle = shapeData.color;
+                drawPolygonPath(ctx, 0, 0, 15, shapeData.sides);
+                ctx.fill();
+                
+                btn.appendChild(cvs);
+                
+                // Key Hint
+                let key = i + 1;
+                let hint = document.createElement('div');
+                hint.className = 'key-hint';
+                hint.innerText = `[ ${key} ]`;
+                btn.appendChild(hint);
+
+                container.appendChild(btn);
+            });
+            
+            // Restore active state visuals
+            setPlayerShape(playerShapeIdx);
+        }
+
+        function setPlayerShape(idx) {
+            if (!activeShapeIndices.includes(idx)) return; // Security check
+            if (playerShapeIdx !== idx) playSound('switch');
+            
+            playerShapeIdx = idx;
+
+            // Update UI Highlights
+            document.querySelectorAll('.shape-btn').forEach(b => {
+                b.classList.remove('active');
+                b.style.opacity = '0.6';
+                b.style.boxShadow = 'none';
+            });
+            let activeBtn = document.getElementById(`btn-${idx}`);
+            if(activeBtn) {
+                activeBtn.classList.add('active');
+                activeBtn.style.opacity = '1';
+                activeBtn.style.boxShadow = `0 0 15px ${SHAPES[idx].color}`;
+            }
+            
+            createParticles(100, roadY, SHAPES[idx].color, 5);
+        }
+
+        // --- DRAWING ENGINE ---
+
+        function draw() {
+            // Trail Background
+            CTX.fillStyle = 'rgba(5, 5, 16, 0.35)';
+            CTX.fillRect(0, 0, CANVAS.width, CANVAS.height);
+
+            // Draw Road Grid (Floor)
+            let gridOffset = (frames * speed) % 100;
+            CTX.lineWidth = 1;
+            CTX.strokeStyle = 'rgba(255,255,255,0.1)';
+            
+            // Horizon line
+            CTX.beginPath();
+            CTX.moveTo(0, roadY);
+            CTX.lineTo(CANVAS.width, roadY);
+            CTX.stroke();
+
+            // Moving vertical lines
+            for(let x=0; x<CANVAS.width + 200; x+=150) {
+                let drawX = x - gridOffset;
+                CTX.beginPath();
+                CTX.moveTo(drawX, roadY);
+                CTX.lineTo(drawX - 400, CANVAS.height); // Perspective slant
+                CTX.stroke();
+            }
+
+            // Draw Obstacles
+            obstacles.forEach(obs => drawGate(obs.x, roadY, obs.shapeIdx));
+
+            // Draw Player
+            drawPlayer(100, roadY, playerShapeIdx);
+
+            // Draw Particles
+            particles.forEach(p => {
+                CTX.fillStyle = p.color;
+                CTX.fillRect(p.x, p.y, 4, 4);
+            });
+        }
+
+        function drawPolygonPath(ctx, x, y, radius, sides) {
+            ctx.beginPath();
+            if (sides === 0) { // Circle
+                ctx.arc(x, y, radius, 0, Math.PI * 2);
+            } else {
+                // Rotate slightly so squares/pentagons sit flat
+                let offsetAngle = -Math.PI / 2; 
+                if(sides === 4) offsetAngle = -Math.PI/4;
+                
+                for (let i = 0; i < sides; i++) {
+                    const angle = offsetAngle + (i * 2 * Math.PI / sides);
+                    const px = x + radius * Math.cos(angle);
+                    const py = y + radius * Math.sin(angle);
+                    if (i === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.closePath();
+            }
+        }
+
+        function drawPlayer(x, y, idx) {
+            let data = SHAPES[idx];
+            CTX.fillStyle = data.color;
+            CTX.shadowBlur = 20;
+            CTX.shadowColor = data.color;
+            
+            // Bobbing animation
+            let bob = Math.sin(frames * 0.1) * 5;
+            
+            drawPolygonPath(CTX, x, y + bob, 30, data.sides);
+            CTX.fill();
+            
+            // Inner glow/wireframe
+            CTX.strokeStyle = "white";
+            CTX.lineWidth = 2;
+            CTX.stroke();
+
+            CTX.shadowBlur = 0;
+        }
+
+        function drawGate(x, y, idx) {
+            let data = SHAPES[idx];
+            
+            // Draw Wall
+            CTX.fillStyle = 'rgba(40, 40, 60, 0.8)';
+            // Perspective wall
+            CTX.beginPath();
+            CTX.moveTo(x, y); // Bottom center
+            CTX.lineTo(x, y - 200); // Top center
+            CTX.lineTo(x + 100, y - 250); // Top right (depth)
+            CTX.lineTo(x + 100, y + 50); // Bottom right (depth)
+            CTX.fill();
+            
+            // Draw Wall Front Face (thin strip for "approaching")
+            CTX.fillStyle = '#222';
+            CTX.fillRect(x-5, y-180, 10, 180);
+
+            // Draw the HOLE (Outline)
+            CTX.strokeStyle = data.color;
+            CTX.lineWidth = 4;
+            CTX.shadowBlur = 10;
+            CTX.shadowColor = data.color;
+            
+            drawPolygonPath(CTX, x, y - 60, 35, data.sides);
+            CTX.stroke();
+            
+            // Label
+            CTX.fillStyle = '#fff';
+            CTX.font = '12px Orbitron';
+            CTX.textAlign = 'center';
+            CTX.fillText(data.name, x, y - 110);
+            
+            CTX.shadowBlur = 0;
+        }
+
+        function createParticles(x, y, color, amt) {
+            for(let i=0; i<amt; i++) {
+                particles.push({
+                    x: x, y: y,
+                    vx: (Math.random()-0.5)*15,
+                    vy: (Math.random()-0.5)*15,
+                    life: 20 + Math.random()*10,
+                    color: color
+                });
+            }
+        }
+
+        function updateHUD() {
+            document.getElementById('score-val').innerText = score;
+            document.getElementById('level-display').innerText = `${activeShapeIndices.length} / ${SHAPES.length}`;
+        }
+
+        function gameOver() {
+            isPlaying = false;
+            playSound('crash');
+            
+            // Shake
+            CANVAS.style.transform = "translate(10px, 10px)";
+            setTimeout(() => CANVAS.style.transform = "none", 100);
+
+            const overlay = document.getElementById('overlay');
+            overlay.innerHTML = `
+                <h1 style="color:#ff0055">COLLISION</h1>
+                <div style="margin:20px 0; font-size:1.5em; color:white">FINAL SCORE: ${score}</div>
+                <div style="color:#aaa">You reached ${activeShapeIndices.length} shapes</div>
+                <button class="btn-start" onclick="initGame()">RETRY</button>
+            `;
+            overlay.style.display = 'flex';
+        }
+
+        // --- INPUTS ---
+        window.addEventListener('keydown', (e) => {
+            if (!isPlaying) return;
+            // Number keys 1-6
+            if(e.key >= '1' && e.key <= '6') {
+                let idx = parseInt(e.key) - 1;
+                if(idx < activeShapeIndices.length) {
+                    setPlayerShape(activeShapeIndices[idx]);
+                }
+            }
+        });
+
+        document.body.addEventListener('click', function() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }, { once: true });
+
+    </script>
+</body>
+</html>

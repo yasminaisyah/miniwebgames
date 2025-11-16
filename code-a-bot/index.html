@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code-A-Bot: Infinite Blueprint</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #f0f4f8;
+            --grid-bg: #dbe4f0;
+            --cell-bg: #ffffff;
+            --cell-border: #b0c4de;
+            --accent: #0077ff;
+            --btn-action: #2ecc71;
+            --btn-cmd: #0077ff;
+            --btn-turn: #f39c12;
+            --btn-clear: #e74c3c;
+            --text-dark: #34495e;
+            --text-light: #7f8c8d;
+        }
+
+        body {
+            font-family: 'Fredoka', sans-serif;
+            background-color: var(--bg-color);
+            /* Blueprint grid background */
+            background-image: linear-gradient(var(--cell-border) 1px, transparent 1px),
+                              linear-gradient(90deg, var(--cell-border) 1px, transparent 1px);
+            background-size: 20px 20px;
+            color: var(--text-dark);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            user-select: none;
+        }
+
+        header { 
+            text-align: center; 
+            margin-bottom: 20px; 
+            background: rgba(255,255,255,0.9);
+            padding: 15px 40px;
+            border-radius: 20px;
+            border: 2px solid var(--cell-border);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        }
+        h1 { 
+            margin: 0; 
+            color: var(--accent); 
+            font-weight: 700;
+            font-size: 2.2em; 
+        }
+        .subtitle { 
+            color: var(--text-light); 
+            margin-top: 5px; 
+            font-weight: 600;
+            font-size: 1.1em;
+        }
+
+        /* GAME LAYOUT */
+        .game-wrapper {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 30px;
+            justify-content: center;
+            align-items: flex-start;
+            max-width: 1100px;
+            width: 100%;
+        }
+
+        /* LEFT: THE GRID */
+        .grid-container {
+            background: var(--grid-bg);
+            padding: 15px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            border: 4px solid white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #game-grid {
+            display: grid;
+            gap: 5px;
+            /* Columns/Rows set by JS */
+        }
+
+        .cell {
+            width: 60px;
+            height: 60px;
+            background-color: var(--cell-bg);
+            border-radius: 6px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2.5em;
+            position: relative;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.05);
+        }
+        /* Mobile resizing */
+        @media (max-width: 600px) {
+            .cell { width: 40px; height: 40px; font-size: 1.5em; }
+        }
+
+        .obstacle { 
+            background-color: #34495e; 
+            color: white;
+            border-radius: 6px;
+        }
+        .goal { 
+            background-color: #27ae60; 
+            animation: pulse 1s infinite alternate; 
+            border-radius: 50%;
+            transform: scale(0.8);
+            box-shadow: 0 0 10px #2ecc71;
+        }
+        
+        /* THE ROBOT */
+        #robot {
+            position: absolute;
+            font-size: 2.2em;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 10;
+            display: flex; justify-content: center; align-items: center;
+            width: 100%; height: 100%;
+        }
+        
+        /* Arrow to show direction clearly */
+        #robot-arrow {
+            position: absolute;
+            font-size: 0.4em;
+            color: var(--accent);
+            top: 2px;
+            font-weight: bold;
+        }
+        
+        @media (max-width: 600px) {
+            #robot { font-size: 1.5em; }
+        }
+
+        /* RIGHT: CONTROL PANEL */
+        .controls-panel {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            width: 320px;
+            min-height: 450px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            border: 1px solid #eee;
+        }
+
+        h3 {
+            margin: 0 0 10px 0;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 10px;
+            color: var(--text-dark);
+        }
+
+        .program-display {
+            background: #ecf0f1;
+            border-radius: 10px;
+            padding: 10px;
+            height: 250px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+            border: 2px solid #bdc3c7;
+        }
+
+        .program-command {
+            background: white;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            font-size: 1em;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            box-shadow: 0 2px 2px rgba(0,0,0,0.05);
+            animation: popIn 0.2s;
+        }
+        @keyframes popIn { from { transform: scale(0.9); opacity: 0;} to { transform: scale(1); opacity: 1;}}
+
+        .program-command.active {
+            background: #f1c40f;
+            color: white;
+            transform: scale(1.02);
+            border-left: 5px solid #d35400;
+        }
+
+        .cmd-index { color: var(--text-light); margin-right: 10px; font-size: 0.8em; width: 20px;}
+        .cmd-icon { margin-right: 10px; font-size: 1.2em; color: var(--btn-cmd); }
+        .program-command.active .cmd-icon { color: white; }
+
+        .controls-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-family: 'Fredoka', sans-serif;
+            font-weight: 600;
+            font-size: 1em;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.1s;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1;
+            box-shadow: 0 4px 0 rgba(0,0,0,0.2);
+        }
+        .btn:active { transform: translateY(4px); box-shadow: none !important; }
+        .btn:disabled { background: #ccc; cursor: not-allowed; box-shadow: none; }
+
+        .btn-forward { background: var(--btn-cmd); }
+        .btn-left { background: var(--btn-turn); }
+        .btn-right { background: var(--btn-turn); }
+
+        .icon-lg { font-size: 1.5em; margin-bottom: 5px; }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-run {
+            flex: 2;
+            background: var(--btn-action);
+            font-size: 1.2em;
+            flex-direction: row;
+            justify-content: center;
+            gap: 10px;
+            background: linear-gradient(to bottom, #2ecc71, #27ae60);
+        }
+        .btn-clear {
+            flex: 1;
+            background: var(--btn-clear);
+        }
+        
+        /* MESSAGE */
+        #message {
+            text-align: center;
+            font-weight: bold;
+            min-height: 24px;
+            margin-top: 15px;
+            font-size: 1.1em;
+            color: var(--text-dark);
+        }
+
+        #confetti-canvas {
+            position: fixed; top: 0; left: 0; pointer-events: none; z-index: 99;
+        }
+
+        @keyframes pulse {
+            from { transform: scale(0.8); opacity: 0.8; }
+            to { transform: scale(0.9); opacity: 1; }
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+
+        /* Mute Button */
+        #mute-btn {
+            position: absolute; top: 20px; right: 20px;
+            background: white;
+            border: 2px solid var(--cell-border);
+            color: var(--text-dark);
+            width: 40px; height: 40px;
+            border-radius: 50%; cursor: pointer; font-size: 1.2em;
+            z-index: 100;
+        }
+
+    </style>
+</head>
+<body>
+
+    <button id="mute-btn" onclick="toggleMute()">🔊</button>
+
+    <header>
+        <h1>🤖 Code-A-Bot</h1>
+        <div class="subtitle">Level <span id="level-display">1</span> | Mission: Reach the Battery 🔋</div>
+    </header>
+
+    <div class="game-wrapper">
+        
+        <div class="grid-container">
+            <div id="game-grid">
+                </div>
+        </div>
+
+        <div class="controls-panel">
+            <h3>Program Sequence</h3>
+            <div class="program-display" id="program-display">
+                <div style="width:100%; text-align:center; color:#999; margin-top:20px;">
+                    Tap buttons to add commands
+                </div>
+            </div>
+
+            <div class="controls-buttons">
+                <button class="btn btn-left" onclick="addCommand('L')"><span class="icon-lg">↺</span> Left</button>
+                <button class="btn btn-forward" onclick="addCommand('F')"><span class="icon-lg">⬆</span> Move</button>
+                <button class="btn btn-right" onclick="addCommand('R')"><span class="icon-lg">↻</span> Right</button>
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn btn-clear" onclick="clearProgram()">Clear ✕</button>
+                <button class="btn btn-run" onclick="runProgram()">RUN ▶</button>
+            </div>
+
+            <div id="message"></div>
+        </div>
+
+    </div>
+    
+    <canvas id="confetti-canvas"></canvas>
+
+    <script>
+        // --- AUDIO SYSTEM ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = new AudioContext();
+        let isMuted = false;
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            document.getElementById('mute-btn').innerText = isMuted ? "🔇" : "🔊";
+        }
+
+        function playTone(freq, type, duration, vol = 0.1) {
+            if (isMuted) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            
+            gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+
+        function sfx(name) {
+            switch(name) {
+                case 'click': playTone(400, 'sine', 0.1); break;
+                case 'add': playTone(600, 'triangle', 0.05, 0.15); break;
+                case 'run': playTone(200, 'sawtooth', 0.2); break;
+                case 'step': playTone(300, 'square', 0.1, 0.05); break;
+                case 'turn': playTone(450, 'sine', 0.1, 0.05); break;
+                case 'win': 
+                    setTimeout(() => playTone(523, 'sine', 0.1), 0);
+                    setTimeout(() => playTone(659, 'sine', 0.1), 100);
+                    setTimeout(() => playTone(783, 'sine', 0.2), 200);
+                    break;
+                case 'crash': playTone(100, 'sawtooth', 0.4); break;
+            }
+        }
+
+        // --- GAME LOGIC ---
+        
+        // State
+        let level = 1;
+        let robot = { x: 0, y: 0, dir: 0 }; // 0=Up, 1=Right, 2=Down, 3=Left
+        let goal = { x: 4, y: 4 };
+        let obstacles = [];
+        let commands = [];
+        let isRunning = false;
+        let currentGridSize = 5;
+
+        function initGame() {
+            generateLevel();
+        }
+
+        function generateLevel() {
+            // Grid size grows every 3 levels, max 8
+            currentGridSize = Math.min(5 + Math.floor((level - 1) / 3), 8); 
+            
+            // Obstacles scale
+            let maxObstacles = Math.floor((currentGridSize * currentGridSize) / 4);
+            let obstacleCount = Math.min(2 + Math.floor(level/2), maxObstacles);
+            
+            // Random start direction
+            let startDir = Math.floor(Math.random() * 4); 
+            robot = { x: 0, y: 0, dir: startDir }; 
+            
+            // Random goal not at start
+            do {
+                goal = { 
+                    x: Math.floor(Math.random() * currentGridSize), 
+                    y: Math.floor(Math.random() * currentGridSize) 
+                };
+            } while (goal.x === 0 && goal.y === 0);
+
+            // Generate obstacles
+            obstacles = [];
+            let safeties = 0;
+            while(obstacles.length < obstacleCount && safeties < 100) {
+                safeties++;
+                let obs = {
+                    x: Math.floor(Math.random() * currentGridSize),
+                    y: Math.floor(Math.random() * currentGridSize)
+                };
+                // Don't block start or goal
+                if((obs.x === 0 && obs.y === 0) || (obs.x === goal.x && obs.y === goal.y)) continue;
+                
+                // Simple duplicate check
+                let duplicate = false;
+                for(let o of obstacles) {
+                    if(o.x === obs.x && o.y === obs.y) duplicate = true;
+                }
+                if(!duplicate) obstacles.push(obs);
+            }
+            
+            // Render
+            renderGrid();
+            clearProgram();
+            document.getElementById('level-display').innerText = level;
+            setMessage("");
+        }
+
+        function renderGrid() {
+            const gridEl = document.getElementById('game-grid');
+            gridEl.innerHTML = '';
+            
+            // CSS Grid Config
+            gridEl.style.gridTemplateColumns = `repeat(${currentGridSize}, 1fr)`;
+            gridEl.style.gridTemplateRows = `repeat(${currentGridSize}, 1fr)`;
+            
+            // Calculate pixel size for cells based on total container width usually being around 400-500px
+            // But CSS Grid + 1fr handles resizing well if container is fixed.
+            // Let's enforce specific pixel widths for the container logic via inline styles on the grid itself.
+            // Actually, let's just stick to the JS generating cells.
+            
+            // Adjust sizing based on grid count
+            let cellSize = 60;
+            if(currentGridSize > 6) cellSize = 50;
+            if(window.innerWidth < 600) cellSize = 40;
+            
+            gridEl.style.gridTemplateColumns = `repeat(${currentGridSize}, ${cellSize}px)`;
+            gridEl.style.gridTemplateRows = `repeat(${currentGridSize}, ${cellSize}px)`;
+
+
+            for(let y=0; y<currentGridSize; y++) {
+                for(let x=0; x<currentGridSize; x++) {
+                    let cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.style.width = cellSize + 'px';
+                    cell.style.height = cellSize + 'px';
+
+                    if(x === goal.x && y === goal.y) {
+                        cell.classList.add('goal');
+                        cell.innerText = '🔋';
+                    }
+                    else if(obstacles.some(o => o.x === x && o.y === y)) {
+                        cell.classList.add('obstacle');
+                        // cell.innerText = '█'; 
+                    }
+
+                    // Robot
+                    if(x === robot.x && y === robot.y) {
+                        let robotEl = document.createElement('div');
+                        robotEl.id = 'robot';
+                        robotEl.innerHTML = '🤖<div id="robot-arrow">⬆</div>';
+                        
+                        let rotation = robot.dir * 90; // 0=0, 1=90, 2=180, 3=270
+                        robotEl.style.transform = `rotate(${rotation}deg)`;
+                        cell.appendChild(robotEl);
+                    }
+                    gridEl.appendChild(cell);
+                }
+            }
+        }
+
+        function addCommand(cmd) {
+            if(isRunning) return;
+            commands.push(cmd);
+            sfx('add');
+            updateProgramDisplay();
+        }
+
+        function clearProgram() {
+            if(isRunning) return;
+            commands = [];
+            sfx('click');
+            updateProgramDisplay();
+        }
+
+        function updateProgramDisplay() {
+            const disp = document.getElementById('program-display');
+            disp.innerHTML = '';
+            if(commands.length === 0) {
+                disp.innerHTML = '<div style="width:100%; text-align:center; color:#999; margin-top:20px;">(Tap buttons to add commands)</div>';
+                return;
+            }
+
+            commands.forEach((cmd, index) => {
+                let el = document.createElement('div');
+                el.className = 'program-command';
+                el.id = `cmd-${index}`;
+                
+                let text = '';
+                let icon = '';
+                if(cmd === 'F') { text = 'Move Forward'; icon = '⬆'; }
+                if(cmd === 'L') { text = 'Turn Left'; icon = '↺'; }
+                if(cmd === 'R') { text = 'Turn Right'; icon = '↻'; }
+
+                el.innerHTML = `
+                    <span class="cmd-index">${index+1}</span>
+                    <span class="cmd-icon">${icon}</span>
+                    <span class="cmd-text">${text}</span>
+                `;
+                disp.appendChild(el);
+            });
+            disp.scrollTop = disp.scrollHeight;
+        }
+
+        async function runProgram() {
+            if(isRunning || commands.length === 0) return;
+            isRunning = true;
+            sfx('run');
+            setMessage("Running...", "#3498db");
+            toggleButtons(false);
+
+            let startRobot = {...robot};
+
+            for(let i=0; i<commands.length; i++) {
+                // Highlight command
+                let allCmds = document.querySelectorAll('.program-command');
+                allCmds.forEach(c => c.classList.remove('active'));
+                if(document.getElementById(`cmd-${i}`)) {
+                    document.getElementById(`cmd-${i}`).classList.add('active');
+                }
+
+                await executeCommand(commands[i]);
+                
+                // Check Collisions
+                if(checkCollision()) {
+                    sfx('crash');
+                    setMessage("CRASH! 💥 Resetting...", "#e74c3c");
+                    shakeGrid();
+                    isRunning = false;
+                    setTimeout(() => {
+                         robot = startRobot;
+                         renderGrid();
+                         setMessage("");
+                         toggleButtons(true);
+                    }, 1500);
+                    return;
+                }
+
+                // Check Win
+                if(robot.x === goal.x && robot.y === goal.y) {
+                    sfx('win');
+                    setMessage("LEVEL COMPLETE! 🎉", "#2ecc71");
+                    triggerConfetti();
+                    isRunning = false;
+                    setTimeout(() => {
+                        level++;
+                        generateLevel();
+                        toggleButtons(true);
+                    }, 2000);
+                    return;
+                }
+            }
+            
+            if(isRunning) { // Finished code but didn't reach goal
+                setMessage("Code finished. Try again!", "#f39c12");
+                isRunning = false;
+                setTimeout(() => {
+                    robot = startRobot; 
+                    renderGrid();
+                    setMessage("");
+                    toggleButtons(true);
+                }, 1500);
+            }
+        }
+        
+        function toggleButtons(enabled) {
+            document.querySelectorAll('button').forEach(b => {
+                if(b.id !== 'mute-btn') b.disabled = !enabled;
+            });
+        }
+
+        // THIS WAS THE FIX: Don't use CSS variable syntax here!
+        function setMessage(text, colorCode = '#34495e') {
+             const msgEl = document.getElementById('message');
+             msgEl.innerText = text;
+             msgEl.style.color = colorCode;
+        }
+
+        function executeCommand(cmd) {
+            return new Promise(resolve => {
+                setTimeout(() => {
+                    if(cmd === 'L') {
+                        robot.dir = (robot.dir - 1 + 4) % 4;
+                        sfx('turn');
+                    } else if (cmd === 'R') {
+                        robot.dir = (robot.dir + 1) % 4;
+                        sfx('turn');
+                    } else if (cmd === 'F') {
+                        let nx = robot.x, ny = robot.y;
+                        if(robot.dir === 0) ny--; // Up
+                        if(robot.dir === 1) nx++; // Right
+                        if(robot.dir === 2) ny++; // Down
+                        if(robot.dir === 3) nx--; // Left
+                        
+                        if(nx >= 0 && nx < currentGridSize && ny >= 0 && ny < currentGridSize) {
+                            robot.x = nx;
+                            robot.y = ny;
+                            sfx('step');
+                        } else {
+                            sfx('crash'); 
+                        }
+                    }
+                    renderGrid();
+                    resolve();
+                }, 400); 
+            });
+        }
+
+        function checkCollision() {
+            return obstacles.some(o => o.x === robot.x && o.y === robot.y);
+        }
+
+        function shakeGrid() {
+            const g = document.querySelector('.grid-container');
+            g.style.animation = 'shake 0.3s';
+            setTimeout(() => g.style.animation = '', 300);
+        }
+
+        // --- CONFETTI ---
+        const canvas = document.getElementById("confetti-canvas");
+        const ctx = canvas.getContext("2d");
+        let particles = [];
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function triggerConfetti() {
+            for (let i = 0; i < 100; i++) {
+                particles.push({
+                    x: window.innerWidth / 2,
+                    y: window.innerHeight / 2,
+                    vx: (Math.random() - 0.5) * 20,
+                    vy: (Math.random() - 0.5) * 20,
+                    color: `hsl(${Math.random() * 360}, 100%, 50%)`,
+                    size: Math.random() * 10 + 5,
+                    life: 100
+                });
+            }
+            if(particles.length > 0) animateLoop();
+        }
+
+        let isAnimatingConfetti = false;
+        function animateLoop() {
+            if(isAnimatingConfetti) return;
+            isAnimatingConfetti = true;
+
+            function loop() {
+                if (particles.length === 0) {
+                    isAnimatingConfetti = false;
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    return;
+                }
+                
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                for (let i = 0; i < particles.length; i++) {
+                    let p = particles[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += 0.5; 
+                    p.life--;
+                    
+                    ctx.fillStyle = p.color;
+                    ctx.fillRect(p.x, p.y, p.size, p.size);
+                    
+                    if (p.life <= 0) {
+                        particles.splice(i, 1);
+                        i--;
+                    }
+                }
+                requestAnimationFrame(loop);
+            }
+            loop();
+        }
+
+        // Init
+        initGame();
+        
+        // Audio Unlock
+        document.body.addEventListener('click', function() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }, { once: true });
+        
+        window.addEventListener('resize', renderGrid);
+
+    </script>
+</body>
+</html>

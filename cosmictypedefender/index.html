@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cosmic Type Defender</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #050510;
+            --neon-green: #39ff14;
+            --neon-red: #ff073a;
+            --neon-blue: #00f3ff;
+            --text-color: #fff;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Press Start 2P', cursive;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            user-select: none;
+        }
+
+        #hud {
+            position: absolute;
+            top: 0;
+            width: 100%;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            box-sizing: border-box;
+            z-index: 10;
+            pointer-events: none;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        .stat-box { text-align: center; }
+        .label { font-size: 0.8em; color: #aaa; margin-bottom: 5px; display: block; }
+        .val { font-size: 1.5em; color: var(--neon-green); }
+        #health-bar { 
+            width: 200px; height: 20px; 
+            background: #333; border: 2px solid #fff; 
+            margin-top: 5px; position: relative;
+        }
+        #health-fill {
+            width: 100%; height: 100%;
+            background: var(--neon-red);
+            transition: width 0.2s;
+        }
+
+        #game-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            cursor: crosshair;
+        }
+
+        #overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+            text-align: center;
+        }
+
+        h1 { 
+            font-size: 3em; margin: 0 0 20px 0; 
+            color: var(--neon-blue);
+            text-shadow: 4px 4px 0 #000;
+            line-height: 1.5;
+        }
+
+        p { color: #ccc; font-size: 0.8em; line-height: 1.6; max-width: 600px; margin-bottom: 40px; }
+
+        .btn-start {
+            padding: 20px 40px;
+            font-size: 1.2em;
+            font-family: 'Press Start 2P', cursive;
+            background: var(--neon-green);
+            color: #000;
+            border: 4px solid #fff;
+            cursor: pointer;
+            box-shadow: 0 6px 0 #006400;
+            transition: transform 0.1s;
+        }
+        .btn-start:active { transform: translateY(6px); box-shadow: none; }
+
+        #mute-btn {
+            position: absolute; bottom: 20px; right: 20px; z-index: 100;
+            background: transparent; border: 2px solid #555; color: #555;
+            padding: 10px; cursor: pointer; font-family: 'Press Start 2P'; font-size: 0.6em;
+        }
+        #mute-btn:hover { color: white; border-color: white; }
+
+        #damage-flash {
+            position: absolute; top:0; left:0; width:100%; height:100%;
+            background: red; opacity: 0; pointer-events: none; z-index: 40;
+            transition: opacity 0.1s;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="hud">
+        <div class="stat-box" style="text-align: left;">
+            <span class="label">SCORE</span>
+            <span class="val" id="score-val">0</span>
+        </div>
+        <div class="stat-box">
+            <span class="label">WAVE</span>
+            <span class="val" id="wave-val">1</span>
+        </div>
+        <div class="stat-box" style="text-align: right;">
+            <span class="label">SHIELD</span>
+            <div id="health-bar"><div id="health-fill"></div></div>
+        </div>
+    </div>
+
+    <div id="damage-flash"></div>
+    <canvas id="game-canvas"></canvas>
+    <button id="mute-btn" onclick="toggleMute()">SOUND: ON</button>
+
+    <div id="overlay">
+        <h1>COSMIC<br>TYPE DEFENDER</h1>
+        <p>
+            ASTEROIDS INCOMING!<br><br>
+            Type the words floating above the asteroids to fire your lasers.<br>
+            Don't let them hit your ship!
+        </p>
+        <button class="btn-start" onclick="initGame()">LAUNCH MISSION</button>
+    </div>
+
+    <script>
+        // --- WORD LIST ---
+        const wordList = {
+            easy: ["cat","dog","run","sky","red","box","sun","pen","cup","hat","bat","fix","jam","net","pig","toy","van","web","zip"],
+            medium: ["star","moon","mars","blue","ship","jump","fire","wind","rock","dust","glow","beam","core","iron","void","warp","zero","alien","comet"],
+            hard: ["galaxy","nebula","planet","rocket","meteor","cosmos","orbit","laser","energy","plasma","shield","gravity","impact","fusion","binary","vacuum","pulsar","quasar","vector"]
+        };
+
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+
+        let isPlaying = false;
+        let score = 0;
+        let health = 100;
+        // Replaced wave with level system
+        let level = 1;
+        let frame = 0;
+
+        // spawn rate based on difficulty
+        let spawnRate = 120;
+
+        // New level progression variables
+        let killsThisLevel = 0;
+        let maxEnemiesOnScreen = 5;       // level 1 = 5
+        let totalEnemiesThisLevel = 10;   // base kills needed to advance
+
+        let player = { x: 0, y: 0 };
+        let enemies = [];
+        let lasers = [];
+        let particles = [];
+        let stars = [];
+
+        let targetEnemyIndex = -1;
+
+        // AUDIO
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = new AudioContext();
+        let isMuted = false;
+
+        function toggleMute() { 
+            isMuted = !isMuted; 
+            document.getElementById('mute-btn').innerText = isMuted ? "SOUND: OFF" : "SOUND: ON"; 
+        }
+
+        function playSound(type) {
+            if (isMuted) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+
+            if (type === 'laser') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(880, now);
+                osc.frequency.exponentialRampToValueAtTime(110, now + 0.1);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now); osc.stop(now + 0.1);
+            }
+            else if (type === 'explosion') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(100, now);
+                osc.frequency.exponentialRampToValueAtTime(10, now + 0.3);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+                osc.start(now); osc.stop(now + 0.3);
+            }
+            else if (type === 'hit') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.linearRampToValueAtTime(100, now + 0.2);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.2);
+                osc.start(now); osc.stop(now + 0.2);
+            }
+        }
+
+        // RESIZE
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+            player.x = width/2;
+            player.y = height - 80;
+            initStars();
+        }
+        window.addEventListener('resize', resize);
+
+        function initStars() {
+            stars = [];
+            for(let i=0;i<100;i++){
+                stars.push({
+                    x: Math.random()*width,
+                    y: Math.random()*height,
+                    size: Math.random()*2,
+                    speed: Math.random()*2 + 0.5
+                });
+            }
+        }
+
+        function initGame() {
+            resize();
+            document.getElementById('overlay').style.display = 'none';
+
+            score = 0;
+            health = 100;
+            level = 1;
+            frame = 0;
+
+            // reset level progression variables
+            killsThisLevel = 0;
+            maxEnemiesOnScreen = 5;
+            totalEnemiesThisLevel = 10;
+
+            enemies = [];
+            lasers = [];
+            particles = [];
+            targetEnemyIndex = -1;
+
+            spawnRate = 120; // slow at first
+
+            isPlaying = true;
+            updateHUD();
+            loop();
+        }
+
+        // UPDATED DIFFICULTY SYSTEM (endless levels, max enemies grows +5 each level)
+        function spawnEnemy() {
+
+            // Limit enemies on screen according to current level
+            if (enemies.length >= maxEnemiesOnScreen) return;
+
+            let list, speed;
+
+            if (level === 1) {           // EASY LEVEL
+                list = wordList.easy;
+                speed = 0.6;
+            }
+            else if (level === 2) {      // MEDIUM LEVEL
+                list = wordList.medium;
+                speed = 0.9;
+            }
+            else {                       // HARD LEVEL and beyond
+                list = wordList.hard;
+                speed = 1.3 + (level * 0.05); // gradually faster each level
+            }
+
+            let word = list[Math.floor(Math.random()*list.length)];
+            let size = 20 + (word.length * 4);
+
+            enemies.push({
+                x: Math.random()*(width - 100) + 50,
+                y: -50,
+                word: word,
+                typedIndex: 0,
+                speed: speed,
+                radius: size,
+                color: `hsl(${Math.random()*360},70%,60%)`
+            });
+        }
+
+        function update() {
+            frame++;
+
+            // spawn based on spawnRate
+            if (frame % spawnRate === 0) spawnEnemy();
+
+            // Adjust spawnRate per level band (keeps similar feel)
+            if (level === 1) spawnRate = 120;     
+            else if (level === 2) spawnRate = 90; 
+            else spawnRate = Math.max(40, 60 - (level - 3) * 2); // gets faster but bounded
+
+            // Note: progression is based on killsThisLevel, not score now
+
+            stars.forEach(s => {
+                s.y += s.speed;
+                if (s.y > height){ s.y=0; s.x=Math.random()*width; }
+            });
+
+            for(let i=enemies.length-1;i>=0;i--){
+                let e = enemies[i];
+                e.y += e.speed;
+
+                if (e.y + e.radius > player.y) {
+                    takeDamage(10);
+                    enemies.splice(i,1);
+                    if (i === targetEnemyIndex) targetEnemyIndex = -1;
+                    else if (i < targetEnemyIndex) targetEnemyIndex--;
+                }
+            }
+
+            for(let i=particles.length-1;i>=0;i--){
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life--;
+                if(p.life<=0) particles.splice(i,1);
+            }
+
+            for(let i=lasers.length-1;i>=0;i--){
+                lasers[i].life--;
+                if(lasers[i].life<=0) lasers.splice(i,1);
+            }
+
+            // Level progression: when sufficient kills in current level, increase level
+            if (killsThisLevel >= totalEnemiesThisLevel) {
+                level++;
+                killsThisLevel = 0;
+
+                // increase allowed enemies on screen and required kills
+                maxEnemiesOnScreen += 5;
+                totalEnemiesThisLevel += 5;
+
+                // slightly increase spawn frequency (but bounded)
+                spawnRate = Math.max(30, spawnRate - 5);
+            }
+
+            updateHUD();
+        }
+
+        function draw() {
+            ctx.fillStyle = '#050510';
+            ctx.fillRect(0,0,width,height);
+
+            ctx.fillStyle = '#fff';
+            stars.forEach(s=>{
+                ctx.beginPath();
+                ctx.arc(s.x,s.y,s.size,0,Math.PI*2);
+                ctx.fill();
+            });
+
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.moveTo(player.x, player.y);
+            ctx.lineTo(player.x-30, player.y+60);
+            ctx.lineTo(player.x+30, player.y+60);
+            ctx.fill();
+
+            ctx.fillStyle = `rgba(0,243,255,${0.5+Math.random()*0.5})`;
+            ctx.beginPath();
+            ctx.moveTo(player.x-10,player.y+60);
+            ctx.lineTo(player.x+10,player.y+60);
+            ctx.lineTo(player.x,player.y+90);
+            ctx.fill();
+
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#39ff14';
+            lasers.forEach(l=>{
+                ctx.beginPath();
+                ctx.moveTo(l.x,l.y);
+                ctx.lineTo(l.tx,l.ty);
+                ctx.stroke();
+            });
+
+            enemies.forEach((e,index)=>{
+                ctx.fillStyle='#333';
+                ctx.strokeStyle=e.color;
+                ctx.lineWidth = index===targetEnemyIndex?4:2;
+                ctx.beginPath();
+                ctx.arc(e.x,e.y,e.radius,0,Math.PI*2);
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.fillStyle='rgba(0,0,0,0.7)';
+                ctx.fillRect(e.x - e.radius, e.y - e.radius - 25, e.radius*2, 20);
+
+                ctx.font="16px 'Press Start 2P'";
+                let startX = e.x - (e.word.length * 8);
+                let yPos = e.y - e.radius - 10;
+
+                ctx.fillStyle='#39ff14';
+                ctx.fillText(e.word.substring(0,e.typedIndex), startX, yPos);
+
+                ctx.fillStyle='#fff';
+                let typedWidth = ctx.measureText(e.word.substring(0,e.typedIndex)).width;
+                ctx.fillText(e.word.substring(e.typedIndex), startX + typedWidth, yPos);
+            });
+
+            particles.forEach(p=>{
+                ctx.fillStyle=p.color;
+                ctx.fillRect(p.x,p.y,3,3);
+            });
+        }
+
+        // KEY TYPING
+        window.addEventListener('keydown', (e)=>{
+            if(!isPlaying) return;
+            let key=e.key.toLowerCase();
+            if(key.length!==1 || !/[a-z]/.test(key)) return;
+
+            if(targetEnemyIndex!==-1){
+                let t = enemies[targetEnemyIndex];
+                if(!t){ targetEnemyIndex=-1; return; }
+
+                let nextChar = t.word.charAt(t.typedIndex);
+
+                if(key === nextChar){
+                    fireLaser(t.x, t.y);
+                    t.typedIndex++;
+                    if(t.typedIndex >= t.word.length){
+                        destroyEnemy(targetEnemyIndex);
+                        targetEnemyIndex=-1;
+                    }
+                } else playSound('hit');
+            }
+            else {
+                let closest=-1, index=-1;
+                enemies.forEach((en,idx)=>{
+                    if(en.word.charAt(0)===key){
+                        if(en.y > closest){ closest=en.y; index=idx; }
+                    }
+                });
+
+                if(index!==-1){
+                    targetEnemyIndex=index;
+                    let t=enemies[index];
+                    fireLaser(t.x,t.y);
+                    t.typedIndex++;
+                    if(t.typedIndex>=t.word.length){
+                        destroyEnemy(index);
+                        targetEnemyIndex=-1;
+                    }
+                }
+            }
+        });
+
+        function fireLaser(tx,ty){
+            playSound('laser');
+            lasers.push({ x:player.x, y:player.y, tx,ty, life:5 });
+        }
+
+        function destroyEnemy(i){
+            let e=enemies[i];
+            createExplosion(e.x,e.y,e.color,15);
+            score += e.word.length * 100;
+            playSound('explosion');
+            enemies.splice(i,1);
+
+            // Count this kill toward current level progression
+            killsThisLevel++;
+        }
+
+        function createExplosion(x,y,color,count){
+            for(let i=0;i<count;i++){
+                particles.push({
+                    x,y,
+                    vx:(Math.random()-0.5)*10,
+                    vy:(Math.random()-0.5)*10,
+                    life:30,
+                    color
+                });
+            }
+        }
+
+        function takeDamage(a){
+            health -= a;
+            playSound('hit');
+            const flash=document.getElementById('damage-flash');
+            flash.style.opacity=0.5;
+            setTimeout(()=>flash.style.opacity=0,100);
+
+            if(health<=0) gameOver();
+        }
+
+        function updateHUD(){
+            document.getElementById('score-val').innerText=score;
+            // Show level in HUD (keeps label "WAVE" for layout)
+            document.getElementById('wave-val').innerText = "Lv " + level;
+            document.getElementById('health-fill').style.width=health + "%";
+        }
+
+        function gameOver(){
+            isPlaying=false;
+            document.getElementById('overlay').innerHTML = `
+                <h1 style="color:red">MISSION FAILED</h1>
+                <p>FINAL SCORE: <span style="color:white; font-size:1.5em">${score}</span></p>
+                <p>LEVEL REACHED: ${level}</p>
+                <button class="btn-start" onclick="initGame()">RETRY MISSION</button>
+            `;
+            document.getElementById('overlay').style.display='flex';
+        }
+
+        function loop(){
+            if(!isPlaying) return;
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        document.body.addEventListener('click', function() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }, { once:true });
+
+        resize();
+    </script>
+</body>
+</html>

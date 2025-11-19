@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pizza Pi: Fraction Chef</title>
+    <link href="https://fonts.googleapis.com/css2?family=Chewy&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --red: #e74c3c;
+            --white: #f1f1f1;
+            --crust: #e67e22;
+            --cheese: #f1c40f;
+            --box: #d35400;
+            --table: #c0392b;
+        }
+
+        body {
+            margin: 0;
+            height: 100vh; /* Force full height */
+            background-color: var(--white);
+            /* Checkered Tablecloth Pattern */
+            background-image: 
+                linear-gradient(45deg, var(--table) 25%, transparent 25%), 
+                linear-gradient(-45deg, var(--table) 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, var(--table) 75%), 
+                linear-gradient(-45deg, transparent 75%, var(--table) 75%);
+            background-size: 40px 40px;
+            background-position: 0 0, 0 20px, 20px -20px, -20px 0px;
+            font-family: 'Chewy', cursive;
+            overflow: hidden; /* Prevent scrolling */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            user-select: none;
+        }
+
+        /* Header / HUD */
+        #hud {
+            width: 100%;
+            max-width: 600px;
+            background: white;
+            padding: 5px 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+            border-bottom: 5px solid var(--box);
+            box-sizing: border-box;
+            flex-shrink: 0;
+        }
+
+        .stat { font-size: 1.2rem; color: #333; }
+        .stat span { color: var(--red); font-size: 1.5rem; }
+
+        /* Order Ticket */
+        #order-ticket {
+            background: #fff9c4;
+            padding: 5px 20px;
+            margin-top: 10px;
+            border: 1px solid #e0e0e0;
+            box-shadow: 0 5px 10px rgba(0,0,0,0.2);
+            transform: rotate(-1deg);
+            text-align: center;
+            position: relative;
+            z-index: 5;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            border-radius: 2px;
+        }
+
+        #order-ticket::after {
+            content: ''; /* Pin */
+            position: absolute;
+            top: -15px; left: 50%;
+            width: 10px; height: 10px;
+            background: red;
+            border-radius: 50%;
+            box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+        }
+
+        #fraction-display {
+            font-size: 2.5rem;
+            color: #333;
+            line-height: 0.8;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        
+        .fraction { display: inline-block; text-align: center; vertical-align: middle; }
+        .numerator { border-bottom: 3px solid #333; display: block; }
+        .denominator { display: block; }
+
+        /* Game Area - Flex container to hold canvas */
+        #kitchen {
+            flex: 1; /* Takes up all remaining space */
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            cursor: pointer;
+            filter: drop-shadow(0 10px 20px rgba(0,0,0,0.4));
+            touch-action: none;
+        }
+
+        /* Serve Button */
+        #serve-btn {
+            margin: 10px 0 20px 0;
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 10px 40px;
+            font-family: 'Chewy', cursive;
+            font-size: 1.8rem;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 6px 0 #1e8449;
+            transition: transform 0.1s, box-shadow 0.1s;
+            flex-shrink: 0;
+            z-index: 20;
+        }
+
+        #serve-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #1e8449;
+        }
+
+        /* Feedback Overlay */
+        #overlay {
+            position: fixed; 
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 100;
+            text-align: center;
+        }
+
+        #overlay h1 { font-size: 4rem; color: var(--cheese); margin: 0; text-shadow: 3px 3px 0 var(--red); }
+        #overlay p { font-size: 1.5rem; margin-bottom: 30px; }
+        
+        .btn-restart {
+            background: var(--red);
+            color: white;
+            border: none;
+            padding: 10px 30px;
+            font-size: 1.5rem;
+            font-family: 'Chewy', cursive;
+            cursor: pointer;
+            border-radius: 10px;
+        }
+
+        /* Mobile Landscape Tweak */
+        @media (max-height: 500px) {
+            #order-ticket { margin-top: 5px; padding: 2px 10px; }
+            #fraction-display { font-size: 1.5rem; }
+            #serve-btn { padding: 5px 20px; font-size: 1.2rem; margin-bottom: 10px; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="hud">
+        <div class="stat">TIPS: $<span id="score">0.00</span></div>
+        <div class="stat">LEVEL: <span id="level">1</span></div>
+    </div>
+
+    <div id="order-ticket">
+        <div style="font-size: 1rem; margin-right: 10px;">ORDER:</div>
+        <div id="fraction-display">
+            <span class="fraction">
+                <span class="numerator" id="target-num">1</span>
+                <span class="denominator" id="target-den">2</span>
+            </span>
+        </div>
+        <div id="pizza-name" style="font-size: 1rem; margin-left: 10px;">Pepperoni</div>
+    </div>
+
+    <div id="kitchen">
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <button id="serve-btn" onclick="checkOrder()">SERVE ORDER!</button>
+
+    <div id="overlay">
+        <h1 id="msg-title">DELIZIOSO!</h1>
+        <p id="msg-sub">Ready for the next order?</p>
+        <button class="btn-restart" onclick="nextLevel()">CONTINUE</button>
+    </div>
+
+    <script>
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = new AudioContext();
+
+        function playSound(type) {
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+
+            if(type === 'squish') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.linearRampToValueAtTime(100, now + 0.1);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'ding') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(1200, now);
+                osc.frequency.exponentialRampToValueAtTime(600, now + 0.5);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 1.0);
+                osc.start(now);
+                osc.stop(now + 1.0);
+            } else if (type === 'buzz') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.linearRampToValueAtTime(100, now + 0.3);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            }
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+        }
+
+        const canvas = document.getElementById('gameCanvas');
+        const kitchen = document.getElementById('kitchen');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+
+        let score = 0;
+        let level = 1;
+        let totalSlices = 4;
+        let requiredFraction = { n: 1, d: 2 };
+        let slicesInBox = 0;
+        let slicesOnPan = 4;
+        let isAnimating = false;
+        
+        let slices = [];
+        let panCenter = { x: 0, y: 0, r: 0 };
+        let boxCenter = { x: 0, y: 0, w: 0, h: 0 };
+
+        // --- NEW: Recipe System ---
+        const recipes = {
+            'Pepperoni': ['pepperoni'],
+            'Veggie': ['green_pepper', 'mushroom'],
+            'Hawaiian': ['ham', 'pineapple'],
+            'BBQ Chicken': ['chicken', 'onion'],
+            'Supreme': ['pepperoni', 'green_pepper', 'mushroom']
+        };
+        let currentRecipeName = 'Pepperoni';
+        let currentIngredients = ['pepperoni'];
+
+        function resize() {
+            // Get actual available size from the #kitchen container
+            width = kitchen.clientWidth;
+            height = kitchen.clientHeight;
+            
+            canvas.width = width;
+            canvas.height = height;
+            
+            // Determine layout based on aspect ratio
+            const isLandscape = width > height;
+            
+            if (isLandscape) {
+                // Side by Side
+                const margin = width * 0.05;
+                const availableWidth = width - (margin * 3); // margin left, mid, right
+                const maxR = Math.min(availableWidth / 4, height / 2.2); // Box is 2r wide, pan is 2r wide
+                
+                const r = maxR * 0.9; // slightly smaller for padding
+
+                // Centering logic
+                const centerX = width / 2;
+                const centerY = height / 2;
+                
+                panCenter = { x: centerX - r - (margin), y: centerY, r: r };
+                boxCenter = { x: centerX + r + (margin), y: centerY, w: r * 2.2, h: r * 2.2 };
+
+            } else {
+                // Top and Bottom (Mobile Portrait)
+                const margin = height * 0.05;
+                const availableHeight = height - (margin * 3);
+                const maxR = Math.min(width / 2.2, availableHeight / 4);
+                
+                const r = maxR * 0.9;
+                
+                const centerX = width / 2;
+                const centerY = height / 2;
+
+                // Pan on Top, Box on Bottom
+                panCenter = { x: centerX, y: centerY - r - margin, r: r };
+                boxCenter = { x: centerX, y: centerY + r + margin, w: r * 2.2, h: r * 2.2 };
+            }
+            
+            draw();
+        }
+        window.addEventListener('resize', resize);
+
+        function initGame() {
+            // Call resize initially to set up canvas
+            resize();
+            startLevel();
+            
+            canvas.addEventListener('mousedown', handleInput);
+            canvas.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                const t = e.touches[0];
+                const rect = canvas.getBoundingClientRect();
+                handleInput({ clientX: t.clientX, clientY: t.clientY });
+            }, {passive: false});
+        }
+
+        function startLevel() {
+            isAnimating = false;
+            slicesInBox = 0;
+            
+            // 1. Pick a Recipe
+            const recipeNames = Object.keys(recipes);
+            currentRecipeName = recipeNames[Math.floor(Math.random() * recipeNames.length)];
+            currentIngredients = recipes[currentRecipeName];
+            document.getElementById('pizza-name').innerText = currentRecipeName;
+
+            let targetNum, targetDen, actualCuts;
+
+            // Difficulty Progression
+            if (level === 1) {
+                targetDen = Math.random() > 0.5 ? 2 : 4;
+                targetNum = 1; 
+                actualCuts = targetDen;
+            } else if (level === 2) {
+                targetDen = Math.floor(Math.random() * 3) + 2; 
+                targetNum = Math.ceil(Math.random() * (targetDen - 1));
+                actualCuts = targetDen;
+            } else if (level === 3) {
+                targetNum = 1; targetDen = 2;
+                actualCuts = targetDen * (Math.random() > 0.5 ? 2 : 3);
+            } else if (level === 4) {
+                targetDen = 3;
+                targetNum = Math.random() > 0.5 ? 1 : 2;
+                actualCuts = targetDen * (Math.floor(Math.random() * 2) + 2);
+            } else if (level === 5) {
+                targetDen = 5;
+                targetNum = Math.ceil(Math.random() * 4);
+                actualCuts = 5;
+            } else {
+                const bases = [{n:1, d:2}, {n:1, d:3}, {n:2, d:3}, {n:1, d:4}, {n:3, d:4}, {n:1, d:5}, {n:2, d:5}];
+                const base = bases[Math.floor(Math.random() * bases.length)];
+                targetNum = base.n;
+                targetDen = base.d;
+                const maxMult = Math.floor(12 / targetDen);
+                const mult = Math.floor(Math.random() * (maxMult - 1)) + 2; 
+                actualCuts = targetDen * mult;
+            }
+
+            requiredFraction = { n: targetNum, d: targetDen };
+            totalSlices = actualCuts;
+            slicesOnPan = totalSlices;
+
+            document.getElementById('target-num').innerText = targetNum;
+            document.getElementById('target-den').innerText = targetDen;
+            document.getElementById('level').innerText = level;
+            document.getElementById('overlay').style.display = 'none';
+
+            generateSlices();
+            draw();
+        }
+
+        function generateSlices() {
+            slices = [];
+            const anglePerSlice = (Math.PI * 2) / totalSlices;
+            
+            for(let i=0; i<totalSlices; i++) {
+                const toppings = [];
+                
+                // Generate specific ingredients based on recipe
+                currentIngredients.forEach(ing => {
+                    const count = Math.floor(Math.random() * 2) + 1; // 1-2 of each type
+                    for(let k=0; k<count; k++) {
+                        toppings.push({
+                            type: ing,
+                            r: Math.random() * 0.6 + 0.2, 
+                            a: (Math.random() - 0.5) * 0.5 
+                        });
+                    }
+                });
+
+                slices.push({
+                    id: i,
+                    pos: 'pan', 
+                    angleStart: i * anglePerSlice,
+                    angleEnd: (i+1) * anglePerSlice,
+                    toppings: toppings
+                });
+            }
+        }
+
+        function handleInput(e) {
+            if (isAnimating) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            const dx = x - panCenter.x;
+            const dy = y - panCenter.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+
+            let angle = Math.atan2(dy, dx);
+            if (angle < 0) angle += Math.PI * 2;
+
+            if (dist < panCenter.r) {
+                const clickedSlice = slices.find(s => 
+                    s.pos === 'pan' && angle >= s.angleStart && angle < s.angleEnd
+                );
+                if (clickedSlice) moveSliceToBox(clickedSlice);
+            }
+            else if (x > boxCenter.x - boxCenter.w/2 && x < boxCenter.x + boxCenter.w/2 &&
+                     y > boxCenter.y - boxCenter.h/2 && y < boxCenter.y + boxCenter.h/2) {
+                 const sliceToReturn = slices.filter(s => s.pos === 'box').pop();
+                 if (sliceToReturn) moveSliceToPan(sliceToReturn);
+            }
+        }
+
+        function moveSliceToBox(slice) {
+            playSound('squish');
+            slice.pos = 'box';
+            slicesInBox++;
+            draw();
+        }
+
+        function moveSliceToPan(slice) {
+            playSound('squish');
+            slice.pos = 'pan';
+            slicesInBox--;
+            draw();
+        }
+
+        function checkOrder() {
+            const val1 = slicesInBox * requiredFraction.d;
+            const val2 = totalSlices * requiredFraction.n;
+
+            if (val1 === val2 && slicesInBox > 0) {
+                playSound('ding');
+                score += 5.00;
+                document.getElementById('score').innerText = score.toFixed(2);
+                
+                const ov = document.getElementById('overlay');
+                ov.style.display = 'flex';
+                document.getElementById('msg-title').innerText = "DELIZIOSO!";
+                document.getElementById('msg-sub').innerText = `Perfect! ${slicesInBox}/${totalSlices} is equal to ${requiredFraction.n}/${requiredFraction.d}`;
+                document.querySelector('.btn-restart').innerText = "NEXT ORDER";
+                document.querySelector('.btn-restart').onclick = () => { level++; startLevel(); };
+            } else {
+                playSound('buzz');
+                const ov = document.getElementById('overlay');
+                ov.style.display = 'flex';
+                document.getElementById('msg-title').innerText = "MAMMA MIA!";
+                document.getElementById('msg-sub').innerText = "That's not the right amount! Try again.";
+                document.querySelector('.btn-restart').innerText = "TRY AGAIN";
+                document.querySelector('.btn-restart').onclick = () => { 
+                    slices.forEach(s => s.pos = 'pan');
+                    slicesInBox = 0;
+                    document.getElementById('overlay').style.display = 'none';
+                    draw();
+                };
+            }
+        }
+
+        function nextLevel() {
+            level++;
+            startLevel();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, width, height);
+
+            // 1. Draw Pan
+            ctx.fillStyle = '#555';
+            ctx.beginPath();
+            ctx.arc(panCenter.x, panCenter.y, Math.max(0, panCenter.r + 10), 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = '#222';
+            ctx.beginPath();
+            ctx.arc(panCenter.x, panCenter.y, Math.max(0, panCenter.r), 0, Math.PI*2);
+            ctx.fill();
+
+            // 2. Draw Box (Open)
+            const bx = boxCenter.x - boxCenter.w/2;
+            const by = boxCenter.y - boxCenter.h/2;
+            ctx.fillStyle = '#d35400'; 
+            ctx.fillRect(bx, by, boxCenter.w, boxCenter.h);
+            ctx.lineWidth = 10;
+            ctx.strokeStyle = '#a04000'; 
+            ctx.strokeRect(bx, by, boxCenter.w, boxCenter.h);
+            // Flaps
+            ctx.fillStyle = '#e59866';
+            ctx.beginPath();
+            ctx.moveTo(bx, by); ctx.lineTo(bx + boxCenter.w, by); ctx.lineTo(bx + boxCenter.w - 20, by - 40); ctx.lineTo(bx + 20, by - 40);
+            ctx.fill();
+            
+            // Label Box
+            ctx.fillStyle = 'white';
+            ctx.font = Math.min(30, boxCenter.w/6) + 'px Chewy';
+            ctx.textAlign = 'center';
+            ctx.fillText(`${slicesInBox} SLICES`, boxCenter.x, boxCenter.y + boxCenter.h/2 + 30);
+
+            // 3. Draw Slices
+            slices.forEach(slice => {
+                drawSlice(slice);
+            });
+        }
+
+        function drawSlice(slice) {
+            ctx.save();
+            
+            let cx, cy, r;
+            
+            if (slice.pos === 'pan') {
+                cx = panCenter.x;
+                cy = panCenter.y;
+                r = panCenter.r;
+                r -= 2; 
+            } else {
+                cx = boxCenter.x;
+                cy = boxCenter.y;
+                r = Math.min(boxCenter.w, boxCenter.h) / 2 - 15;
+            }
+
+            if (r <= 0) { ctx.restore(); return; }
+
+            ctx.translate(cx, cy);
+
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.arc(0, 0, r, slice.angleStart, slice.angleEnd);
+            ctx.closePath();
+
+            ctx.fillStyle = '#e67e22';
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.arc(0, 0, r * 0.85, slice.angleStart, slice.angleEnd);
+            ctx.closePath();
+            ctx.fillStyle = '#f1c40f';
+            ctx.fill();
+            ctx.stroke(); 
+
+            // Draw Toppings based on Type
+            slice.toppings.forEach(top => {
+                const midAngle = (slice.angleStart + slice.angleEnd) / 2;
+                const dist = top.r * r;
+                const finalAngle = midAngle + top.a; 
+                const tx = Math.cos(finalAngle) * dist;
+                const ty = Math.sin(finalAngle) * dist;
+
+                const tr = r * 0.08; // topping radius
+
+                if (top.type === 'pepperoni') {
+                    ctx.beginPath();
+                    ctx.arc(tx, ty, tr, 0, Math.PI*2);
+                    ctx.fillStyle = '#c0392b'; 
+                    ctx.fill();
+                    // Shadow
+                    ctx.globalAlpha = 0.3;
+                    ctx.fillStyle = 'black'; 
+                    ctx.beginPath();
+                    ctx.arc(tx+1, ty+1, tr, 0, Math.PI*2);
+                    ctx.fill();
+                    ctx.globalAlpha = 1.0;
+                } else if (top.type === 'green_pepper') {
+                    ctx.beginPath();
+                    ctx.strokeStyle = '#27ae60';
+                    ctx.lineWidth = 3;
+                    ctx.arc(tx, ty, tr, 0, Math.PI*2);
+                    ctx.stroke();
+                } else if (top.type === 'mushroom') {
+                    ctx.beginPath();
+                    ctx.fillStyle = '#d7dbdd';
+                    ctx.arc(tx, ty, tr, 0, Math.PI, true); // Semi circle
+                    ctx.fill();
+                } else if (top.type === 'ham') {
+                    ctx.fillStyle = '#f48fb1';
+                    ctx.fillRect(tx - tr, ty - tr/2, tr*2, tr);
+                } else if (top.type === 'pineapple') {
+                    ctx.fillStyle = '#f1c40f';
+                    ctx.beginPath();
+                    ctx.moveTo(tx, ty - tr);
+                    ctx.lineTo(tx + tr, ty + tr);
+                    ctx.lineTo(tx - tr, ty + tr);
+                    ctx.fill();
+                } else if (top.type === 'chicken') {
+                    ctx.fillStyle = '#a04000';
+                    ctx.beginPath();
+                    ctx.arc(tx, ty, tr, 0, Math.PI*2);
+                    ctx.fill();
+                } else if (top.type === 'onion') {
+                    ctx.beginPath();
+                    ctx.strokeStyle = '#9b59b6';
+                    ctx.lineWidth = 2;
+                    ctx.arc(tx, ty, tr, 0, Math.PI*2);
+                    ctx.stroke();
+                }
+            });
+
+            ctx.restore();
+        }
+
+        // Important: Initialize logic only after DOM is ready
+        window.onload = initGame;
+
+    </script>
+</body>
+</html>

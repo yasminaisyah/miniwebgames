@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orbit Architect: Gravity Sim</title>
+    <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --space-bg: #0b0d17;
+            --hud-color: #00f3ff;
+            --planet-color: #6c5ce7;
+            --safe-zone: rgba(46, 204, 113, 0.1);
+            --safe-border: #2ecc71;
+            --danger: #e74c3c;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh; /* Allow page to grow */
+            background-color: var(--space-bg);
+            /* Starfield */
+            background-image: 
+                radial-gradient(white, rgba(255,255,255,.2) 2px, transparent 3px),
+                radial-gradient(white, rgba(255,255,255,.15) 1px, transparent 2px),
+                radial-gradient(white, rgba(255,255,255,.1) 2px, transparent 3px);
+            background-size: 550px 550px, 350px 350px, 250px 250px;
+            background-position: 0 0, 40px 60px, 130px 270px;
+            font-family: 'Exo 2', sans-serif;
+            overflow: auto; /* Enabled scrolling */
+            color: white;
+            user-select: none;
+            /* Removed touch-action: none from body to allow scrolling outside canvas */
+        }
+
+        /* HUD Overlay */
+        #hud {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%;
+            padding: 20px;
+            box-sizing: border-box;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 10;
+            text-shadow: 0 0 10px var(--hud-color);
+        }
+
+        .stat-box {
+            text-align: center;
+        }
+        .label { font-size: 0.8rem; color: #888; letter-spacing: 1px; text-transform: uppercase; }
+        .value { font-size: 1.5rem; color: var(--hud-color); font-weight: bold; }
+
+        .btn-help {
+            pointer-events: auto;
+            background: rgba(0, 243, 255, 0.2);
+            border: 1px solid var(--hud-color);
+            color: var(--hud-color);
+            width: 30px; height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        /* Timer Bar */
+        #timer-container {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 300px;
+            height: 20px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            border: 1px solid #555;
+            overflow: visible;
+            display: none; /* Hidden until launch */
+            z-index: 10;
+        }
+
+        #timer-bar {
+            width: 0%;
+            height: 100%;
+            background: var(--safe-border);
+            transition: width 0.1s linear;
+            border-radius: 10px;
+        }
+        
+        #timer-text {
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            top: -25px;
+            font-size: 0.9rem;
+            color: var(--safe-border);
+            text-shadow: 0 0 5px black;
+        }
+
+        /* Overlays */
+        .overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(11, 13, 23, 0.95);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            z-index: 100;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        h1 { font-size: 2.5rem; margin: 0 0 20px 0; color: var(--hud-color); text-transform: uppercase; letter-spacing: 2px; }
+        p { font-size: 1.2rem; color: #ccc; margin-bottom: 30px; line-height: 1.5; }
+
+        button.action-btn {
+            background: transparent;
+            color: var(--hud-color);
+            border: 2px solid var(--hud-color);
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            font-family: 'Exo 2', sans-serif;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
+        }
+
+        button.action-btn:hover {
+            background: var(--hud-color);
+            color: #000;
+            box-shadow: 0 0 30px rgba(0, 243, 255, 0.6);
+        }
+
+        /* Instructions Style */
+        .instructions-box {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid #333;
+            padding: 20px;
+            max-width: 500px;
+            text-align: left;
+            margin-bottom: 30px;
+        }
+        .step { margin-bottom: 15px; display: flex; gap: 15px; align-items: center; }
+        .step-num { 
+            background: var(--hud-color); color: black; 
+            width: 25px; height: 25px; 
+            border-radius: 50%; 
+            display: flex; align-items: center; justify-content: center; 
+            font-weight: bold; flex-shrink: 0;
+        }
+        .step strong { color: var(--hud-color); }
+
+        /* Game Canvas */
+        canvas {
+            display: block;
+            touch-action: none; /* Important: Disables scrolling ONLY on the canvas */
+        }
+
+        /* Instruction Hint (In-game) */
+        #hint {
+            position: absolute;
+            bottom: 20%;
+            width: 100%;
+            text-align: center;
+            color: rgba(255,255,255,0.8);
+            font-size: 1.2rem;
+            pointer-events: none;
+            text-shadow: 0 0 5px black;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.05); }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="hud">
+        <div style="display:flex; align-items: center;">
+            <div class="stat-box">
+                <div class="label">Level</div>
+                <div class="value" id="level">1</div>
+            </div>
+            <button class="btn-help" onclick="showStartScreen()">?</button>
+        </div>
+        <div class="stat-box">
+            <div class="label">Attempts</div>
+            <div class="value" id="attempts">0</div>
+        </div>
+    </div>
+
+    <div id="timer-container">
+        <div id="timer-text">STAY IN THE GREEN ZONE</div>
+        <div id="timer-bar"></div>
+    </div>
+
+    <!-- Start / Help Overlay -->
+    <div id="start-overlay" class="overlay" style="display: flex;">
+        <h1>ORBIT ARCHITECT</h1>
+        <div class="instructions-box">
+            <div class="step">
+                <div class="step-num">1</div>
+                <div><strong>Drag Backwards</strong> anywhere on screen to aim (like a slingshot).</div>
+            </div>
+            <div class="step">
+                <div class="step-num">2</div>
+                <div><strong>Release</strong> to launch the satellite.</div>
+            </div>
+            <div class="step">
+                <div class="step-num">3</div>
+                <div>Keep the satellite inside the <strong>Green Safe Zone</strong> for 10 seconds to win.</div>
+            </div>
+            <div style="font-size: 0.9rem; color: #888; margin-top: 10px; text-align: center;">
+                <em>Too fast = Flies away. Too slow = Crashes.</em>
+            </div>
+        </div>
+        <button class="action-btn" onclick="startGame()">INITIALIZE</button>
+    </div>
+
+    <!-- End Level Overlay -->
+    <div id="message-overlay" class="overlay">
+        <h1 id="msg-title">ORBIT STABLE</h1>
+        <p id="msg-sub">Mission Accomplished.</p>
+        <button onclick="nextLevel()" id="btn-action" class="action-btn">NEXT MISSION</button>
+    </div>
+
+    <div id="hint">PULL BACK & RELEASE TO LAUNCH</div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        // --- Audio System ---
+        var AudioContext = window.AudioContext || window.webkitAudioContext;
+        var audioCtx = new AudioContext();
+
+        function playSound(type) {
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+
+            if (type === 'charge') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(200, now);
+                osc.frequency.linearRampToValueAtTime(600, now + 0.1);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0.0, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'launch') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.exponentialRampToValueAtTime(50, now + 0.5);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                osc.start(now);
+                osc.stop(now + 0.5);
+            } else if (type === 'crash') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(100, now);
+                osc.frequency.exponentialRampToValueAtTime(10, now + 0.3);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            } else if (type === 'win') {
+                const freqs = [440, 554, 659, 880];
+                freqs.forEach((f, i) => {
+                    const o = audioCtx.createOscillator();
+                    const g = audioCtx.createGain();
+                    o.type = 'sine';
+                    o.frequency.value = f;
+                    g.gain.setValueAtTime(0.1, now);
+                    g.gain.exponentialRampToValueAtTime(0.001, now + 1.5 + (i*0.1));
+                    o.connect(g);
+                    g.connect(audioCtx.destination);
+                    o.start(now);
+                    o.stop(now + 2);
+                });
+                return;
+            }
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+        }
+
+        // --- Physics Engine ---
+        var canvas = document.getElementById('gameCanvas');
+        var ctx = canvas.getContext('2d');
+        var width, height;
+
+        // Game State
+        var level = 1;
+        var attempts = 0;
+        var gameState = 'aiming'; // aiming, flying, crashed, lost, won
+        var orbitTimer = 0;
+        var ORBIT_TARGET = 10; // seconds to win
+
+        // Physics Constants
+        var G = 0.5; 
+        
+        // Entities
+        var planet = { x: 0, y: 0, m: 2000, r: 40 };
+        var satellite = { x: 0, y: 0, vx: 0, vy: 0, r: 8, trail: [] };
+        var obstacles = []; 
+
+        // Input
+        var dragStart = { x: 0, y: 0 };
+        var currentDrag = { x: 0, y: 0 };
+        var isDragging = false;
+
+        function resize() {
+            width = window.innerWidth;
+            height = Math.max(window.innerHeight, 600); // Ensure minimum height
+            canvas.width = width;
+            canvas.height = height;
+            resetLevel();
+        }
+        window.addEventListener('resize', resize);
+
+        function showStartScreen() {
+            document.getElementById('start-overlay').style.display = 'flex';
+            document.getElementById('message-overlay').style.display = 'none';
+        }
+
+        function startGame() {
+            document.getElementById('start-overlay').style.display = 'none';
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function resetLevel() {
+            gameState = 'aiming';
+            orbitTimer = 0;
+            document.getElementById('timer-container').style.display = 'none';
+            document.getElementById('message-overlay').style.display = 'none';
+            document.getElementById('hint').style.display = 'block';
+            document.getElementById('timer-bar').style.width = '0%';
+
+            // Center Planet
+            planet.x = width / 2;
+            planet.y = height / 2;
+            planet.m = 2000; 
+
+            // Setup Satellite Position (Left of planet)
+            satellite.x = planet.x - 200;
+            satellite.y = planet.y;
+            satellite.vx = 0;
+            satellite.vy = 0;
+            satellite.trail = [];
+
+            // Setup Level Specifics
+            obstacles = [];
+            if(level === 2) {
+                obstacles.push({
+                    x: planet.x + 150, y: planet.y - 150, r: 20, m: 500, type: 'moon', angle: 0, orbitR: 212, speed: 0.02
+                });
+            } else if (level >= 3) {
+                obstacles.push({
+                    x: planet.x - 150, y: planet.y + 150, r: 15, m: 800, type: 'moon', angle: 3, orbitR: 212, speed: -0.03
+                });
+            }
+        }
+
+        function handleInputStart(x, y) {
+            // Prevent input if overlay is visible
+            if(document.getElementById('start-overlay').style.display === 'flex' || 
+               document.getElementById('message-overlay').style.display === 'flex') return;
+
+            if(gameState !== 'aiming') return;
+            isDragging = true;
+            dragStart = { x, y };
+            currentDrag = { x, y };
+        }
+
+        function handleInputMove(x, y) {
+            if(!isDragging) return;
+            currentDrag = { x, y };
+        }
+
+        function handleInputEnd() {
+            if(!isDragging) return;
+            isDragging = false;
+            
+            const dx = dragStart.x - currentDrag.x;
+            const dy = dragStart.y - currentDrag.y;
+            
+            // Cap power
+            const power = 0.15;
+            satellite.vx = dx * power;
+            satellite.vy = dy * power;
+
+            if (Math.abs(satellite.vx) + Math.abs(satellite.vy) > 0.5) {
+                gameState = 'flying';
+                playSound('launch');
+                document.getElementById('timer-container').style.display = 'block';
+                document.getElementById('hint').style.display = 'none';
+                attempts++;
+                document.getElementById('attempts').innerText = attempts;
+            }
+        }
+
+        // Events
+        canvas.addEventListener('mousedown', e => handleInputStart(e.clientX, e.clientY));
+        canvas.addEventListener('mousemove', e => handleInputMove(e.clientX, e.clientY));
+        window.addEventListener('mouseup', handleInputEnd);
+        
+        canvas.addEventListener('touchstart', e => {
+            e.preventDefault(); // Prevent scroll on canvas touch
+            handleInputStart(e.touches[0].clientX, e.touches[0].clientY);
+        }, {passive:false});
+        canvas.addEventListener('touchmove', e => {
+            e.preventDefault(); // Prevent scroll on canvas drag
+            handleInputMove(e.touches[0].clientX, e.touches[0].clientY);
+        }, {passive:false});
+        window.addEventListener('touchend', handleInputEnd);
+
+        function update() {
+            if(gameState === 'flying') {
+                // 1. Physics - Satellite vs Planet
+                const dx = planet.x - satellite.x;
+                const dy = planet.y - satellite.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                
+                const force = G * (planet.m) / (dist*dist);
+                const ax = force * (dx / dist);
+                const ay = force * (dy / dist);
+
+                satellite.vx += ax;
+                satellite.vy += ay;
+
+                // Obstacle Physics
+                obstacles.forEach(obs => {
+                    const ox = obs.x - satellite.x;
+                    const oy = obs.y - satellite.y;
+                    const odist = Math.sqrt(ox*ox + oy*oy);
+                    const oforce = G * (obs.m) / (odist*odist);
+                    satellite.vx += oforce * (ox / odist);
+                    satellite.vy += oforce * (oy / odist);
+                });
+
+                satellite.x += satellite.vx;
+                satellite.y += satellite.vy;
+
+                // Move Obstacles
+                obstacles.forEach(obs => {
+                    obs.angle += obs.speed;
+                    obs.x = planet.x + Math.cos(obs.angle) * obs.orbitR;
+                    obs.y = planet.y + Math.sin(obs.angle) * obs.orbitR;
+                });
+
+                // Trail
+                if(satellite.trail.length > 50) satellite.trail.shift();
+                satellite.trail.push({x: satellite.x, y: satellite.y});
+
+                // 2. Collisions & Win Con
+                if(dist < planet.r + satellite.r) {
+                    failGame("CRITICAL FAILURE", "Impact with planetary surface.");
+                }
+                obstacles.forEach(obs => {
+                    const odist = Math.sqrt((satellite.x - obs.x)**2 + (satellite.y - obs.y)**2);
+                    if(odist < obs.r + satellite.r) failGame("COLLISION DETECTED", "Impact with lunar body.");
+                });
+
+                // Lost in Space
+                if(dist > Math.max(width, height) * 0.8) { 
+                     failGame("SIGNAL LOST", "Satellite drifted into deep space.");
+                }
+
+                // Stable Orbit Check
+                const minOrbit = 100;
+                const maxOrbit = 350;
+                
+                if (dist > minOrbit && dist < maxOrbit) {
+                    orbitTimer += 1/60;
+                    const pct = (orbitTimer / ORBIT_TARGET) * 100;
+                    document.getElementById('timer-bar').style.width = pct + "%";
+                    
+                    if(orbitTimer >= ORBIT_TARGET) {
+                        winGame();
+                    }
+                } else {
+                    orbitTimer = Math.max(0, orbitTimer - 0.05);
+                    document.getElementById('timer-bar').style.width = (orbitTimer / ORBIT_TARGET) * 100 + "%";
+                }
+            }
+        }
+
+        function failGame(title, sub) {
+            gameState = 'crashed';
+            playSound('crash');
+            document.getElementById('message-overlay').style.display = 'flex';
+            document.getElementById('msg-title').innerText = title;
+            document.getElementById('msg-title').style.color = '#e74c3c';
+            document.getElementById('msg-sub').innerText = sub;
+            document.getElementById('btn-action').innerText = "RETRY MISSION";
+            document.getElementById('btn-action').onclick = resetLevel;
+        }
+
+        function winGame() {
+            gameState = 'won';
+            playSound('win');
+            document.getElementById('message-overlay').style.display = 'flex';
+            document.getElementById('msg-title').innerText = "STABLE ORBIT";
+            document.getElementById('msg-title').style.color = '#2ecc71';
+            document.getElementById('msg-sub').innerText = "Telemetry confirms stable trajectory.";
+            document.getElementById('btn-action').innerText = "NEXT LEVEL";
+            document.getElementById('btn-action').onclick = nextLevel;
+        }
+
+        function nextLevel() {
+            level++;
+            document.getElementById('level').innerText = level;
+            resetLevel();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, width, height);
+
+            // Safe Zone
+            const minOrbit = 100;
+            const maxOrbit = 350;
+            ctx.beginPath();
+            ctx.arc(planet.x, planet.y, maxOrbit, 0, Math.PI*2);
+            ctx.arc(planet.x, planet.y, minOrbit, 0, Math.PI*2, true);
+            ctx.fillStyle = 'rgba(46, 204, 113, 0.05)';
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(46, 204, 113, 0.3)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Planet
+            const grad = ctx.createRadialGradient(planet.x, planet.y, planet.r * 0.2, planet.x, planet.y, planet.r * 1.5);
+            grad.addColorStop(0, '#6c5ce7');
+            grad.addColorStop(1, 'transparent');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(planet.x, planet.y, planet.r * 1.5, 0, Math.PI*2);
+            ctx.fill();
+            
+            ctx.fillStyle = '#4834d4';
+            ctx.beginPath();
+            ctx.arc(planet.x, planet.y, planet.r, 0, Math.PI*2);
+            ctx.fill();
+
+            // Obstacles
+            obstacles.forEach(obs => {
+                ctx.fillStyle = '#b2bec3';
+                ctx.beginPath();
+                ctx.arc(obs.x, obs.y, obs.r, 0, Math.PI*2);
+                ctx.fill();
+            });
+
+            // Satellite
+            ctx.fillStyle = '#00f3ff';
+            ctx.beginPath();
+            ctx.arc(satellite.x, satellite.y, satellite.r, 0, Math.PI*2);
+            ctx.fill();
+
+            // Trail
+            ctx.beginPath();
+            if(satellite.trail.length > 0) {
+                ctx.moveTo(satellite.trail[0].x, satellite.trail[0].y);
+                for(let i=1; i<satellite.trail.length; i++) {
+                    ctx.lineTo(satellite.trail[i].x, satellite.trail[i].y);
+                }
+            }
+            ctx.strokeStyle = 'rgba(0, 243, 255, 0.5)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Slingshot
+            if (gameState === 'aiming') {
+                if(isDragging) {
+                    const dx = dragStart.x - currentDrag.x;
+                    const dy = dragStart.y - currentDrag.y;
+
+                    // Arrow
+                    ctx.beginPath();
+                    ctx.moveTo(satellite.x, satellite.y);
+                    ctx.lineTo(satellite.x + dx, satellite.y + dy);
+                    ctx.strokeStyle = '#00f3ff';
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+
+                    // Arrowhead
+                    const angle = Math.atan2(dy, dx);
+                    const headLen = 10;
+                    const endX = satellite.x + dx;
+                    const endY = satellite.y + dy;
+                    ctx.beginPath();
+                    ctx.moveTo(endX, endY);
+                    ctx.lineTo(endX - headLen * Math.cos(angle - Math.PI / 6), endY - headLen * Math.sin(angle - Math.PI / 6));
+                    ctx.lineTo(endX - headLen * Math.cos(angle + Math.PI / 6), endY - headLen * Math.sin(angle + Math.PI / 6));
+                    ctx.fillStyle = '#00f3ff';
+                    ctx.fill();
+
+                    // Prediction
+                    ctx.beginPath();
+                    let simX = satellite.x;
+                    let simY = satellite.y;
+                    let simVx = dx * 0.15;
+                    let simVy = dy * 0.15;
+                    ctx.moveTo(simX, simY);
+                    
+                    // Loop increased to 150 to show curvature
+                    for(let i=0; i<150; i++) {
+                        // Gravity from Planet
+                        const pdx = planet.x - simX;
+                        const pdy = planet.y - simY;
+                        const d2 = pdx*pdx + pdy*pdy;
+                        const f = G * planet.m / d2;
+                        simVx += f * (pdx/Math.sqrt(d2));
+                        simVy += f * (pdy/Math.sqrt(d2));
+                        
+                        // Gravity from Obstacles
+                        obstacles.forEach(obs => {
+                            const ox = obs.x - simX;
+                            const oy = obs.y - simY;
+                            const odist2 = ox*ox + oy*oy;
+                            // Avoid division by zero or extreme forces at close range
+                            if(odist2 > 100) {
+                                const oforce = G * obs.m / odist2;
+                                simVx += oforce * (ox / Math.sqrt(odist2));
+                                simVy += oforce * (oy / Math.sqrt(odist2));
+                            }
+                        });
+
+                        simX += simVx;
+                        simY += simVy;
+                        ctx.lineTo(simX, simY);
+                    }
+                    ctx.strokeStyle = 'rgba(0, 243, 255, 0.3)';
+                    ctx.setLineDash([5, 5]);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+            }
+
+            requestAnimationFrame(loop);
+        }
+
+        function loop() {
+            update();
+            draw();
+        }
+
+        // Init
+        resize();
+        loop();
+
+    </script>
+</body>
+</html>

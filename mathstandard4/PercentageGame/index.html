@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Alchemist's Ratio</title>
+    <style>
+        :root {
+            --wood-dark: #3e2723;
+            --wood-light: #5d4037;
+            --parchment: #f3e5ab;
+            --parchment-dim: #e6dba0;
+            --magic-gold: #ffd700;
+            --magic-purple: #4a148c;
+            --potion-red: #ff5252;
+            --potion-blue: #448aff;
+            --potion-green: #69f0ae;
+            --text-ink: #2c1b18;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            background-color: #1a0f0f;
+            font-family: 'Georgia', 'Times New Roman', serif;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            color: var(--text-ink);
+            overflow-x: hidden;
+            padding: 20px 0;
+        }
+
+        /* Background Ambience */
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at center, #2c1b18 0%, #000000 100%);
+            z-index: -2;
+        }
+
+        .game-container {
+            width: 100%;
+            max-width: 700px;
+            height: auto;
+            min-height: 800px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 10px;
+        }
+
+        /* The Wooden Table */
+        .wooden-frame {
+            background: var(--wood-dark);
+            border: 4px solid #2a1b18;
+            border-radius: 15px;
+            box-shadow: 
+                inset 0 0 20px rgba(0,0,0,0.8),
+                0 10px 30px rgba(0,0,0,0.5);
+            width: 100%;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Decorative Wood Grain */
+        .wooden-frame::after {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0,0,0,0.1) 10px, rgba(0,0,0,0.1) 20px);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Top Shelf (Header) */
+        .shelf-header {
+            background: var(--wood-light);
+            padding: 15px;
+            text-align: center;
+            border-bottom: 4px solid #2a1b18;
+            box-shadow: 0 5px 10px rgba(0,0,0,0.3);
+            position: relative;
+            z-index: 2;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .game-title {
+            color: var(--parchment);
+            font-size: 1.8rem;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            text-shadow: 2px 2px 0 #000;
+            margin: 0;
+        }
+
+        .score-tag {
+            background: #2a1b18;
+            color: var(--magic-gold);
+            padding: 5px 15px;
+            border-radius: 5px;
+            border: 1px solid var(--magic-gold);
+            font-weight: bold;
+        }
+
+        /* Main Play Area */
+        .lab-area {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            z-index: 1;
+            padding: 20px;
+            min-height: 500px;
+        }
+
+        /* Recipe Scroll */
+        .recipe-scroll {
+            background: var(--parchment);
+            width: 80%;
+            padding: 30px;
+            border-radius: 2px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+            text-align: center;
+            position: relative;
+            margin-bottom: 30px;
+            transform: rotate(-1deg);
+            transition: transform 0.3s;
+        }
+        
+        .recipe-scroll::before, .recipe-scroll::after {
+            content: "";
+            position: absolute;
+            left: 0; right: 0; height: 10px;
+            background: var(--parchment-dim);
+            border-radius: 50%;
+        }
+        .recipe-scroll::before { top: -5px; }
+        .recipe-scroll::after { bottom: -5px; }
+
+        .recipe-text {
+            font-size: 1.2rem;
+            color: #5d4037;
+            font-style: italic;
+            margin-bottom: 10px;
+        }
+
+        .target-value {
+            font-size: 3.5rem;
+            font-weight: bold;
+            color: var(--magic-purple);
+            display: block;
+            margin: 10px 0;
+        }
+
+        /* Cauldron */
+        .cauldron-container {
+            width: 120px;
+            height: 100px;
+            background: #222;
+            border-radius: 0 0 50px 50px;
+            position: relative;
+            margin-bottom: 40px;
+            border: 4px solid #444;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+        }
+        .cauldron-rim {
+            position: absolute;
+            top: -10px; left: -10px;
+            width: 132px; height: 20px;
+            background: #333;
+            border-radius: 10px;
+            border: 2px solid #555;
+        }
+        .liquid {
+            position: absolute;
+            bottom: 10px; left: 10px;
+            width: 92px; height: 60px;
+            background: var(--potion-green);
+            border-radius: 0 0 40px 40px;
+            opacity: 0.8;
+            transition: background 0.5s, height 0.3s;
+        }
+        
+        .bubble {
+            position: absolute;
+            background: rgba(255,255,255,0.3);
+            border-radius: 50%;
+            animation: bubbleRise 2s infinite;
+        }
+        @keyframes bubbleRise {
+            0% { transform: translateY(0) scale(0.5); opacity: 0; }
+            50% { opacity: 1; }
+            100% { transform: translateY(-40px) scale(1.2); opacity: 0; }
+        }
+
+        /* Potions Shelf */
+        .potion-shelf {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            width: 100%;
+            background: rgba(0,0,0,0.2);
+            padding: 20px;
+            border-radius: 10px;
+            border-top: 4px solid var(--wood-light);
+        }
+
+        .potion-bottle {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 40% 40% 10px 10px;
+            height: 100px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            position: relative;
+            transition: transform 0.2s;
+            overflow: hidden;
+        }
+
+        .potion-bottle:active { transform: scale(0.95); }
+        .potion-bottle:hover { background: rgba(255,255,255,0.15); }
+
+        .bottle-liquid {
+            position: absolute;
+            bottom: 0; left: 0; width: 100%; height: 70%;
+            background: var(--potion-blue);
+            z-index: 0;
+            opacity: 0.6;
+        }
+
+        .potion-bottle::before {
+            content: "";
+            position: absolute;
+            top: -10px; left: 50%; transform: translateX(-50%);
+            width: 30px; height: 15px;
+            background: #8d6e63;
+            border-radius: 2px;
+            z-index: 2;
+        }
+
+        .bottle-label {
+            position: relative;
+            z-index: 1;
+            background: var(--parchment);
+            padding: 5px 15px;
+            border-radius: 2px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--text-ink);
+            border: 1px solid #8d6e63;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        /* Screens */
+        .overlay-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(26, 15, 15, 0.95);
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 40px;
+            color: var(--parchment);
+            display: none;
+        }
+        .overlay-screen.active { display: flex; }
+
+        .main-btn {
+            background: var(--wood-light);
+            color: var(--parchment);
+            border: 2px solid var(--magic-gold);
+            padding: 15px 40px;
+            font-family: inherit;
+            font-size: 1.5rem;
+            cursor: pointer;
+            margin-top: 20px;
+            box-shadow: 0 0 10px var(--magic-gold);
+            transition: all 0.2s;
+        }
+        .main-btn:hover {
+            background: var(--magic-gold);
+            color: var(--wood-dark);
+        }
+
+        /* Audio Toggle */
+        .audio-rune {
+            position: fixed;
+            bottom: 20px; right: 20px;
+            width: 40px; height: 40px;
+            background: var(--wood-dark);
+            border: 2px solid var(--magic-gold);
+            border-radius: 50%;
+            color: var(--magic-gold);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            font-size: 1.2rem;
+            z-index: 20;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <div class="wooden-frame">
+            
+            <!-- Header -->
+            <div class="shelf-header">
+                <h1 class="game-title">The Alchemist's Ratio</h1>
+                <div class="score-tag">Potions: <span id="score">0</span>/10</div>
+            </div>
+
+            <!-- Main Lab -->
+            <div class="lab-area">
+                
+                <div class="recipe-scroll" id="scroll-ui">
+                    <div class="recipe-text">"Apprentice! Brew me a potion with..."</div>
+                    <span class="target-value" id="target-display">50%</span>
+                    <div class="recipe-text">...purity concentration."</div>
+                </div>
+
+                <div class="cauldron-container">
+                    <div class="cauldron-rim"></div>
+                    <div class="liquid" id="cauldron-liquid">
+                        <div class="bubble" style="left: 20%; width: 10px; height: 10px; animation-delay: 0s;"></div>
+                        <div class="bubble" style="left: 50%; width: 15px; height: 15px; animation-delay: 1s;"></div>
+                        <div class="bubble" style="left: 70%; width: 8px; height: 8px; animation-delay: 0.5s;"></div>
+                    </div>
+                </div>
+
+                <div class="potion-shelf" id="bottle-shelf"></div>
+
+            </div>
+
+        </div>
+
+        <div class="audio-rune" id="audio-btn" onclick="toggleAudio()">♪</div>
+
+        <!-- Start Screen -->
+        <div id="screen-start" class="overlay-screen active">
+            <h1 style="color: var(--magic-gold); font-size: 3rem; margin-bottom: 10px;">Alchemy 101</h1>
+            <p style="font-size: 1.2rem; max-width: 500px;">
+                The Master needs specific concentrations for his spells. <br><br>
+                Match the <strong>Percent (%)</strong> request with the correct <strong>Decimal</strong> or <strong>Fraction</strong> ingredient.
+            </p>
+            <button class="main-btn" onclick="startGame()">Begin Brewing</button>
+        </div>
+
+        <!-- End Screen -->
+        <div id="screen-end" class="overlay-screen">
+            <h1 style="color: var(--magic-gold); font-size: 3rem; margin-bottom: 10px;">Lab Report</h1>
+            <div id="grade-display" style="font-size: 8rem; font-weight: bold; margin: 20px; text-shadow: 0 0 20px rgba(255,255,255,0.5);">A</div>
+            <p id="final-msg" style="font-size: 1.5rem;">Potions Brewed: 8/10</p>
+            <button class="main-btn" onclick="startGame()">Brew Again</button>
+        </div>
+
+    </div>
+
+    <script>
+        /** AUDIO SYSTEM */
+        const Sfx = {
+            ctx: null,
+            on: true,
+            init() { if(!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
+            play(type) {
+                if(!this.on || !this.ctx) return;
+                const t = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.connect(gain); gain.connect(this.ctx.destination);
+
+                if(type === 'correct') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(523.25, t);
+                    osc.frequency.setValueAtTime(659.25, t + 0.1);
+                    osc.frequency.setValueAtTime(783.99, t + 0.2);
+                    osc.frequency.setValueAtTime(1046.50, t + 0.3);
+                    gain.gain.setValueAtTime(0.1, t);
+                    gain.gain.linearRampToValueAtTime(0, t + 0.6);
+                    osc.start(t); osc.stop(t + 0.6);
+                } else if (type === 'wrong') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(100, t);
+                    osc.frequency.linearRampToValueAtTime(50, t + 0.3);
+                    gain.gain.setValueAtTime(0.1, t);
+                    gain.gain.linearRampToValueAtTime(0, t + 0.3);
+                    osc.start(t); osc.stop(t + 0.3);
+                } else if (type === 'bubble') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(400 + Math.random()*200, t);
+                    osc.frequency.exponentialRampToValueAtTime(800, t + 0.1);
+                    gain.gain.setValueAtTime(0.05, t);
+                    gain.gain.linearRampToValueAtTime(0, t + 0.1);
+                    osc.start(t); osc.stop(t + 0.1);
+                }
+            }
+        };
+
+        function toggleAudio() {
+            Sfx.on = !Sfx.on;
+            document.getElementById('audio-btn').style.opacity = Sfx.on ? '1' : '0.5';
+            if(Sfx.on) Sfx.init();
+        }
+
+        /** GAME LOGIC */
+        const state = {
+            score: 0,
+            qCount: 0,
+            totalQ: 10,
+            locked: false,
+            history: new Set(),
+            currentAns: null
+        };
+
+        function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+        function startGame() {
+            Sfx.init();
+            state.score = 0;
+            state.qCount = 0;
+            state.history.clear();
+            document.getElementById('screen-start').classList.remove('active');
+            document.getElementById('screen-end').classList.remove('active');
+            document.getElementById('score').textContent = '0';
+            nextRound();
+        }
+
+        function nextRound() {
+            if(state.qCount >= state.totalQ) return endGame();
+            
+            state.qCount++;
+            state.locked = false;
+            
+            const scroll = document.getElementById('scroll-ui');
+            scroll.style.transform = 'rotate(-1deg) scale(1)';
+            document.getElementById('cauldron-liquid').style.background = 'var(--potion-green)';
+            
+            generateUniqueQuestion();
+        }
+
+        function generateUniqueQuestion() {
+            let unique = false;
+            let attempts = 0;
+            let qData;
+
+            // Logic to ensure no repeats within a session
+            while (!unique && attempts < 50) {
+                qData = createQuestion();
+                if (!state.history.has(qData.id)) {
+                    state.history.add(qData.id);
+                    unique = true;
+                }
+                attempts++;
+            }
+            // Fallback if we run out of unique combinations (unlikely)
+            if(!unique) qData = createQuestion();
+            
+            renderQuestion(qData);
+        }
+
+        function createQuestion() {
+            const mode = Math.random() > 0.5 ? 'PtoD' : 'DtoP';
+            let pct, dec, id;
+            const special = [10, 20, 25, 50, 75, 100];
+            
+            if(Math.random() < 0.6) {
+                pct = special[rand(0, special.length-1)];
+            } else {
+                pct = rand(1, 99);
+            }
+            
+            dec = (pct / 100).toString();
+            if(pct % 10 === 0 && pct !== 100) dec = (pct/100).toFixed(1);
+            else dec = (pct/100).toString();
+
+            if (mode === 'PtoD') {
+                return {
+                    target: `${pct}%`,
+                    ans: dec,
+                    type: 'decimal',
+                    id: `PtoD-${pct}`
+                };
+            } else {
+                return {
+                    target: dec,
+                    ans: `${pct}%`,
+                    type: 'percent',
+                    id: `DtoP-${pct}`
+                };
+            }
+        }
+
+        function renderQuestion(q) {
+            state.currentAns = q.ans;
+            document.getElementById('target-display').textContent = q.target;
+
+            const shelf = document.getElementById('bottle-shelf');
+            shelf.innerHTML = '';
+
+            let opts = new Set([q.ans]);
+            
+            while(opts.size < 4) {
+                let fake;
+                if(q.type === 'decimal') {
+                    const base = parseFloat(q.ans);
+                    const r = Math.random();
+                    if(r < 0.3) fake = (base / 10).toString();
+                    else if(r < 0.6 && base < 10) fake = (base * 10).toString();
+                    else fake = (Math.random()).toFixed(2);
+                    fake = parseFloat(fake).toString(); 
+                } else {
+                    const base = parseFloat(q.ans);
+                    const r = Math.random();
+                    if(r < 0.3) fake = `${base/10}%`;
+                    else if(r < 0.6) fake = `${Math.min(100, base*10)}%`;
+                    else fake = `${rand(1,99)}%`;
+                }
+                
+                if(fake !== q.ans) opts.add(fake);
+            }
+
+            Array.from(opts).sort(() => Math.random() - 0.5).forEach(opt => {
+                const bottle = document.createElement('div');
+                bottle.className = 'potion-bottle';
+                const colors = ['#ff5252', '#448aff', '#69f0ae', '#e040fb'];
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                
+                bottle.innerHTML = `
+                    <div class="bottle-liquid" style="background: ${color}"></div>
+                    <span class="bottle-label">${opt}</span>
+                `;
+                bottle.onclick = () => handleInput(opt, bottle, color);
+                shelf.appendChild(bottle);
+                
+                setTimeout(() => Sfx.play('bubble'), rand(0,300));
+            });
+        }
+
+        function handleInput(val, bottle, color) {
+            if(state.locked) return;
+            state.locked = true;
+
+            if(val === state.currentAns) {
+                Sfx.play('correct');
+                state.score++;
+                document.getElementById('score').textContent = state.score;
+                document.getElementById('cauldron-liquid').style.background = 'var(--magic-gold)';
+                document.getElementById('scroll-ui').style.transform = 'rotate(1deg) scale(1.05)';
+                bottle.style.opacity = '0';
+                setTimeout(nextRound, 1200);
+            } else {
+                Sfx.play('wrong');
+                document.getElementById('cauldron-liquid').style.background = '#2c1b18';
+                bottle.style.transform = 'rotate(20deg) translateY(20px)';
+                bottle.style.opacity = '0.5';
+                setTimeout(nextRound, 1500);
+            }
+        }
+
+        function endGame() {
+            document.getElementById('screen-end').classList.add('active');
+            
+            let grade = '';
+            let color = '';
+            const s = state.score;
+
+            // Grading Logic
+            if(s >= 8) { grade = 'A'; color = 'var(--magic-gold)'; }
+            else if(s >= 6) { grade = 'B'; color = 'var(--potion-green)'; }
+            else if(s >= 4) { grade = 'C'; color = 'var(--potion-blue)'; }
+            else if(s >= 3) { grade = 'D'; color = '#e040fb'; } // Purple
+            else { grade = 'F'; color = 'var(--potion-red)'; }
+
+            const gd = document.getElementById('grade-display');
+            gd.textContent = grade;
+            gd.style.color = color;
+
+            document.getElementById('final-msg').textContent = "Potions Brewed: " + s + "/10";
+        }
+
+    </script>
+</body>
+</html>

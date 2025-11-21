@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sky Builder: Length Edition</title>
+    <style>
+        :root {
+            --sky-start: #0f2027;
+            --sky-end: #203a43;
+            --accent: #f1c40f;
+            --danger: #e74c3c;
+            --success: #2ecc71;
+            --text-light: #ecf0f1;
+            --block-color: #34495e;
+            --window-on: #f1c40f;
+            --window-off: #2c3e50;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            background: linear-gradient(to bottom, var(--sky-start), var(--sky-end));
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text-light);
+            overflow: hidden; /* Game takes full screen */
+            display: flex;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        .game-ui {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; /* Let clicks pass to canvas/buttons */
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+        }
+
+        /* HUD */
+        .hud-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .score-board {
+            background: rgba(0,0,0,0.5);
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: 2px solid var(--accent);
+            text-align: center;
+        }
+
+        .score-label { font-size: 0.8rem; color: #ccc; }
+        .score-val { font-size: 2rem; font-weight: bold; color: var(--accent); }
+
+        .health-meter {
+            width: 200px;
+            background: rgba(0,0,0,0.5);
+            border-radius: 10px;
+            padding: 10px;
+            border: 2px solid #fff;
+        }
+        .stability-label { font-size: 0.8rem; margin-bottom: 5px; }
+        .bar-frame { width: 100%; height: 10px; background: #333; border-radius: 5px; overflow: hidden; }
+        .bar-fill { height: 100%; width: 100%; background: var(--success); transition: width 0.3s, background 0.3s; }
+
+        /* Question Bubble (Attached to Crane visually, but DOM for text) */
+        .crane-question {
+            position: absolute;
+            top: 15%; left: 50%; transform: translateX(-50%);
+            background: #fff;
+            color: #333;
+            padding: 15px 25px;
+            border-radius: 15px;
+            text-align: center;
+            font-weight: bold;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            max-width: 90%;
+            animation: float 3s ease-in-out infinite;
+            border: 4px solid var(--block-color);
+            z-index: 10;
+        }
+        .crane-question::before {
+            content: ""; position: absolute; top: -20px; left: 50%; margin-left: -2px;
+            width: 4px; height: 20px; background: #555; /* Cable */
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateX(-50%) translateY(0); }
+            50% { transform: translateX(-50%) translateY(-5px); }
+        }
+
+        /* Controls */
+        .controls-area {
+            pointer-events: auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr; /* 3 options */
+            gap: 10px;
+            padding-bottom: 20px;
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .build-btn {
+            background: linear-gradient(to bottom, #3498db, #2980b9);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-size: 1.1rem;
+            font-weight: bold;
+            padding: 20px 5px;
+            cursor: pointer;
+            box-shadow: 0 6px 0 #1c5980;
+            transition: transform 0.1s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .build-btn:active {
+            transform: translateY(6px);
+            box-shadow: none;
+        }
+
+        .build-btn.correct { background: var(--success); box-shadow: 0 6px 0 #219150; }
+        .build-btn.wrong { background: var(--danger); box-shadow: 0 6px 0 #c0392b; animation: shake 0.4s; }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        /* Canvas Layer */
+        #game-canvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0;
+        }
+
+        /* Screens */
+        .screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 32, 39, 0.95);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            pointer-events: auto;
+            display: none;
+        }
+        .screen.active { display: flex; }
+
+        .big-btn {
+            background: var(--accent);
+            color: #333;
+            border: none;
+            padding: 20px 50px;
+            font-size: 1.5rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            cursor: pointer;
+            margin-top: 30px;
+            box-shadow: 0 0 20px var(--accent);
+            border-radius: 5px;
+        }
+        .big-btn:hover { transform: scale(1.05); }
+
+        .audio-toggle {
+            position: fixed; top: 20px; right: 20px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            display: flex; justify-content: center; align-items: center;
+            cursor: pointer;
+            z-index: 200;
+            pointer-events: auto;
+        }
+
+    </style>
+</head>
+<body>
+
+    <canvas id="game-canvas"></canvas>
+
+    <div class="game-ui">
+        <div class="hud-top">
+            <div class="health-meter">
+                <div class="stability-label">TOWER STABILITY</div>
+                <div class="bar-frame">
+                    <div class="bar-fill" id="stability-bar"></div>
+                </div>
+            </div>
+            <div class="score-board">
+                <div class="score-label">FLOORS</div>
+                <div class="score-val" id="score">0</div>
+            </div>
+        </div>
+
+        <div class="crane-question" id="question-bubble">
+            <div style="font-size:0.8rem; color:#777; text-transform:uppercase; margin-bottom:5px;" id="q-topic">Loading...</div>
+            <div style="font-size:1.3rem; line-height:1.2;" id="q-text">...</div>
+        </div>
+
+        <div class="controls-area" id="options-container">
+            <!-- Buttons injected here -->
+        </div>
+    </div>
+
+    <div class="audio-toggle" id="audio-btn" onclick="toggleAudio()">🔊</div>
+
+    <!-- START SCREEN -->
+    <div id="screen-start" class="screen active">
+        <h1 style="font-size: 3.5rem; color: var(--accent); text-shadow: 0 4px 0 #000;">SKY BUILDER</h1>
+        <p style="font-size: 1.2rem; max-width: 400px; color: #ccc; line-height: 1.6;">
+            Construct the tallest skyscraper by solving length problems.<br><br>
+            Correct answers place blocks perfectly.<br>
+            Wrong answers make the tower <strong>unstable</strong>.<br>
+            Don't let it fall!
+        </p>
+        <button class="big-btn" onclick="startGame()">START BUILDING</button>
+    </div>
+
+    <!-- END SCREEN -->
+    <div id="screen-end" class="screen">
+        <h1 style="font-size: 3rem; color: var(--danger);">COLLAPSE!</h1>
+        <p style="font-size: 1.5rem;">You built <span id="final-score" style="color:white; font-weight:bold;">0</span> floors.</p>
+        <button class="big-btn" onclick="startGame()">TRY AGAIN</button>
+    </div>
+
+    <script>
+        /** AUDIO SYSTEM */
+        const AudioSys = {
+            ctx: null, on: true,
+            init() { if(!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
+            play(type) {
+                if(!this.on || !this.ctx) return;
+                const t = this.ctx.currentTime;
+                const o = this.ctx.createOscillator();
+                const g = this.ctx.createGain();
+                o.connect(g); g.connect(this.ctx.destination);
+
+                if (type === 'motor') { // Crane sound
+                    o.type = 'sawtooth'; o.frequency.setValueAtTime(100, t);
+                    o.frequency.linearRampToValueAtTime(50, t+0.3);
+                    g.gain.setValueAtTime(0.1, t); g.gain.linearRampToValueAtTime(0, t+0.3);
+                    o.start(t); o.stop(t+0.3);
+                } else if (type === 'thud') { // Block land
+                    o.type = 'square'; o.frequency.setValueAtTime(50, t);
+                    g.gain.setValueAtTime(0.2, t); g.gain.exponentialRampToValueAtTime(0.01, t+0.2);
+                    o.start(t); o.stop(t+0.2);
+                } else if (type === 'crash') { // Game Over
+                    o.type = 'sawtooth';
+                    // Noise burst simulation
+                    for(let i=0;i<10;i++) {
+                        let n = this.ctx.createOscillator();
+                        let ng = this.ctx.createGain();
+                        n.connect(ng); ng.connect(this.ctx.destination);
+                        n.frequency.value = 100 + Math.random()*500;
+                        n.start(t); n.stop(t+1.0);
+                        ng.gain.setValueAtTime(0.1, t);
+                        ng.gain.exponentialRampToValueAtTime(0.001, t+1.0);
+                    }
+                }
+            }
+        };
+        function toggleAudio() {
+            AudioSys.on = !AudioSys.on;
+            document.getElementById('audio-btn').textContent = AudioSys.on ? '🔊' : '🔇';
+            if(AudioSys.on) AudioSys.init();
+        }
+
+        /** GAME STATE */
+        const state = {
+            floors: 0,
+            stability: 100,
+            history: new Set(),
+            currentAns: null,
+            locked: false,
+            cameraY: 0,
+            blocks: [] // Array of {x, y, width, height, crooked}
+        };
+
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        let animFrame;
+
+        // Resize handling
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        /** DRAWING LOOP */
+        function draw() {
+            // Background
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#0f2027');
+            gradient.addColorStop(1, '#203a43');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Stars
+            ctx.fillStyle = '#fff';
+            for(let i=0; i<50; i++) {
+                // Deterministic stars based on index to make them "scroll" with camera
+                const x = (i * 137) % canvas.width;
+                const y = ((i * 83) + state.cameraY * 0.2) % canvas.height;
+                ctx.fillRect(x, y, 2, 2);
+            }
+
+            // Ground - MOVED UP (Changed from 50 to 250)
+            const groundOffset = 250; 
+            const groundY = canvas.height - groundOffset + state.cameraY;
+            
+            ctx.fillStyle = '#2c3e50';
+            ctx.fillRect(0, groundY, canvas.width, canvas.height); // Draw all the way down
+
+            // Tower Blocks
+            const blockH = 60;
+            const blockW = 200;
+            const startX = (canvas.width - blockW) / 2;
+            const startY = canvas.height - groundOffset; // Start building from the new ground level
+
+            state.blocks.forEach((b, index) => {
+                const drawY = startY - (index + 1) * blockH + state.cameraY;
+                
+                ctx.save();
+                // Pivot for rotation
+                ctx.translate(startX + blockW/2, drawY + blockH/2);
+                if (b.crooked) ctx.rotate(b.crooked * 0.05); // Slight tilt
+                ctx.translate(-(startX + blockW/2), -(drawY + blockH/2));
+
+                // Draw Block
+                ctx.fillStyle = b.color || '#34495e';
+                ctx.fillRect(startX, drawY, blockW, blockH);
+                ctx.strokeStyle = '#2c3e50';
+                ctx.lineWidth = 4;
+                ctx.strokeRect(startX, drawY, blockW, blockH);
+
+                // Windows
+                for(let i=0; i<4; i++) {
+                    ctx.fillStyle = (index % 2 === 0) ? '#f1c40f' : '#95a5a6';
+                    if(Math.random() > 0.9) ctx.fillStyle = '#2c3e50'; // Flicker
+                    ctx.fillRect(startX + 20 + i*45, drawY + 15, 25, 30);
+                }
+
+                ctx.restore();
+            });
+
+            // Crane (Visual only, hangs from top)
+            const craneY = 100;
+            ctx.beginPath();
+            ctx.moveTo(canvas.width/2, 0);
+            ctx.lineTo(canvas.width/2, craneY);
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#555';
+            ctx.stroke();
+
+            // Crane Hook
+            ctx.fillStyle = '#e67e22';
+            ctx.fillRect(canvas.width/2 - 15, craneY, 30, 20);
+
+            animFrame = requestAnimationFrame(draw);
+        }
+
+        /** GAME LOGIC */
+        function startGame() {
+            AudioSys.init();
+            AudioSys.play('motor');
+            
+            state.floors = 0;
+            state.stability = 100;
+            state.blocks = [];
+            state.cameraY = 0;
+            state.history.clear();
+            
+            document.getElementById('screen-start').classList.remove('active');
+            document.getElementById('screen-end').classList.remove('active');
+            
+            updateUI();
+            draw(); // Start loop
+            nextRound();
+        }
+
+        function updateUI() {
+            document.getElementById('score').textContent = state.floors;
+            const bar = document.getElementById('stability-bar');
+            bar.style.width = state.stability + '%';
+            if(state.stability < 40) bar.style.background = '#e74c3c';
+            else bar.style.background = '#2ecc71';
+        }
+
+        function addBlock(isPerfect) {
+            const tilt = isPerfect ? 0 : (Math.random() > 0.5 ? 1 : -1); // -1 or 1 tilt
+            state.blocks.push({
+                crooked: tilt,
+                color: isPerfect ? '#34495e' : '#5d6d7e'
+            });
+            state.floors++;
+            
+            // Move camera down as tower grows
+            // Target camera Y moves up by block height (60)
+            // Simple lerp effect simulated by just incrementing
+            state.cameraY += 60; 
+            
+            AudioSys.play('thud');
+        }
+
+        function nextRound() {
+            state.locked = false;
+            generateQuestion();
+        }
+
+        /* QUESTION ENGINE */
+        const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+        function generateQuestion() {
+            // Syllabus: Units, Convert, Math, Measure
+            const types = ['unit', 'convert', 'math', 'measure'];
+            let qData;
+            let attempts = 0;
+            
+            // No repeat logic
+            do {
+                qData = createQuestionLogic(types[rand(0,3)]);
+                attempts++;
+            } while(state.history.has(qData.id) && attempts < 20);
+            
+            state.history.add(qData.id);
+            renderQuestion(qData);
+        }
+
+        function createQuestionLogic(type) {
+            let q = { id: '', topic: '', text: '', ans: '', opts: [] };
+
+            if (type === 'unit') {
+                q.topic = "SELECT UNIT";
+                const items = [
+                    {o: "Height of Tree", u: "m"},
+                    {o: "Width of Phone", u: "cm"},
+                    {o: "Road Distance", u: "km"},
+                    {o: "Ant Length", u: "mm"},
+                    {o: "Room Length", u: "m"}
+                ];
+                const i = items[rand(0, items.length-1)];
+                q.text = `Measure: ${i.o}`;
+                q.ans = i.u;
+                q.opts = ["mm", "cm", "m"];
+                q.id = `unit-${i.o}`;
+            } 
+            else if (type === 'convert') {
+                q.topic = "CONVERT";
+                const mode = rand(0, 2);
+                let val;
+                if(mode === 0) { // m to cm
+                    val = rand(1, 9);
+                    q.text = `${val} m = ? cm`;
+                    q.ans = (val*100).toString();
+                    q.opts = [(val*10).toString(), (val*100).toString(), (val*1000).toString()];
+                } else if (mode === 1) { // cm to mm
+                    val = rand(2, 15);
+                    q.text = `${val} cm = ? mm`;
+                    q.ans = (val*10).toString();
+                    q.opts = [(val*10).toString(), (val*100).toString(), (val+10).toString()];
+                } else { // km to m
+                    val = rand(1, 5);
+                    q.text = `${val} km = ? m`;
+                    q.ans = (val*1000).toString();
+                    q.opts = [(val*100).toString(), (val*1000).toString(), (val*10).toString()];
+                }
+                q.id = `conv-${q.text}`;
+            }
+            else if (type === 'math') {
+                q.topic = "CALCULATE";
+                const op = rand(0, 1);
+                if(op === 0) { // Add
+                    const a = rand(1, 5); const b = rand(1, 5);
+                    q.text = `${a}m 20cm + ${b}m 50cm`;
+                    q.ans = `${a+b}m 70cm`;
+                    q.opts = [`${a+b}m 70cm`, `${a+b}m 30cm`, `${a+b}m 50cm`];
+                } else { // Sub
+                    const a = rand(5, 9); const b = rand(1, 4);
+                    q.text = `${a}m 80cm - ${b}m 30cm`;
+                    q.ans = `${a-b}m 50cm`;
+                    q.opts = [`${a-b}m 50cm`, `${a-b}m 10cm`, `${a-b+1}m 50cm`];
+                }
+                q.id = `math-${q.text}`;
+            }
+            else if (type === 'measure') {
+                q.topic = "ESTIMATE";
+                const len = rand(2, 8);
+                q.text = `Length of a ${len}m car in cm?`;
+                q.ans = (len*100).toString();
+                q.opts = [(len*100).toString(), (len*10).toString(), (len*1000).toString()];
+                q.id = `est-${len}`;
+            }
+
+            // Shuffle options
+            q.opts.sort(() => Math.random() - 0.5);
+            state.currentAns = q.ans;
+            return q;
+        }
+
+        function renderQuestion(q) {
+            document.getElementById('q-topic').textContent = q.topic;
+            document.getElementById('q-text').textContent = q.text;
+            
+            const container = document.getElementById('options-container');
+            container.innerHTML = '';
+            
+            q.opts.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = 'build-btn';
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(opt, btn);
+                container.appendChild(btn);
+            });
+        }
+
+        function handleAnswer(val, btn) {
+            if(state.locked) return;
+            state.locked = true;
+
+            if(val === state.currentAns) {
+                btn.classList.add('correct');
+                addBlock(true);
+                // Bonus stability for streaks?
+                state.stability = Math.min(100, state.stability + 5);
+            } else {
+                btn.classList.add('wrong');
+                addBlock(false); // Crooked block
+                state.stability -= 20; // Damage
+            }
+
+            updateUI();
+
+            if(state.stability <= 0) {
+                setTimeout(endGame, 1000);
+            } else {
+                setTimeout(nextRound, 1000);
+            }
+        }
+
+        function endGame() {
+            AudioSys.play('crash');
+            document.getElementById('screen-end').classList.add('active');
+            document.getElementById('final-score').textContent = state.floors;
+        }
+
+    </script>
+</body>
+</html>

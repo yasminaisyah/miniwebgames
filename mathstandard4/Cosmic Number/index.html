@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cosmic Number Commander - Math Quest</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;600;700&display=swap');
+
+        body {
+            font-family: 'Fredoka', sans-serif;
+            background-color: #0f172a;
+            background-image: 
+                radial-gradient(white, rgba(255,255,255,.2) 2px, transparent 3px),
+                radial-gradient(white, rgba(255,255,255,.15) 1px, transparent 2px),
+                radial-gradient(white, rgba(255,255,255,.1) 2px, transparent 3px);
+            background-size: 550px 550px, 350px 350px, 250px 250px;
+            background-position: 0 0, 40px 60px, 130px 270px;
+            overflow-x: hidden;
+            color: white;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        .game-btn {
+            transition: all 0.2s ease;
+            border-bottom: 4px solid rgba(0,0,0,0.2);
+        }
+        .game-btn:active {
+            transform: translateY(2px);
+            border-bottom: 0px solid rgba(0,0,0,0.2);
+        }
+
+        /* Animations */
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+        .floating { animation: float 3s ease-in-out infinite; }
+
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 15px rgba(59, 130, 246, 0.5); }
+            50% { box-shadow: 0 0 25px rgba(59, 130, 246, 0.8); }
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .slide-in { animation: slideIn 0.4s ease-out forwards; }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+
+        .correct-anim { animation: popSuccess 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .wrong-anim { animation: shakeError 0.4s ease-in-out; }
+
+        @keyframes popSuccess {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); background-color: #22c55e; border-color: #22c55e; }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes shakeError {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); background-color: #ef4444; border-color: #ef4444; }
+            75% { transform: translateX(5px); background-color: #ef4444; border-color: #ef4444; }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4 selection:bg-purple-500 selection:text-white">
+
+    <!-- Main Menu Screen -->
+    <div id="menuScreen" class="w-full max-w-4xl mx-auto text-center z-10">
+        <div class="mb-8 floating">
+            <h1 class="text-5xl md:text-7xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500 mb-2 drop-shadow-lg">
+                Cosmic Number Commander
+            </h1>
+            <p class="text-cyan-200 text-xl">Master Numbers up to 100,000!</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 px-4">
+            <!-- Mission 1: Place Value -->
+            <button onclick="startGame('placeValue')" class="game-btn group relative overflow-hidden rounded-2xl p-6 bg-indigo-600 hover:bg-indigo-500 text-white text-left">
+                <div class="absolute -right-4 -top-4 text-indigo-400 opacity-20 text-9xl transition-transform group-hover:scale-110">
+                    <i class="fa-solid fa-rocket"></i>
+                </div>
+                <div class="relative z-10">
+                    <div class="w-12 h-12 rounded-full bg-indigo-400/30 flex items-center justify-center mb-4 text-2xl">
+                        <i class="fa-solid fa-crosshairs"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold mb-1">Launch Prep</h3>
+                    <p class="text-indigo-200 text-sm">Identify Place Value & Digit Value</p>
+                </div>
+            </button>
+
+            <!-- Mission 2: Rounding -->
+            <button onclick="startGame('rounding')" class="game-btn group relative overflow-hidden rounded-2xl p-6 bg-emerald-600 hover:bg-emerald-500 text-white text-left">
+                <div class="absolute -right-4 -top-4 text-emerald-400 opacity-20 text-9xl transition-transform group-hover:scale-110">
+                    <i class="fa-solid fa-globe"></i>
+                </div>
+                <div class="relative z-10">
+                    <div class="w-12 h-12 rounded-full bg-emerald-400/30 flex items-center justify-center mb-4 text-2xl">
+                        <i class="fa-solid fa-magnet"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold mb-1">Nav Computer</h3>
+                    <p class="text-emerald-200 text-sm">Round Numbers to Navigate</p>
+                </div>
+            </button>
+
+            <!-- Mission 3: Patterns -->
+            <button onclick="startGame('patterns')" class="game-btn group relative overflow-hidden rounded-2xl p-6 bg-amber-600 hover:bg-amber-500 text-white text-left">
+                <div class="absolute -right-4 -top-4 text-amber-400 opacity-20 text-9xl transition-transform group-hover:scale-110">
+                    <i class="fa-solid fa-satellite-dish"></i>
+                </div>
+                <div class="relative z-10">
+                    <div class="w-12 h-12 rounded-full bg-amber-400/30 flex items-center justify-center mb-4 text-2xl">
+                        <i class="fa-solid fa-wave-square"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold mb-1">Alien Signal</h3>
+                    <p class="text-amber-200 text-sm">Complete Number Patterns</p>
+                </div>
+            </button>
+
+            <!-- Mission 4: Comparing -->
+            <button onclick="startGame('comparing')" class="game-btn group relative overflow-hidden rounded-2xl p-6 bg-rose-600 hover:bg-rose-500 text-white text-left">
+                <div class="absolute -right-4 -top-4 text-rose-400 opacity-20 text-9xl transition-transform group-hover:scale-110">
+                    <i class="fa-solid fa-meteor"></i>
+                </div>
+                <div class="relative z-10">
+                    <div class="w-12 h-12 rounded-full bg-rose-400/30 flex items-center justify-center mb-4 text-2xl">
+                        <i class="fa-solid fa-scale-balanced"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold mb-1">Asteroid Belt</h3>
+                    <p class="text-rose-200 text-sm">Compare & Order Numbers</p>
+                </div>
+            </button>
+
+             <!-- Mission 5: Partitioning -->
+             <button onclick="startGame('partitioning')" class="game-btn group relative overflow-hidden rounded-2xl p-6 bg-purple-600 hover:bg-purple-500 text-white text-left md:col-span-2 lg:col-span-1">
+                <div class="absolute -right-4 -top-4 text-purple-400 opacity-20 text-9xl transition-transform group-hover:scale-110">
+                    <i class="fa-solid fa-boxes-stacked"></i>
+                </div>
+                <div class="relative z-10">
+                    <div class="w-12 h-12 rounded-full bg-purple-400/30 flex items-center justify-center mb-4 text-2xl">
+                        <i class="fa-solid fa-puzzle-piece"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold mb-1">Cargo Bay</h3>
+                    <p class="text-purple-200 text-sm">Partition & Expand Numbers</p>
+                </div>
+            </button>
+        </div>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="gameScreen" class="hidden w-full max-w-3xl z-10 slide-in">
+        <!-- HUD -->
+        <div class="flex justify-between items-center mb-6 glass-panel p-4 rounded-2xl">
+            <button onclick="exitGame()" class="text-slate-300 hover:text-white transition-colors">
+                <i class="fa-solid fa-arrow-left mr-2"></i> Abort Mission
+            </button>
+            <div class="flex items-center gap-6">
+                <div class="flex flex-col items-center">
+                    <span class="text-xs text-slate-400 uppercase tracking-wider">Score</span>
+                    <span id="scoreDisplay" class="text-2xl font-bold text-yellow-400">0</span>
+                </div>
+                <div class="flex flex-col items-center">
+                    <span class="text-xs text-slate-400 uppercase tracking-wider">Streak</span>
+                    <span id="streakDisplay" class="text-2xl font-bold text-cyan-400">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Area -->
+        <div class="glass-panel rounded-3xl p-8 md:p-12 relative overflow-hidden">
+            
+            <!-- Progress Bar -->
+            <div class="absolute top-0 left-0 w-full h-2 bg-slate-700">
+                <div id="progressBar" class="h-full bg-gradient-to-r from-cyan-500 to-blue-500 w-0 transition-all duration-500"></div>
+            </div>
+
+            <!-- Character/Theme Icon -->
+            <div class="flex justify-center mb-6">
+                <div id="missionIcon" class="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-4xl shadow-lg shadow-purple-500/50 floating">
+                    <i class="fa-solid fa-rocket"></i>
+                </div>
+            </div>
+
+            <!-- Question Container -->
+            <div class="text-center mb-8">
+                <h2 id="questionText" class="text-2xl md:text-4xl font-bold mb-4 leading-tight">Question Loading...</h2>
+                <div id="subQuestionText" class="text-xl text-cyan-200 font-mono bg-slate-800/50 inline-block px-4 py-2 rounded-lg"></div>
+            </div>
+
+            <!-- Answers Grid -->
+            <div id="answersGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Buttons generated by JS -->
+            </div>
+
+            <!-- Feedback Message -->
+            <div id="feedbackArea" class="h-8 mt-4 text-center font-bold text-lg"></div>
+        </div>
+    </div>
+
+    <!-- Game Over Modal -->
+    <div id="gameOverScreen" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="glass-panel p-8 rounded-3xl max-w-md w-full text-center slide-in border-t-4 border-yellow-400">
+            <div class="mb-6 text-6xl text-yellow-400">
+                <i class="fa-solid fa-trophy"></i>
+            </div>
+            <h2 class="text-4xl font-bold mb-2">Mission Complete!</h2>
+            <p class="text-slate-300 mb-6">Great job, Commander.</p>
+            
+            <div class="bg-slate-800/50 rounded-xl p-6 mb-8">
+                <div class="flex justify-between items-end mb-2">
+                    <span class="text-slate-400">Final Score</span>
+                    <span id="finalScore" class="text-3xl font-bold text-white">0</span>
+                </div>
+                <div class="w-full h-px bg-slate-700 my-2"></div>
+                <div class="flex justify-between items-end">
+                    <span class="text-slate-400">High Score</span>
+                    <span id="highScore" class="text-xl font-bold text-yellow-400">0</span>
+                </div>
+            </div>
+
+            <button onclick="exitGame()" class="w-full py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 font-bold text-lg hover:shadow-lg hover:shadow-cyan-500/30 transition-all">
+                Return to Base
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Game State
+        const state = {
+            currentMode: null,
+            score: 0,
+            streak: 0,
+            questionsAnswered: 0,
+            maxQuestions: 10,
+            currentQuestion: null,
+            isAnimating: false
+        };
+
+        // Audio Context (Simple Beeps)
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            if (type === 'correct') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(500, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1000, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.1);
+            } else {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.2);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.2);
+            }
+        }
+
+        // Utility Functions
+        const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+        const formatNum = (num) => num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ","); // Add commas like 10,000
+
+        // --- Question Generators ---
+
+        const generators = {
+            placeValue: () => {
+                // Topic: Recognize number, Place value and digit value
+                // Logic: Pick a number up to 100,000. Highlight a digit. Ask for its Place or Value.
+                const num = randomInt(1000, 99999);
+                const numStr = num.toString();
+                const digitIndex = randomInt(0, numStr.length - 1);
+                const digit = numStr[digitIndex];
+                
+                // Calculate place value (1, 10, 100, etc)
+                const powerOf10 = Math.pow(10, numStr.length - 1 - digitIndex);
+                
+                const type = Math.random() > 0.5 ? 'place' : 'value';
+                
+                let questionText, correctAnswer;
+                let options = [];
+
+                if (type === 'place') {
+                    questionText = `What is the <span class="text-yellow-400">PLACE</span> of the digit ${digit}?`;
+                    const places = ['Ones', 'Tens', 'Hundreds', 'Thousands', 'Ten Thousands'];
+                    // Map powerOf10 to name
+                    const placeMap = { 1: 'Ones', 10: 'Tens', 100: 'Hundreds', 1000: 'Thousands', 10000: 'Ten Thousands' };
+                    correctAnswer = placeMap[powerOf10];
+                    
+                    // Generate distractors
+                    const wrongPlaces = places.filter(p => p !== correctAnswer);
+                    options = [correctAnswer, ...wrongPlaces.sort(() => 0.5 - Math.random()).slice(0, 3)];
+                } else {
+                    questionText = `What is the <span class="text-yellow-400">VALUE</span> of the digit ${digit}?`;
+                    correctAnswer = (parseInt(digit) * powerOf10).toString(); // e.g., 500
+                    
+                    // Distractors: the digit itself, digit * different power, random number
+                    options.push(correctAnswer);
+                    options.push(digit); // e.g., 5
+                    if (powerOf10 > 1) options.push((parseInt(digit) * (powerOf10/10)).toString());
+                    else options.push((parseInt(digit) * 10).toString());
+                    options.push((parseInt(digit) * (powerOf10 * 10)).toString());
+                    options = [...new Set(options)].slice(0,4); // Remove dupes
+                    while(options.length < 4) options.push(randomInt(1, 90000).toString());
+                }
+
+                // Format the number specifically to highlight the digit
+                const formattedNum = numStr.split('').map((d, i) => 
+                    i === digitIndex ? `<span class="text-yellow-400 text-5xl font-bold border-b-4 border-yellow-400 mx-1">${d}</span>` : `<span class="text-4xl text-slate-400 mx-1">${d}</span>`
+                ).join('');
+
+                return {
+                    mainText: questionText,
+                    subTextHTML: `<div class="mt-4 tracking-widest flex justify-center items-baseline">${formattedNum}</div>`,
+                    options: options.sort(() => 0.5 - Math.random()),
+                    correct: correctAnswer
+                };
+            },
+
+            rounding: () => {
+                // Topic: Round off numbers
+                const num = randomInt(1200, 98000);
+                const modes = [10, 100, 1000, 10000];
+                const roundTo = modes[randomInt(0, (num > 10000 ? 3 : 2))]; // Only round to 10k if num is big enough
+                
+                const questionText = `Round this number to the nearest <span class="text-emerald-400">${formatNum(roundTo)}</span>`;
+                
+                // Logic for rounding
+                const correctAnswer = Math.round(num / roundTo) * roundTo;
+                
+                // Distractors: Floor, Ceil (if not same), Off by one step
+                let options = new Set();
+                options.add(correctAnswer);
+                options.add(Math.floor(num / roundTo) * roundTo);
+                options.add(Math.ceil(num / roundTo) * roundTo);
+                options.add(correctAnswer + roundTo);
+                options.add(correctAnswer - roundTo);
+                
+                // Filter out distractors that happen to be the same as correct (e.g. if num is already round)
+                // and ensure we have 4 options
+                let finalOptions = Array.from(options).filter(n => n !== correctAnswer);
+                finalOptions = finalOptions.slice(0, 3);
+                finalOptions.push(correctAnswer);
+                
+                // Fill if needed
+                while(finalOptions.length < 4) finalOptions.push(finalOptions[0] + roundTo * 5);
+
+                return {
+                    mainText: questionText,
+                    subTextHTML: `<span class="text-5xl font-bold">${formatNum(num)}</span>`,
+                    options: finalOptions.map(formatNum).sort(() => 0.5 - Math.random()),
+                    correct: formatNum(correctAnswer)
+                };
+            },
+
+            patterns: () => {
+                // Topic: Number patterns
+                const step = randomInt(1, 5) * Math.pow(10, randomInt(1, 3)); // Steps like 10, 200, 5000
+                const start = randomInt(1000, 80000);
+                const isAscending = Math.random() > 0.3;
+                const realStep = isAscending ? step : -step;
+                
+                let sequence = [];
+                for(let i=0; i<5; i++) {
+                    sequence.push(start + (i * realStep));
+                }
+
+                // Hide one index (not the first one usually, simpler to see pattern)
+                const hideIndex = randomInt(1, 4);
+                const correctAnswer = sequence[hideIndex];
+                sequence[hideIndex] = "❓";
+
+                const sequenceHTML = sequence.map(n => 
+                    n === "❓" ? `<span class="text-amber-400 font-bold mx-2 bg-slate-800 px-3 py-1 rounded border-2 border-amber-400 border-dashed">?</span>` 
+                               : `<span class="mx-1">${formatNum(n)}</span>`
+                ).join(' <i class="fa-solid fa-arrow-right text-xs text-slate-600"></i> ');
+
+                const distractors = [
+                    correctAnswer + realStep,
+                    correctAnswer - realStep,
+                    correctAnswer + (realStep/2), // tricky
+                    correctAnswer + 10 // random small error
+                ];
+
+                return {
+                    mainText: "Find the missing number in the pattern:",
+                    subTextHTML: `<div class="text-lg md:text-2xl flex flex-wrap justify-center items-center gap-2">${sequenceHTML}</div>`,
+                    options: [correctAnswer, ...distractors.slice(0,3)].map(Math.round).map(formatNum).sort(() => 0.5 - Math.random()),
+                    correct: formatNum(correctAnswer)
+                };
+            },
+
+            comparing: () => {
+                // Topic: Compare numbers, Estimate quantity
+                const base = randomInt(10000, 90000);
+                const diff = randomInt(1, 500); // Close numbers are harder
+                const num1 = base;
+                const num2 = Math.random() > 0.5 ? base + diff : base - diff;
+                
+                // Modes: "Select Greater", "Select Smaller", or Symbols
+                const mode = Math.random();
+                let q, ans, opts, subHTML;
+
+                if (mode < 0.33) {
+                    q = "Which number is <span class='text-rose-400'>LARGER</span>?";
+                    ans = Math.max(num1, num2);
+                    subHTML = ""; // No subtext, buttons act as options
+                    opts = [num1, num2];
+                } else if (mode < 0.66) {
+                    q = "Which number is <span class='text-rose-400'>SMALLER</span>?";
+                    ans = Math.min(num1, num2);
+                    subHTML = "";
+                    opts = [num1, num2];
+                } else {
+                    q = "Choose the correct symbol:";
+                    subHTML = `<div class="text-4xl font-bold flex gap-4 items-center bg-slate-800 px-6 py-3 rounded-xl border border-slate-600">
+                        <span>${formatNum(num1)}</span> 
+                        <span class="w-12 h-12 bg-slate-700 rounded flex items-center justify-center text-yellow-400">?</span> 
+                        <span>${formatNum(num2)}</span>
+                    </div>`;
+                    ans = num1 > num2 ? ">" : (num1 < num2 ? "<" : "=");
+                    opts = [">", "<", "="];
+                }
+
+                return {
+                    mainText: q,
+                    subTextHTML: subHTML,
+                    options: opts.map(o => typeof o === 'number' ? formatNum(o) : o),
+                    correct: typeof ans === 'number' ? formatNum(ans) : ans
+                };
+            },
+
+            partitioning: () => {
+                // Topic: Partition numbers (Standard vs Expanded)
+                const num = randomInt(1000, 99999);
+                const numStr = num.toString();
+                
+                // Create expanded form parts
+                let parts = [];
+                for(let i=0; i<numStr.length; i++) {
+                    if(numStr[i] !== '0') {
+                        parts.push(numStr[i] + '0'.repeat(numStr.length - 1 - i));
+                    }
+                }
+
+                const isCombine = Math.random() > 0.5; // 50% chance: Combine parts -> Number, or Number -> Parts
+                
+                if (isCombine) {
+                    // Show: 40000 + 200 + 50
+                    const questionText = "Combine these numbers:";
+                    const expandedStr = parts.join(" + ");
+                    
+                    // Distractors: digits concatenated, or missing a zero
+                    const d1 = parts.join(""); // 4000020050
+                    const d2 = numStr.replace('0', ''); // Remove a zero
+                    const d3 = randomInt(1000, 99999).toString();
+
+                    return {
+                        mainText: questionText,
+                        subTextHTML: `<div class="text-2xl md:text-3xl text-purple-300 font-mono break-all">${expandedStr}</div>`,
+                        options: [formatNum(num), formatNum(parseInt(d1)), formatNum(parseInt(d2)), formatNum(parseInt(d3))].sort(() => 0.5 - Math.random()),
+                        correct: formatNum(num)
+                    };
+                } else {
+                    // Show: 42,050. Find expanded form.
+                    const questionText = "Find the expanded form:";
+                    const correctStr = parts.join(" + ");
+                    
+                    // Fake options
+                    const wrongParts1 = [...parts]; 
+                    if(wrongParts1.length > 1) wrongParts1[0] = wrongParts1[0].slice(0,-1); // Remove a zero from biggest number
+                    
+                    const wrongParts2 = numStr.split('').join(" + "); // 4 + 2 + 0 + 5 + 0
+                    
+                    const wrongParts3 = [...parts];
+                    wrongParts3.push("10"); // Add extra
+
+                    return {
+                        mainText: questionText,
+                        subTextHTML: `<div class="text-5xl font-bold">${formatNum(num)}</div>`,
+                        options: [correctStr, wrongParts1.join(" + "), wrongParts2, wrongParts3.join(" + ")].sort(() => 0.5 - Math.random()),
+                        correct: correctStr
+                    };
+                }
+            }
+        };
+
+        // --- Game Logic ---
+
+        function startGame(mode) {
+            state.currentMode = mode;
+            state.score = 0;
+            state.streak = 0;
+            state.questionsAnswered = 0;
+            
+            // UI Update
+            document.getElementById('menuScreen').classList.add('hidden');
+            document.getElementById('gameOverScreen').classList.add('hidden');
+            const gameScreen = document.getElementById('gameScreen');
+            gameScreen.classList.remove('hidden');
+            
+            // Update Icon based on mode
+            const icons = {
+                placeValue: '<i class="fa-solid fa-rocket"></i>',
+                rounding: '<i class="fa-solid fa-globe"></i>',
+                patterns: '<i class="fa-solid fa-satellite-dish"></i>',
+                comparing: '<i class="fa-solid fa-meteor"></i>',
+                partitioning: '<i class="fa-solid fa-boxes-stacked"></i>'
+            };
+            document.getElementById('missionIcon').innerHTML = icons[mode];
+
+            updateScoreUI();
+            nextQuestion();
+        }
+
+        function nextQuestion() {
+            if (state.questionsAnswered >= state.maxQuestions) {
+                endGame();
+                return;
+            }
+
+            // Update Progress
+            const pct = ((state.questionsAnswered) / state.maxQuestions) * 100;
+            document.getElementById('progressBar').style.width = `${pct}%`;
+
+            // Generate Content
+            const qData = generators[state.currentMode]();
+            state.currentQuestion = qData;
+
+            // Render
+            document.getElementById('questionText').innerHTML = qData.mainText;
+            document.getElementById('subQuestionText').innerHTML = qData.subTextHTML || '';
+            document.getElementById('feedbackArea').innerHTML = '';
+            document.getElementById('feedbackArea').className = 'h-8 mt-4 text-center font-bold text-lg';
+
+            const grid = document.getElementById('answersGrid');
+            grid.innerHTML = '';
+
+            // Special styling for comparison mode (2 large buttons vs 4 grid)
+            if (state.currentMode === 'comparing' && qData.options.length === 2) {
+                grid.className = "grid grid-cols-2 gap-4";
+            } else {
+                grid.className = "grid grid-cols-1 md:grid-cols-2 gap-4";
+            }
+
+            qData.options.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = `game-btn bg-slate-700 hover:bg-slate-600 text-white font-bold py-6 px-4 rounded-xl text-xl md:text-2xl shadow-lg w-full break-words`;
+                btn.innerHTML = opt;
+                btn.onclick = () => handleAnswer(opt, btn);
+                grid.appendChild(btn);
+            });
+
+            state.isAnimating = false;
+        }
+
+        function handleAnswer(selected, btnElement) {
+            if (state.isAnimating) return;
+            state.isAnimating = true;
+
+            const isCorrect = selected.toString() === state.currentQuestion.correct.toString();
+            const feedback = document.getElementById('feedbackArea');
+
+            if (isCorrect) {
+                playSound('correct');
+                state.score += 100 + (state.streak * 10);
+                state.streak++;
+                
+                // Visuals
+                btnElement.classList.remove('bg-slate-700', 'hover:bg-slate-600');
+                btnElement.classList.add('bg-green-500', 'border-green-700', 'correct-anim');
+                feedback.textContent = "Correct! Systems Optimal.";
+                feedback.classList.add('text-green-400');
+            } else {
+                playSound('wrong');
+                state.streak = 0;
+                
+                // Visuals
+                btnElement.classList.remove('bg-slate-700', 'hover:bg-slate-600');
+                btnElement.classList.add('bg-red-500', 'border-red-700', 'wrong-anim');
+                feedback.innerHTML = `Incorrect. Answer: <span class="text-white">${state.currentQuestion.correct}</span>`;
+                feedback.classList.add('text-red-400');
+
+                // Highlight correct one
+                const buttons = document.querySelectorAll('#answersGrid button');
+                buttons.forEach(b => {
+                    if (b.textContent === state.currentQuestion.correct.toString()) {
+                        b.classList.add('bg-green-500/50', 'border-green-500');
+                    }
+                });
+            }
+
+            updateScoreUI();
+            state.questionsAnswered++;
+
+            setTimeout(() => {
+                nextQuestion();
+            }, 1500);
+        }
+
+        function updateScoreUI() {
+            document.getElementById('scoreDisplay').textContent = state.score;
+            document.getElementById('streakDisplay').textContent = state.streak;
+        }
+
+        function endGame() {
+            document.getElementById('gameScreen').classList.add('hidden');
+            document.getElementById('gameOverScreen').classList.remove('hidden');
+            document.getElementById('finalScore').textContent = state.score;
+            
+            // Save/Load High Score
+            const key = `highScore_${state.currentMode}`;
+            const saved = localStorage.getItem(key) || 0;
+            if (state.score > saved) {
+                localStorage.setItem(key, state.score);
+                document.getElementById('highScore').textContent = state.score + " (NEW!)";
+            } else {
+                document.getElementById('highScore').textContent = saved;
+            }
+        }
+
+        function exitGame() {
+            document.getElementById('gameScreen').classList.add('hidden');
+            document.getElementById('gameOverScreen').classList.add('hidden');
+            document.getElementById('menuScreen').classList.remove('hidden');
+        }
+
+    </script>
+</body>
+</html>

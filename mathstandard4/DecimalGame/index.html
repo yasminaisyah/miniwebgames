@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orbital Decimals: Mission Control</title>
+    <style>
+        :root {
+            --hud-color: #00f3ff; /* Cyan */
+            --hud-dim: #005f63;
+            --alert: #ff2a2a;
+            --success: #39ff14;
+            --bg: #050505;
+            --scanline: rgba(0, 255, 255, 0.03);
+        }
+
+        * {
+            box-sizing: border-box;
+            font-family: 'Courier New', Courier, monospace;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            background-color: var(--bg);
+            color: var(--hud-color);
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; 
+            min-height: 100vh;
+            overflow-x: hidden;
+            text-transform: uppercase;
+            padding: 20px 0;
+        }
+
+        /* CRT Scanline Effect */
+        body::after {
+            content: "";
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: linear-gradient(to bottom, var(--scanline) 50%, transparent 50%);
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 999;
+        }
+
+        .interface-container {
+            width: 100%;
+            max-width: 600px;
+            height: auto;
+            min-height: 90vh;
+            border: 2px solid var(--hud-dim);
+            box-shadow: 0 0 20px var(--hud-dim);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            padding: 30px; /* Increased padding */
+            background: radial-gradient(circle at center, #0a0a0a 0%, #000000 100%);
+            margin: 10px;
+            padding-bottom: 60px; /* Space for audio button at bottom */
+        }
+
+        /* Corner Accents */
+        .interface-container::before {
+            content: "";
+            position: absolute;
+            top: -2px; left: -2px; width: 20px; height: 20px;
+            border-top: 4px solid var(--hud-color);
+            border-left: 4px solid var(--hud-color);
+        }
+        .interface-container::after {
+            content: "";
+            position: absolute;
+            bottom: -2px; right: -2px; width: 20px; height: 20px;
+            border-bottom: 4px solid var(--hud-color);
+            border-right: 4px solid var(--hud-color);
+        }
+
+        /* Audio Toggle - MOVED TO BOTTOM RIGHT TO AVOID OVERLAP */
+        .audio-toggle {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: #000;
+            border: 1px solid var(--hud-color);
+            color: var(--hud-color);
+            padding: 8px 15px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            z-index: 100;
+            box-shadow: 0 0 5px var(--hud-dim);
+        }
+        .audio-toggle:hover { background: var(--hud-dim); color: #fff; }
+
+        /* Screens */
+        .screen {
+            display: none;
+            flex-direction: column;
+            height: 100%;
+            width: 100%;
+            animation: flicker 0.2s ease-in;
+        }
+        .screen.active { display: flex; }
+
+        @keyframes flicker {
+            0% { opacity: 0.8; }
+            50% { opacity: 0.4; }
+            100% { opacity: 1; }
+        }
+
+        /* Typography */
+        h1 {
+            text-align: center;
+            font-size: 2rem;
+            text-shadow: 0 0 10px var(--hud-color);
+            margin: 10px 0 20px 0;
+            letter-spacing: 4px;
+            border-bottom: 1px solid var(--hud-dim);
+            padding-bottom: 10px;
+            line-height: 1.2;
+        }
+
+        .status-line {
+            text-align: center;
+            font-size: 0.9rem;
+            color: var(--hud-dim);
+            margin-bottom: 30px;
+        }
+
+        /* Buttons */
+        .menu-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+            padding: 0 10px;
+        }
+
+        .hud-btn {
+            background: rgba(0, 243, 255, 0.05);
+            border: 1px solid var(--hud-color);
+            color: var(--hud-color);
+            padding: 20px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            text-align: left;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .hud-btn:hover {
+            background: var(--hud-color);
+            color: #000;
+            box-shadow: 0 0 15px var(--hud-color);
+        }
+
+        .hud-btn::before {
+            content: "[ ]";
+            margin-right: 10px;
+            opacity: 0.5;
+        }
+        .hud-btn:hover::before { content: "[X]"; opacity: 1; }
+
+        /* Game HUD */
+        .top-hud {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--hud-dim);
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+            font-size: 1rem; /* Increased size for readability */
+            font-weight: bold;
+        }
+
+        .data-display {
+            flex-grow: 1;
+            border: 1px solid var(--hud-dim);
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 20px;
+            position: relative;
+            padding: 20px;
+            min-height: 180px; 
+        }
+
+        .data-label {
+            font-size: 0.8rem;
+            color: var(--hud-dim);
+            position: absolute;
+            top: 5px;
+            left: 5px;
+        }
+
+        .data-content {
+            font-size: 2.2rem;
+            text-shadow: 0 0 5px var(--hud-color);
+            text-align: center;
+            line-height: 1.3;
+            word-break: break-word;
+        }
+
+        .options-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            padding-bottom: 20px;
+        }
+
+        .opt-btn {
+            background: transparent;
+            border: 1px solid var(--hud-dim);
+            color: var(--hud-color);
+            padding: 20px 10px;
+            font-size: 1.3rem;
+            cursor: pointer;
+            transition: 0.2s;
+            word-break: break-all; /* Prevent overflow on long decimals */
+        }
+
+        .opt-btn:hover {
+            border-color: var(--hud-color);
+            box-shadow: inset 0 0 10px var(--hud-dim);
+        }
+
+        .opt-btn.correct {
+            background: var(--success);
+            color: black;
+            border-color: var(--success);
+            box-shadow: 0 0 20px var(--success);
+        }
+
+        .opt-btn.wrong {
+            background: var(--alert);
+            color: black;
+            border-color: var(--alert);
+            box-shadow: 0 0 20px var(--alert);
+        }
+
+        .message-log {
+            height: 30px;
+            margin-top: 15px;
+            text-align: center;
+            font-size: 1rem;
+            color: var(--hud-color);
+        }
+
+        /* Results */
+        .report-container {
+            border: 1px dashed var(--hud-color);
+            padding: 20px;
+            margin: 20px;
+            text-align: center;
+        }
+
+        .big-stat {
+            font-size: 4rem;
+            margin: 20px 0;
+        }
+
+        .progress-line {
+            width: 100%;
+            height: 4px;
+            background: var(--hud-dim);
+            margin-bottom: 20px;
+            position: relative;
+        }
+        .progress-fill {
+            height: 100%;
+            background: var(--hud-color);
+            width: 0%;
+            transition: width 0.3s;
+            box-shadow: 0 0 10px var(--hud-color);
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="interface-container">
+        <!-- MOVED AUDIO TOGGLE DOWN HERE -->
+        <button class="audio-toggle" id="audio-btn" onclick="toggleAudio()">AUDIO: ON</button>
+        
+        <!-- MENU SCREEN -->
+        <div id="screen-menu" class="screen active">
+            <h1>ORBITAL DECIMALS</h1>
+            <div class="status-line">SYSTEM ONLINE // SELECT MODULE</div>
+            
+            <div class="menu-grid">
+                <button class="hud-btn" onclick="initMission('recognise')">
+                    <span>SENSOR CALIBRATION</span>
+                    <small>ID Place Value</small>
+                </button>
+                <button class="hud-btn" onclick="initMission('convert')">
+                    <span>FUEL CONVERSION</span>
+                    <small>Fractions/Decimals</small>
+                </button>
+                <button class="hud-btn" onclick="initMission('compare')">
+                    <span>TARGET LOCK</span>
+                    <small>Compare Values</small>
+                </button>
+                <button class="hud-btn" onclick="initMission('ops')">
+                    <span>TRAJECTORY CALC</span>
+                    <small>Add/Sub/Mul/Div</small>
+                </button>
+                <button class="hud-btn" onclick="initMission('mix')">
+                    <span>FULL DIAGNOSTIC</span>
+                    <small>All Systems</small>
+                </button>
+            </div>
+        </div>
+
+        <!-- GAME SCREEN -->
+        <div id="screen-game" class="screen">
+            <div class="top-hud">
+                <!-- Used flex-basis to ensure even spacing -->
+                <div style="flex: 1; text-align: left;">INTEGRITY: <span id="score">100</span>%</div>
+                <div style="flex: 1; text-align: right;">TASK: <span id="progress-text">1/10</span></div>
+            </div>
+
+            <div class="progress-line">
+                <div id="progress-bar" class="progress-fill"></div>
+            </div>
+
+            <div class="data-display">
+                <span class="data-label">INCOMING_DATA_STREAM</span>
+                <div class="data-content" id="question-display">
+                    LOADING...
+                </div>
+            </div>
+            
+            <div class="message-log" id="feedback-log">AWAITING INPUT...</div>
+
+            <div class="options-panel" id="options-grid">
+                <!-- Options injected here -->
+            </div>
+        </div>
+
+        <!-- RESULT SCREEN -->
+        <div id="screen-result" class="screen">
+            <h1>MISSION DEBRIEF</h1>
+            <div class="report-container">
+                <div class="status-line">FINAL SYSTEM STATUS</div>
+                <div class="big-stat" id="final-percent">90%</div>
+                <p id="mission-outcome">OPERATIONAL</p>
+            </div>
+            <button class="hud-btn" onclick="goMenu()">RETURN TO BASE</button>
+        </div>
+    </div>
+
+    <script>
+        // --- AUDIO SYSTEM (Sci-Fi Style) ---
+        const Sfx = {
+            ctx: null,
+            on: true,
+            init() { if(!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
+            play(type) {
+                if(!this.on || !this.ctx) return;
+                const t = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.connect(gain); gain.connect(this.ctx.destination);
+
+                if (type === 'select') {
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(800, t);
+                    osc.frequency.exponentialRampToValueAtTime(1200, t + 0.05);
+                    gain.gain.setValueAtTime(0.1, t);
+                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+                    osc.start(t); osc.stop(t + 0.05);
+                } else if (type === 'correct') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(440, t);
+                    osc.frequency.linearRampToValueAtTime(880, t + 0.15);
+                    gain.gain.value = 0.1;
+                    gain.gain.linearRampToValueAtTime(0, t + 0.15);
+                    osc.start(t); osc.stop(t + 0.15);
+                } else if (type === 'wrong') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(150, t);
+                    osc.frequency.linearRampToValueAtTime(100, t + 0.3);
+                    gain.gain.value = 0.1;
+                    gain.gain.linearRampToValueAtTime(0, t + 0.3);
+                    osc.start(t); osc.stop(t + 0.3);
+                }
+            }
+        };
+
+        function toggleAudio() {
+            Sfx.on = !Sfx.on;
+            document.getElementById('audio-btn').textContent = Sfx.on ? 'AUDIO: ON' : 'AUDIO: MUTED';
+            if(Sfx.on) Sfx.init();
+        }
+
+        // --- GAME LOGIC ---
+        const state = {
+            score: 100, 
+            qIndex: 0,
+            totalQ: 10,
+            mode: 'mix',
+            history: new Set(),
+            currentAns: null,
+            locked: false
+        };
+
+        const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+        const randDec = (min, max, fixed) => (Math.random() * (max - min) + min).toFixed(fixed);
+
+        function switchScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        function initMission(mode) {
+            Sfx.init();
+            Sfx.play('select');
+            state.mode = mode;
+            state.qIndex = 0;
+            state.score = 100;
+            state.history.clear();
+            switchScreen('screen-game');
+            nextQuestion();
+        }
+
+        function nextQuestion() {
+            if (state.qIndex >= state.totalQ) return endMission();
+            
+            state.qIndex++;
+            state.locked = false;
+
+            document.getElementById('progress-text').textContent = `${state.qIndex}/${state.totalQ}`;
+            document.getElementById('progress-bar').style.width = `${((state.qIndex-1)/state.totalQ)*100}%`;
+            document.getElementById('feedback-log').textContent = "AWAITING INPUT...";
+            document.getElementById('feedback-log').style.color = "var(--hud-color)";
+
+            let type = state.mode;
+            if (type === 'mix') {
+                const types = ['recognise', 'convert', 'compare', 'ops'];
+                type = types[rand(0, 3)];
+            }
+
+            generateUniqueQuestion(type);
+        }
+
+        function generateUniqueQuestion(type) {
+            let unique = false;
+            let attempts = 0;
+            
+            while(!unique && attempts < 100) {
+                const q = createQuestionLogic(type);
+                const sig = `${type}:${q.text}`;
+                if(!state.history.has(sig)) {
+                    state.history.add(sig);
+                    renderQuestion(q);
+                    unique = true;
+                }
+                attempts++;
+            }
+            if (!unique) renderQuestion(createQuestionLogic(type));
+        }
+
+        function createQuestionLogic(type) {
+            let q = { text: '', ans: null, opts: [] };
+
+            if (type === 'recognise') {
+                const a = rand(10, 99);
+                const b = rand(100, 999);
+                const numStr = `${a}.${b}`;
+                const places = ["Tenths", "Hundredths", "Thousandths"];
+                const placeIdx = rand(0, 2);
+                const digit = numStr.split('.')[1][placeIdx];
+                
+                q.text = `IDENTIFY DIGIT IN <br><span style="color:var(--success)">${places[placeIdx]}</span><br>VALUE: ${numStr}`;
+                q.ans = digit;
+                
+                let opts = new Set([digit]);
+                while(opts.size < 4) opts.add(rand(0, 9).toString());
+                q.opts = Array.from(opts);
+            } 
+            else if (type === 'convert') {
+                // UPDATED: Math-based generation instead of fixed list
+                const validDenoms = [2, 4, 5, 8, 10, 20, 25, 50];
+                const d = validDenoms[rand(0, validDenoms.length-1)];
+                const n = rand(1, d-1); // Proper fraction
+                
+                // Simplify for display if possible, but calc decimal based on raw
+                // Actually, just show raw n/d is fine for drill
+                const decVal = (n/d).toString();
+                // Remove leading zero for style consistency if desired, but standard is 0.x
+                
+                const isFracToDec = rand(0,1); // 50/50 chance
+
+                if (isFracToDec) {
+                    q.text = `CONVERT FUEL RATIO:<br>${n}/${d}`;
+                    q.ans = decVal;
+                    // Generate options
+                    let opts = new Set([decVal]);
+                    while(opts.size < 4) {
+                        let fake = (parseFloat(decVal) + (rand(0,1)?0.1:-0.1) * rand(1,5)/10).toFixed(3);
+                        // Remove trailing zeros
+                        fake = parseFloat(fake).toString();
+                        if(fake !== decVal && fake > 0) opts.add(fake);
+                        // Fallback
+                        if(opts.size < 4) opts.add((Math.random()).toFixed(2));
+                    }
+                    q.opts = Array.from(opts);
+                } else {
+                    q.text = `CONVERT DECIMAL:<br>${decVal}`;
+                    q.ans = `${n}/${d}`;
+                    
+                    // Fraction options need to be distinct
+                    let opts = new Set([`${n}/${d}`]);
+                    while(opts.size < 4) {
+                        const fd = validDenoms[rand(0, validDenoms.length-1)];
+                        const fn = rand(1, fd-1);
+                        const fStr = `${fn}/${fd}`;
+                        if (fStr !== `${n}/${d}`) opts.add(fStr);
+                    }
+                    q.opts = Array.from(opts);
+                }
+            }
+            else if (type === 'compare') {
+                // UPDATED: Dynamic comparison generation
+                const base = rand(1, 8);
+                const vals = [];
+                // Generate 4 variations
+                vals.push(`0.${base}`);
+                vals.push(`0.0${base}`);
+                vals.push(`0.${base}${base}`);
+                vals.push(`0.${base}${base+1}`);
+                
+                // Ensure unique values
+                const uniqueVals = Array.from(new Set(vals));
+                while(uniqueVals.length < 4) {
+                    uniqueVals.push((Math.random()).toFixed(2));
+                }
+                
+                const shuffled = uniqueVals.sort(()=>Math.random()-0.5);
+                const goal = rand(0,1) ? 'LARGEST' : 'SMALLEST';
+                
+                let sorted = [...shuffled].sort((a,b) => parseFloat(a) - parseFloat(b));
+                q.ans = goal === 'SMALLEST' ? sorted[0] : sorted[sorted.length-1];
+                q.text = `SELECT ${goal} SIGNATURE`;
+                q.opts = shuffled;
+            }
+            else if (type === 'ops') {
+                const op = rand(0, 3); 
+                let n1, n2, res, symbol;
+                
+                if (op === 0) { // Add
+                    n1 = parseFloat(randDec(1, 10, 1));
+                    n2 = parseFloat(randDec(1, 10, 1));
+                    res = (n1 + n2).toFixed(1);
+                    symbol = "+";
+                } else if (op === 1) { // Sub
+                    n1 = parseFloat(randDec(5, 15, 1));
+                    n2 = parseFloat(randDec(1, 4, 1));
+                    res = (n1 - n2).toFixed(1);
+                    symbol = "-";
+                } else if (op === 2) { // Mul
+                    n1 = rand(2, 5);
+                    n2 = parseFloat(randDec(1, 2, 1)); 
+                    res = (n1 * n2).toFixed(1); 
+                    if (res.endsWith('.0')) res = res.split('.')[0];
+                    symbol = "×";
+                } else { // Div
+                    n2 = rand(2, 5); 
+                    let qVal = parseFloat(randDec(1.1, 3.5, 1));
+                    n1 = (qVal * n2).toFixed(1);
+                    if (n1.endsWith('.0')) n1 = n1.split('.')[0];
+                    res = qVal.toString();
+                    symbol = "÷";
+                }
+
+                q.text = `CALCULATE:<br>${n1} ${symbol} ${n2}`;
+                q.ans = res.toString();
+                
+                let opts = new Set([q.ans]);
+                let numRes = parseFloat(res);
+                while(opts.size < 4) {
+                    let v = (numRes + (rand(0,1)?0.1:-0.1) * rand(1,5)).toFixed(res.includes('.')?1:0);
+                    if(v !== q.ans && v >= 0) opts.add(v);
+                    if(opts.size < 4) opts.add((numRes + Math.random()).toFixed(1));
+                }
+                q.opts = Array.from(opts);
+            }
+
+            return q;
+        }
+
+        function renderQuestion(q) {
+            state.currentAns = q.ans;
+            document.getElementById('question-display').innerHTML = q.text;
+            const grid = document.getElementById('options-grid');
+            grid.innerHTML = '';
+
+            q.opts.sort(()=>Math.random()-0.5).forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = 'opt-btn';
+                btn.textContent = opt;
+                btn.onclick = () => handleInput(opt, btn);
+                grid.appendChild(btn);
+            });
+        }
+
+        function handleInput(val, btn) {
+            if(state.locked) return;
+            state.locked = true;
+
+            // Convert to string for comparison just in case
+            if (String(val) === String(state.currentAns)) {
+                Sfx.play('correct');
+                btn.classList.add('correct');
+                document.getElementById('feedback-log').textContent = "DATA VERIFIED. INTEGRITY STABLE.";
+                document.getElementById('feedback-log').style.color = "var(--success)";
+                setTimeout(nextQuestion, 1000);
+            } else {
+                Sfx.play('wrong');
+                btn.classList.add('wrong');
+                state.score = Math.max(0, state.score - 10);
+                document.getElementById('score').textContent = state.score;
+                document.getElementById('feedback-log').textContent = "ERROR. INTEGRITY COMPROMISED.";
+                document.getElementById('feedback-log').style.color = "var(--alert)";
+                
+                document.querySelectorAll('.opt-btn').forEach(b => {
+                    if(String(b.textContent) === String(state.currentAns)) b.classList.add('correct');
+                });
+                
+                setTimeout(nextQuestion, 1500);
+            }
+        }
+
+        function endMission() {
+            switchScreen('screen-result');
+            document.getElementById('final-percent').textContent = state.score + "%";
+            const out = document.getElementById('mission-outcome');
+            
+            if(state.score >= 90) { out.textContent = "MISSION SUCCESS: OPTIMAL"; out.style.color = "var(--success)"; }
+            else if(state.score >= 70) { out.textContent = "MISSION SUCCESS: ACCEPTABLE"; out.style.color = "var(--hud-color)"; }
+            else { out.textContent = "MISSION FAILED: CRITICAL SYSTEMS OFFLINE"; out.style.color = "var(--alert)"; }
+        }
+
+        function goMenu() {
+            Sfx.play('select');
+            switchScreen('screen-menu');
+        }
+
+    </script>
+</body>
+</html>

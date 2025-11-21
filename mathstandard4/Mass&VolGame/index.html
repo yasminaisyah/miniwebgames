@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Alchemist's Measure</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700&display=swap');
+
+        :root {
+            --bg-color: #2b1055;
+            --card-bg: #4c2a85;
+            --accent: #00f2ff;
+            --accent-secondary: #d600ff;
+            --text-color: #fff;
+            --success: #00e676;
+            --error: #ff1744;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Nunito', sans-serif;
+            background: radial-gradient(circle at center, #533483 0%, #2b1055 100%);
+            height: 100vh;
+            overflow: hidden;
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* --- UI Layout --- */
+        #game-container {
+            width: 100%;
+            max-width: 600px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            background: rgba(0,0,0,0.2);
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+        }
+
+        /* Header */
+        .header {
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0,0,0,0.3);
+            backdrop-filter: blur(5px);
+            border-bottom: 2px solid rgba(255,255,255,0.1);
+            z-index: 10;
+        }
+
+        .stat-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            opacity: 0.7;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-value {
+            font-family: 'Fredoka One', cursive;
+            font-size: 1.5rem;
+            color: var(--accent);
+            text-shadow: 0 0 10px rgba(0, 242, 255, 0.5);
+        }
+
+        /* Main Game Area */
+        #scene {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            padding: 20px;
+        }
+
+        /* The Customer (Wizard) */
+        #customer {
+            font-size: 5rem;
+            margin-bottom: 20px;
+            filter: drop-shadow(0 10px 20px rgba(0,0,0,0.5));
+            animation: float 3s ease-in-out infinite;
+            transition: transform 0.2s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-15px); }
+        }
+
+        /* The Speech Bubble (Question) */
+        .bubble {
+            background: #fff;
+            color: #2b1055;
+            padding: 20px 30px;
+            border-radius: 50px;
+            font-family: 'Fredoka One', cursive;
+            font-size: 1.8rem;
+            text-align: center;
+            position: relative;
+            margin-bottom: 40px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            border: 4px solid var(--accent-secondary);
+            max-width: 90%;
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 15px 15px 0;
+            border-style: solid;
+            border-color: var(--accent-secondary) transparent transparent transparent;
+        }
+
+        /* Timer Bar */
+        .timer-container {
+            width: 80%;
+            height: 10px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+
+        #timer-bar {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--accent-secondary));
+            border-radius: 10px;
+            transition: width 0.1s linear;
+        }
+
+        /* Options Grid */
+        #options-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            width: 100%;
+            padding: 0 10px 20px 10px;
+        }
+
+        .option-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            padding: 20px 5px;
+            cursor: pointer;
+            transition: all 0.1s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .option-btn:active {
+            transform: scale(0.95);
+        }
+
+        .option-icon {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .option-text {
+            font-family: 'Fredoka One', cursive;
+            font-size: 1.2rem;
+            color: #fff;
+            text-align: center;
+        }
+
+        /* Feedback Overlay */
+        #feedback {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Fredoka One', cursive;
+            font-size: 4rem;
+            pointer-events: none;
+            opacity: 0;
+            z-index: 100;
+            text-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        .correct-feedback {
+            color: var(--success);
+            animation: feedbackPop 0.8s forwards;
+        }
+        
+        .wrong-feedback {
+            color: var(--error);
+            animation: feedbackPop 0.8s forwards;
+        }
+
+        @keyframes feedbackPop {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+            20% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+            100% { opacity: 0; transform: translate(-50%, -150%) scale(1); }
+        }
+
+        @keyframes popIn {
+            from { transform: scale(0); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        /* Screens (Start/Game Over) */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(43, 16, 85, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        h1 {
+            font-family: 'Fredoka One', cursive;
+            font-size: 3rem;
+            color: var(--accent);
+            margin: 0 0 10px 0;
+            text-shadow: 4px 4px 0px #d600ff;
+        }
+
+        p {
+            font-size: 1.2rem;
+            margin-bottom: 30px;
+            line-height: 1.5;
+        }
+
+        .btn-main {
+            background: linear-gradient(45deg, #ff00cc, #333399);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            font-family: 'Fredoka One', cursive;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+            transition: transform 0.2s;
+            text-transform: uppercase;
+        }
+
+        .btn-main:hover {
+            transform: scale(1.05);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.4);
+        }
+
+        /* Particles */
+        .particle {
+            position: absolute;
+            pointer-events: none;
+            background: white;
+            border-radius: 50%;
+            animation: floatUp 1s linear forwards;
+        }
+
+        @keyframes floatUp {
+            to { transform: translateY(-100px); opacity: 0; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="start-screen" class="screen">
+        <h1>The Alchemist's<br>Measure</h1>
+        <p>Master the arts of Mass and Volume!</p>
+        <div style="font-size: 4rem; margin-bottom: 20px;">🧙‍♂️⚖️🧪</div>
+        <p>Solve the recipe math before the customer leaves!</p>
+        <button class="btn-main" onclick="startGame()">Open Shop</button>
+    </div>
+
+    <div id="game-over-screen" class="screen hidden">
+        <h1>Shop Closed!</h1>
+        <p id="final-msg">Great work!</p>
+        <div class="stat-box" style="margin-bottom: 20px;">
+            <span class="stat-label">Final Score</span>
+            <span class="stat-value" id="final-score" style="font-size: 3rem;">0</span>
+        </div>
+        <button class="btn-main" onclick="startGame()">Play Again</button>
+    </div>
+
+    <div id="game-container">
+        <div class="header">
+            <div class="stat-box">
+                <span class="stat-label">Score</span>
+                <span class="stat-value" id="score-display">0</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">Level</span>
+                <span class="stat-value" id="level-display">1</span>
+            </div>
+        </div>
+
+        <div id="scene">
+            <div id="customer">🧙‍♂️</div>
+            <div class="bubble" id="question-display">Loading...</div>
+            
+            <div class="timer-container">
+                <div id="timer-bar"></div>
+            </div>
+
+            <div id="options-grid">
+                </div>
+        </div>
+
+        <div id="feedback"></div>
+    </div>
+
+    <script>
+        // --- Game State ---
+        let state = {
+            score: 0,
+            level: 1,
+            isPlaying: false,
+            timer: 100,
+            maxTime: 100,
+            timerInterval: null,
+            currentQuestion: null
+        };
+
+        // --- Audio System (Synthesizer) ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'correct') {
+                // High pleasant ding
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(500, now);
+                osc.frequency.exponentialRampToValueAtTime(1000, now + 0.1);
+                gainNode.gain.setValueAtTime(0.1, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                osc.start(now);
+                osc.stop(now + 0.5);
+            } else if (type === 'wrong') {
+                // Low error buzz
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.linearRampToValueAtTime(100, now + 0.3);
+                gainNode.gain.setValueAtTime(0.1, now);
+                gainNode.gain.linearRampToValueAtTime(0.01, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            } else if (type === 'pop') {
+                // Bubble pop
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, now);
+                gainNode.gain.setValueAtTime(0.05, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'gameover') {
+                // Sad slide
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.linearRampToValueAtTime(100, now + 1);
+                gainNode.gain.setValueAtTime(0.2, now);
+                gainNode.gain.linearRampToValueAtTime(0.001, now + 1);
+                osc.start(now);
+                osc.stop(now + 1);
+            }
+        }
+
+        // --- Math & Logic Generator ---
+        
+        const UNITS = {
+            mass: ['g', 'kg'],
+            liquid: ['ml', 'ℓ']
+        };
+
+        const CUSTOMERS = ['🧙‍♂️', '🧚‍♀️', '🧛', '🧝', '🧟', '🦄', '👩‍🔬'];
+
+        function generateQuestion(level) {
+            const isMass = Math.random() > 0.5;
+            const unitSet = isMass ? UNITS.mass : UNITS.liquid;
+            
+            // Determine difficulty based on level
+            // 1-3: Simple Add/Sub (Small numbers)
+            // 4-6: Add/Sub (Large numbers), Simple Mult
+            // 7+: Mixed, Division, Unit Conversions potential
+            
+            let num1, num2, operator, answer, displayQ;
+            let unit = unitSet[0]; // Default to smaller unit (g or ml) for simplicity usually
+
+            const opType = Math.random();
+            
+            if (level <= 3) {
+                // Simple Addition/Subtraction
+                unit = Math.random() > 0.5 ? unitSet[0] : unitSet[1]; // g or kg
+                operator = Math.random() > 0.5 ? '+' : '-';
+                
+                if (operator === '+') {
+                    num1 = getRandomInt(10, 100) * 10;
+                    num2 = getRandomInt(10, 100) * 10;
+                    answer = num1 + num2;
+                } else {
+                    num1 = getRandomInt(20, 100) * 10;
+                    num2 = getRandomInt(10, (num1/10)) * 10; // Ensure result positive
+                    answer = num1 - num2;
+                }
+                displayQ = `${num1} ${unit} ${operator} ${num2} ${unit}`;
+            } 
+            else if (level <= 7) {
+                // Harder Add/Sub or Simple Multiplication
+                if (opType < 0.7) { // Add/Sub with bigger numbers
+                    unit = unitSet[0];
+                    operator = Math.random() > 0.5 ? '+' : '-';
+                    if (operator === '+') {
+                        num1 = getRandomInt(100, 500);
+                        num2 = getRandomInt(100, 500);
+                        answer = num1 + num2;
+                    } else {
+                        num1 = getRandomInt(300, 900);
+                        num2 = getRandomInt(100, 300);
+                        answer = num1 - num2;
+                    }
+                    displayQ = `${num1} ${unit} ${operator} ${num2} ${unit}`;
+                } else { // Multiplication
+                    unit = unitSet[0];
+                    num1 = getRandomInt(2, 9) * 50; // e.g., 150
+                    num2 = getRandomInt(2, 5); // e.g., 3
+                    answer = num1 * num2;
+                    displayQ = `${num1} ${unit} × ${num2}`;
+                }
+            }
+            else {
+                // Expert Mode: Division included
+                if (opType < 0.4) { // Big Addition
+                    unit = unitSet[0];
+                    num1 = getRandomInt(500, 2000);
+                    num2 = getRandomInt(200, 1000);
+                    answer = num1 + num2;
+                    displayQ = `${num1} ${unit} + ${num2} ${unit}`;
+                } else if (opType < 0.7) { // Multiplication
+                    unit = unitSet[1]; // kg or l
+                    num1 = getRandomInt(2, 15);
+                    num2 = getRandomInt(2, 9);
+                    answer = num1 * num2;
+                    displayQ = `${num1} ${unit} × ${num2}`;
+                } else { // Division
+                    unit = unitSet[0];
+                    answer = getRandomInt(5, 50) * 10; // Ensure clean answer
+                    num2 = getRandomInt(2, 5);
+                    num1 = answer * num2;
+                    displayQ = `${num1} ${unit} ÷ ${num2}`;
+                }
+            }
+
+            // Generate Wrong Options
+            let options = new Set();
+            options.add(answer);
+            
+            while(options.size < 3) {
+                let offset = getRandomInt(1, 5) * 10;
+                if(level > 5) offset = getRandomInt(1, 20) * 5;
+                let wrong = Math.random() > 0.5 ? answer + offset : answer - offset;
+                if (wrong > 0 && wrong !== answer) options.add(wrong);
+            }
+
+            // Determine Icon (Bottle or Bag)
+            const icon = isMass ? '⚖️' : '🧪';
+
+            return {
+                question: displayQ,
+                answer: answer,
+                unit: unit,
+                options: Array.from(options).sort(() => Math.random() - 0.5),
+                icon: icon,
+                customer: CUSTOMERS[Math.floor(Math.random() * CUSTOMERS.length)]
+            };
+        }
+
+        function getRandomInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        // --- Game Logic ---
+
+        function startGame() {
+            state.score = 0;
+            state.level = 1;
+            state.maxTime = 100;
+            state.timer = 100;
+            state.isPlaying = true;
+            
+            document.getElementById('score-display').textContent = 0;
+            document.getElementById('level-display').textContent = 1;
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-over-screen').classList.add('hidden');
+            
+            if (state.timerInterval) clearInterval(state.timerInterval);
+            state.timerInterval = setInterval(gameLoop, 100); // Update timer
+            
+            nextTurn();
+        }
+
+        function nextTurn() {
+            if (!state.isPlaying) return;
+            
+            // Generate Question
+            state.currentQuestion = generateQuestion(state.level);
+            
+            // Update UI
+            document.getElementById('customer').textContent = state.currentQuestion.customer;
+            document.getElementById('question-display').textContent = state.currentQuestion.question; // Raw text without "I need..." for quicker reading
+            
+            // Render Options
+            const grid = document.getElementById('options-grid');
+            grid.innerHTML = '';
+            
+            state.currentQuestion.options.forEach(opt => {
+                const btn = document.createElement('div');
+                btn.className = 'option-btn';
+                btn.innerHTML = `
+                    <div class="option-icon">${state.currentQuestion.icon}</div>
+                    <div class="option-text">${opt} ${state.currentQuestion.unit}</div>
+                `;
+                btn.onclick = () => checkAnswer(opt);
+                grid.appendChild(btn);
+            });
+
+            playSound('pop');
+        }
+
+        function checkAnswer(selectedVal) {
+            if (!state.isPlaying) return;
+
+            const correct = selectedVal === state.currentQuestion.answer;
+            
+            if (correct) {
+                playSound('correct');
+                showFeedback("Correct!", "correct-feedback");
+                state.score += 10 + (state.level * 2);
+                state.timer = Math.min(state.maxTime, state.timer + 15); // Add time bonus
+                
+                // Level Up
+                if (state.score > state.level * 100) {
+                    state.level++;
+                    state.maxTime = Math.max(30, 100 - (state.level * 2)); // Time gets tighter
+                }
+
+                document.getElementById('score-display').textContent = state.score;
+                document.getElementById('level-display').textContent = state.level;
+                
+                // Create Sparkles
+                createParticles();
+
+                setTimeout(nextTurn, 800);
+            } else {
+                playSound('wrong');
+                showFeedback("Wrong!", "wrong-feedback");
+                state.timer -= 20; // Penalty
+                
+                // Visual shake
+                document.getElementById('game-container').style.transform = "translateX(10px)";
+                setTimeout(() => {
+                     document.getElementById('game-container').style.transform = "translateX(-10px)";
+                     setTimeout(() => document.getElementById('game-container').style.transform = "none", 50);
+                }, 50);
+            }
+        }
+
+        function showFeedback(text, className) {
+            const el = document.getElementById('feedback');
+            el.textContent = text;
+            el.className = ''; // reset
+            void el.offsetWidth; // trigger reflow
+            el.className = className;
+        }
+
+        function gameLoop() {
+            if (!state.isPlaying) return;
+
+            // Decrease Timer
+            // Speed increases slightly with level
+            const decay = 0.5 + (state.level * 0.1);
+            state.timer -= decay;
+
+            const bar = document.getElementById('timer-bar');
+            bar.style.width = state.timer + '%';
+
+            // Color change for urgency
+            if (state.timer < 30) bar.style.background = '#ff1744';
+            else bar.style.background = 'linear-gradient(90deg, #00f2ff, #d600ff)';
+
+            if (state.timer <= 0) {
+                gameOver();
+            }
+        }
+
+        function gameOver() {
+            state.isPlaying = false;
+            clearInterval(state.timerInterval);
+            playSound('gameover');
+            document.getElementById('game-over-screen').classList.remove('hidden');
+            document.getElementById('final-score').textContent = state.score;
+            
+            const msg = document.getElementById('final-msg');
+            if (state.score < 100) msg.textContent = "Keep practicing your mixtures!";
+            else if (state.score < 300) msg.textContent = "Good job, Apprentice!";
+            else msg.textContent = "Amazing! A true Potion Master!";
+        }
+
+        // --- Particles FX ---
+        function createParticles() {
+            const rect = document.getElementById('customer').getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+
+            for (let i = 0; i < 10; i++) {
+                const p = document.createElement('div');
+                p.className = 'particle';
+                document.body.appendChild(p);
+                
+                const size = Math.random() * 10 + 5;
+                p.style.width = size + 'px';
+                p.style.height = size + 'px';
+                p.style.left = centerX + 'px';
+                p.style.top = centerY + 'px';
+                
+                // Random direction
+                const tx = (Math.random() - 0.5) * 100;
+                const ty = -Math.random() * 100;
+                
+                p.animate([
+                    { transform: 'translate(0,0) scale(1)', opacity: 1 },
+                    { transform: `translate(${tx}px, ${ty}px) scale(0)`, opacity: 0 }
+                ], {
+                    duration: 800,
+                    easing: 'ease-out'
+                });
+
+                setTimeout(() => p.remove(), 800);
+            }
+        }
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Number Voyager: Mission 100k</title>
+    <style>
+        :root {
+            --primary: #00f2ff;
+            --secondary: #ff0055;
+            --bg: #0b0e14;
+            --panel: #161b25;
+            --text: #ffffff;
+            --success: #00ff88;
+        }
+
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@400;700&display=swap');
+
+        body {
+            margin: 0;
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Roboto', sans-serif;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            user-select: none;
+        }
+
+        /* Animated Background */
+        .stars {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at center, transparent 0%, var(--bg) 100%),
+                        url("data:image/svg+xml,%3Csvg width='400' height='400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.15'/%3E%3C/svg%3E");
+            z-index: -1;
+            animation: drift 60s linear infinite;
+        }
+
+        @keyframes drift { from { background-position: 0 0; } to { background-position: 1000px 500px; } }
+
+        /* UI Container */
+        #game-container {
+            width: 90%;
+            max-width: 700px;
+            background: var(--panel);
+            border: 2px solid var(--primary);
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0, 242, 255, 0.2);
+            padding: 2rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        h1 { font-family: 'Orbitron', sans-serif; color: var(--primary); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 2px; }
+        
+        /* HUD */
+        .hud {
+            display: flex;
+            justify-content: space-between;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 10px;
+        }
+        .score-box { color: var(--success); }
+        .life-box { color: var(--secondary); }
+
+        /* Question Area */
+        .question-area {
+            min-height: 150px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .topic-label {
+            background: rgba(0, 242, 255, 0.1);
+            color: var(--primary);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+        }
+
+        .question-text {
+            font-size: 1.8rem;
+            font-weight: bold;
+            line-height: 1.4;
+        }
+
+        .highlight { color: var(--primary); font-size: 2.2rem; }
+
+        /* Options Grid */
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .btn {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--primary);
+            color: white;
+            padding: 15px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s;
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .btn:hover { background: var(--primary); color: var(--bg); box-shadow: 0 0 15px var(--primary); transform: translateY(-2px); }
+        .btn:active { transform: scale(0.98); }
+
+        .btn.correct { background: var(--success); border-color: var(--success); color: black; }
+        .btn.wrong { background: var(--secondary); border-color: var(--secondary); animation: shake 0.4s; }
+
+        /* Screens */
+        #start-screen, #game-over-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(11, 14, 20, 0.95); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10; }
+        .hidden { display: none !important; }
+
+        .big-btn {
+            padding: 20px 40px;
+            font-size: 1.5rem;
+            background: var(--primary);
+            color: var(--bg);
+            border: none;
+            border-radius: 50px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 20px;
+            box-shadow: 0 0 20px var(--primary);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(0, 242, 255, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(0, 242, 255, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 242, 255, 0); } }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
+
+    </style>
+</head>
+<body>
+
+    <div class="stars"></div>
+
+    <div id="game-container">
+        <div id="start-screen">
+            <h1>Number Voyager</h1>
+            <p>Mission: Master Numbers up to 100,000</p>
+            <button class="big-btn" onclick="startGame()">LAUNCH MISSION</button>
+        </div>
+
+        <div id="game-over-screen" class="hidden">
+            <h1>Mission Aborted</h1>
+            <p>Final Score: <span id="final-score">0</span></p>
+            <p>Level Reached: <span id="final-level">1</span></p>
+            <button class="big-btn" onclick="startGame()">RETRY MISSION</button>
+        </div>
+
+        <div class="hud">
+            <div>SCORE: <span id="score" class="score-box">0</span></div>
+            <div>LEVEL: <span id="level">1</span></div>
+            <div>LIVES: <span id="lives" class="life-box">❤️❤️❤️</span></div>
+        </div>
+
+        <div class="question-area">
+            <div id="topic-label" class="topic-label">Topic</div>
+            <div id="question-text" class="question-text">Loading...</div>
+        </div>
+
+        <div id="options" class="options-grid">
+            </div>
+    </div>
+
+<script>
+    // --- AUDIO SYSTEM (Synthesized, no external files) ---
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    function playSound(type) {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        if (type === 'correct') {
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.3);
+        } else if (type === 'wrong') {
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+            osc.frequency.linearRampToValueAtTime(100, audioCtx.currentTime + 0.3);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.3);
+        } else if (type === 'click') {
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.1);
+        }
+    }
+
+    // --- GAME LOGIC ---
+    let state = {
+        score: 0,
+        level: 1,
+        lives: 3,
+        correctIndex: 0,
+        isProcessing: false
+    };
+
+    const maxNumber = 100000;
+
+    function startGame() {
+        state = { score: 0, level: 1, lives: 3, isProcessing: false };
+        updateHUD();
+        document.getElementById('start-screen').classList.add('hidden');
+        document.getElementById('game-over-screen').classList.add('hidden');
+        playSound('correct');
+        generateQuestion();
+    }
+
+    function updateHUD() {
+        document.getElementById('score').innerText = state.score;
+        document.getElementById('level').innerText = state.level;
+        document.getElementById('lives').innerText = "❤️".repeat(state.lives);
+    }
+
+    function gameOver() {
+        playSound('wrong');
+        document.getElementById('final-score').innerText = state.score;
+        document.getElementById('final-level').innerText = state.level;
+        document.getElementById('game-over-screen').classList.remove('hidden');
+    }
+
+    function getRandomInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function formatNumber(num) {
+        return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " "); // Adds space for thousands
+    }
+
+    // --- QUESTION GENERATORS ---
+    // Topics based on image: Recognise, Explore, Place Value, Partition, Value, Estimate, Patterns, Rounding
+
+    function generateQuestion() {
+        if(state.lives <= 0) return gameOver();
+
+        // Randomly choose a topic type
+        const types = ['place_value', 'digit_value', 'partition', 'rounding', 'pattern', 'compare', 'estimate'];
+        const type = types[Math.floor(Math.random() * types.length)];
+        
+        let questionData = {};
+
+        // Scale difficulty with level (numbers get bigger)
+        let min = 1000;
+        let max = Math.min(10000 + (state.level * 5000), 99999);
+        
+        switch (type) {
+            case 'place_value':
+                questionData = generatePlaceValue(min, max);
+                break;
+            case 'digit_value':
+                questionData = generateDigitValue(min, max);
+                break;
+            case 'partition':
+                questionData = generatePartition(min, max);
+                break;
+            case 'rounding':
+                questionData = generateRounding(min, max);
+                break;
+            case 'pattern':
+                questionData = generatePattern(min, max);
+                break;
+            case 'compare':
+                questionData = generateCompare(min, max);
+                break;
+            case 'estimate':
+                questionData = generateEstimate(min, max);
+                break;
+        }
+
+        renderQuestion(questionData);
+    }
+
+    function generatePlaceValue(min, max) {
+        let num = getRandomInt(min, max);
+        let numStr = num.toString();
+        let pos = getRandomInt(0, numStr.length - 1);
+        let digit = numStr[pos];
+        
+        // Positions from right: 0=ones, 1=tens, 2=hundreds...
+        // Positions from left (index): len-1-pos
+        
+        const places = ["Ones", "Tens", "Hundreds", "Thousands", "Ten Thousands"];
+        let placeIndex = (numStr.length - 1) - pos;
+        let correctPlace = places[placeIndex];
+
+        let options = [correctPlace];
+        while(options.length < 4) {
+            let p = places[getRandomInt(0, 4)];
+            if(!options.includes(p)) options.push(p);
+        }
+
+        return {
+            topic: "Place Value",
+            text: `What is the <span class='highlight'>PLACE VALUE</span> of the digit <span class='highlight'>${digit}</span> in <br>${formatNumber(num)}?`,
+            correct: correctPlace,
+            options: shuffleArray(options)
+        };
+    }
+
+    function generateDigitValue(min, max) {
+        let num = getRandomInt(min, max);
+        let numStr = num.toString();
+        let pos = getRandomInt(0, numStr.length - 1);
+        let digit = parseInt(numStr[pos]);
+        
+        let power = (numStr.length - 1) - pos; // 0 for ones, 1 for tens
+        let correctVal = digit * Math.pow(10, power);
+
+        let options = [correctVal];
+        while(options.length < 4) {
+            let fakePower = getRandomInt(0, 4);
+            let fakeVal = digit * Math.pow(10, fakePower);
+            if(!options.includes(fakeVal) && fakeVal > 0) options.push(fakeVal);
+            if(options.length < 4) { // Fallback if collisions
+                options.push(getRandomInt(1, 90000));
+            }
+        }
+
+        return {
+            topic: "Digit Value",
+            text: `What is the <span class='highlight'>DIGIT VALUE</span> of <span class='highlight'>${digit}</span> in <br>${formatNumber(num)}?`,
+            correct: formatNumber(correctVal),
+            options: shuffleArray(options).map(formatNumber)
+        };
+    }
+
+    function generateRounding(min, max) {
+        let num = getRandomInt(min, max);
+        const types = [10, 100, 1000, 10000];
+        let roundTo = types[getRandomInt(0, Math.min(state.level, 3))]; // Unlock harder rounding later
+        
+        let correct = Math.round(num / roundTo) * roundTo;
+        
+        let options = [correct];
+        options.push(Math.floor(num / roundTo) * roundTo); // Floor
+        options.push(Math.ceil(num / roundTo) * roundTo); // Ceil
+        options.push(correct + roundTo);
+        
+        // Remove duplicates and fill
+        options = [...new Set(options)];
+        while(options.length < 4) {
+            options.push(options[0] + (getRandomInt(1,5) * roundTo));
+        }
+
+        let placeName = "";
+        if(roundTo === 10) placeName = "Ten";
+        if(roundTo === 100) placeName = "Hundred";
+        if(roundTo === 1000) placeName = "Thousand";
+        if(roundTo === 10000) placeName = "Ten Thousand";
+
+        return {
+            topic: "Rounding Numbers",
+            text: `Round <span class='highlight'>${formatNumber(num)}</span> to the nearest <span class='highlight'>${placeName}</span>.`,
+            correct: formatNumber(correct),
+            options: shuffleArray(options).map(formatNumber)
+        };
+    }
+
+    function generatePartition(min, max) {
+        // e.g., 45200 = 40000 + ? + 200
+        let num = getRandomInt(min, max);
+        let numStr = num.toString();
+        
+        // Pick a non-zero digit to hide
+        let validIndices = [];
+        for(let i=0; i<numStr.length; i++) {
+            if(numStr[i] !== '0') validIndices.push(i);
+        }
+        let hideIdx = validIndices[getRandomInt(0, validIndices.length - 1)];
+        
+        let digit = parseInt(numStr[hideIdx]);
+        let power = (numStr.length - 1) - hideIdx;
+        let correctVal = digit * Math.pow(10, power);
+
+        // Build the equation string
+        let parts = [];
+        for(let i=0; i<numStr.length; i++) {
+            let d = parseInt(numStr[i]);
+            let p = (numStr.length - 1) - i;
+            let val = d * Math.pow(10, p);
+            
+            if(i === hideIdx) {
+                parts.push("?");
+            } else if (val !== 0) {
+                parts.push(formatNumber(val));
+            }
+        }
+        
+        let options = [correctVal];
+        options.push(correctVal * 10);
+        options.push(correctVal / 10 || 1);
+        options.push(digit);
+        
+        return {
+            topic: "Partition Numbers",
+            text: `Complete the partition:<br>${formatNumber(num)} = ${parts.join(" + ")}`,
+            correct: formatNumber(correctVal),
+            options: shuffleArray(options).map(formatNumber)
+        };
+    }
+
+    function generatePattern(min, max) {
+        let start = getRandomInt(min, max - 1000);
+        let step = getRandomInt(2, 20) * (Math.random() > 0.5 ? 10 : 100); // Steps like 20, 50, 100, 500
+        
+        let sequence = [];
+        for(let i=0; i<4; i++) {
+            sequence.push(start + (i * step));
+        }
+        
+        // Hide the last one
+        let correct = sequence[3];
+        sequence[3] = "?";
+
+        let options = [correct];
+        options.push(correct + step);
+        options.push(correct - step);
+        options.push(correct + (step*2));
+
+        return {
+            topic: "Number Patterns",
+            text: `What comes next?<br>${sequence.map(s => typeof s === 'number' ? formatNumber(s) : '?').join(", ")}`,
+            correct: formatNumber(correct),
+            options: shuffleArray(options).map(formatNumber)
+        };
+    }
+
+    function generateCompare(min, max) {
+        let n1 = getRandomInt(min, max);
+        let n2 = n1 + getRandomInt(1, 1000) * (Math.random() > 0.5 ? 1 : -1);
+        if(n2 === n1) n2 += 10;
+
+        let correct = n1 > n2 ? "Larger than" : "Smaller than";
+        
+        return {
+            topic: "Compare Numbers",
+            text: `<span class='highlight'>${formatNumber(n1)}</span> is _________ <span class='highlight'>${formatNumber(n2)}</span>`,
+            correct: correct,
+            options: ["Larger than", "Smaller than", "Equal to", "None"]
+        };
+    }
+
+    function generateEstimate(min, max) {
+        // Simple range estimation logic
+        let target = getRandomInt(min, max);
+        let lower = Math.floor(target / 1000) * 1000;
+        let upper = lower + 1000;
+        
+        return {
+            topic: "Estimate Quantity",
+            text: `The number <span class='highlight'>${formatNumber(target)}</span> is between which two numbers?`,
+            correct: `${formatNumber(lower)} and ${formatNumber(upper)}`,
+            options: shuffleArray([
+                `${formatNumber(lower)} and ${formatNumber(upper)}`,
+                `${formatNumber(lower + 1000)} and ${formatNumber(upper + 1000)}`,
+                `${formatNumber(lower - 1000)} and ${formatNumber(upper - 1000)}`,
+                `${formatNumber(lower)} and ${formatNumber(lower + 500)}`
+            ])
+        };
+    }
+
+    // --- UTILS ---
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
+    function renderQuestion(data) {
+        state.isProcessing = false;
+        document.getElementById('topic-label').innerText = data.topic;
+        document.getElementById('question-text').innerHTML = data.text;
+        
+        const optsContainer = document.getElementById('options');
+        optsContainer.innerHTML = '';
+
+        data.options.forEach(opt => {
+            let btn = document.createElement('button');
+            btn.className = 'btn';
+            btn.innerText = opt;
+            btn.onclick = () => checkAnswer(btn, opt, data.correct);
+            optsContainer.appendChild(btn);
+        });
+    }
+
+    function checkAnswer(btn, value, correct) {
+        if(state.isProcessing) return;
+        state.isProcessing = true;
+
+        if (value.toString() === correct.toString()) {
+            // Correct
+            btn.classList.add('correct');
+            playSound('correct');
+            state.score += 100;
+            
+            // Level up every 500 points
+            if(state.score % 500 === 0) {
+                state.level++;
+                state.lives = Math.min(state.lives + 1, 5); // Heal on level up
+            }
+            
+            updateHUD();
+            setTimeout(generateQuestion, 1000);
+        } else {
+            // Wrong
+            btn.classList.add('wrong');
+            playSound('wrong');
+            state.lives--;
+            updateHUD();
+            
+            // Highlight correct answer
+            const buttons = document.querySelectorAll('.btn');
+            buttons.forEach(b => {
+                if(b.innerText === correct.toString()) b.classList.add('correct');
+            });
+
+            setTimeout(generateQuestion, 1500);
+        }
+    }
+
+</script>
+</body>
+</html>

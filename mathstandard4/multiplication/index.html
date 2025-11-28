@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Potion Master: Alchemy Lab</title>
+    <style>
+        :root {
+            --wood-dark: #3e2723;
+            --wood-light: #5d4037;
+            --magic-purple: #9c27b0;
+            --magic-glow: #e040fb;
+            --liquid-green: #76ff03;
+            --parchment: #f3e5f5;
+            --gold: #ffc107;
+            --text-dark: #2a1a10;
+        }
+
+        @import url('https://fonts.googleapis.com/css2?family=MedievalSharp&family=Cinzel:wght@700&display=swap');
+
+        body {
+            margin: 0;
+            background-color: #1a0b1c;
+            color: var(--text-dark);
+            font-family: 'MedievalSharp', cursive;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            user-select: none;
+        }
+
+        /* Animated Background (Lab Atmosphere) */
+        .lab-bg {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at 50% 60%, #2c112e, #0f0518);
+            z-index: -2;
+        }
+
+        .shelf {
+            position: absolute;
+            top: 10%; width: 80%; height: 20px;
+            background: var(--wood-dark);
+            box-shadow: 0 5px 10px rgba(0,0,0,0.5);
+            border-radius: 5px;
+        }
+
+        /* Floating Particles (Magic Dust) */
+        .dust {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            opacity: 0.3;
+            animation: float 5s infinite ease-in-out;
+        }
+        @keyframes float { 0% { transform: translateY(0); opacity: 0; } 50% { opacity: 0.5; } 100% { transform: translateY(-100px); opacity: 0; } }
+
+        /* Game Container (The Desk) */
+        #game-area {
+            width: 90%;
+            max-width: 800px;
+            height: 85vh;
+            background: url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.5' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.05'/%3E%3C/svg%3E"), var(--wood-light);
+            border: 15px solid var(--wood-dark);
+            border-radius: 20px;
+            box-shadow: 0 0 50px rgba(156, 39, 176, 0.3), inset 0 0 50px rgba(0,0,0,0.6);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            padding: 20px;
+        }
+
+        /* Header / Stats */
+        .stats-scroll {
+            width: 100%;
+            display: flex;
+            justify-content: space-around;
+            background: var(--parchment);
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 4px 5px rgba(0,0,0,0.3);
+            font-size: 1.3rem;
+            border: 2px solid #8d6e63;
+            margin-bottom: 20px;
+        }
+        
+        .stat-item span { color: var(--magic-purple); font-weight: bold; }
+
+        /* The Cauldron (Visual Centerpiece) */
+        .cauldron-container {
+            position: relative;
+            width: 150px;
+            height: 120px;
+            margin-bottom: 20px;
+        }
+
+        .cauldron {
+            width: 100%;
+            height: 100%;
+            background: #212121;
+            border-radius: 0 0 50px 50px;
+            position: relative;
+            box-shadow: inset -5px -5px 10px rgba(255,255,255,0.1);
+        }
+        
+        .cauldron-rim {
+            position: absolute;
+            top: -10px; left: 0;
+            width: 100%; height: 30px;
+            background: #424242;
+            border-radius: 50%;
+            border: 2px solid #000;
+        }
+
+        .liquid {
+            position: absolute;
+            top: 0; left: 10%;
+            width: 80%; height: 20px;
+            background: var(--liquid-green);
+            border-radius: 50%;
+            box-shadow: 0 0 15px var(--liquid-green);
+            animation: bubble 2s infinite alternate;
+        }
+
+        @keyframes bubble { from { box-shadow: 0 0 10px var(--liquid-green); } to { box-shadow: 0 0 25px var(--liquid-green); } }
+
+        /* Recipe Book (Question Area) */
+        .recipe-book {
+            background: #fdf5e6;
+            width: 80%;
+            min-height: 150px;
+            border-radius: 5px 15px 15px 5px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.4);
+            padding: 20px;
+            text-align: center;
+            position: relative;
+            margin-bottom: 20px;
+            border-left: 15px solid #5d4037; /* Book spine */
+            transform: rotate(-1deg);
+        }
+
+        .recipe-title {
+            font-family: 'Cinzel', serif;
+            color: var(--wood-dark);
+            border-bottom: 2px solid var(--wood-light);
+            display: inline-block;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+        }
+
+        .math-problem { font-size: 2.2rem; font-weight: bold; color: #4a148c; }
+        .word-problem { font-size: 1.4rem; line-height: 1.4; color: #3e2723; }
+
+        /* Ingredient Shelves (Answers) */
+        .shelf-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            width: 100%;
+        }
+
+        .potion-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            position: relative;
+            transition: transform 0.2s;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .potion-bottle {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(0,0,0,0.1));
+            border: 3px solid var(--wood-dark);
+            border-radius: 10px;
+            background-color: rgba(103, 58, 183, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            color: #fff;
+            text-shadow: 2px 2px 0 #000;
+            box-shadow: 0 5px 0 var(--wood-dark);
+            font-family: 'MedievalSharp', cursive;
+        }
+
+        .potion-btn:hover { transform: translateY(-5px); }
+        .potion-btn:active { transform: translateY(2px); }
+        .potion-btn:hover .potion-bottle { background-color: rgba(103, 58, 183, 0.5); border-color: var(--gold); }
+
+        .correct-anim .potion-bottle { background-color: #76ff03 !important; border-color: #2e7d32 !important; color: black !important; text-shadow: none; }
+        .wrong-anim .potion-bottle { background-color: #d50000 !important; border-color: #b71c1c !important; animation: shake 0.4s; }
+
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+
+        /* Screens */
+        .overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(20, 10, 25, 0.95);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            color: var(--parchment);
+        }
+        .hidden { display: none; }
+
+        .magic-btn {
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            background: var(--magic-purple);
+            color: white;
+            border: 2px solid var(--magic-glow);
+            border-radius: 50px;
+            font-family: 'Cinzel', serif;
+            cursor: pointer;
+            box-shadow: 0 0 15px var(--magic-purple);
+            margin-top: 20px;
+            transition: 0.3s;
+        }
+        .magic-btn:hover { background: var(--magic-glow); box-shadow: 0 0 30px var(--magic-glow); transform: scale(1.05); }
+
+    </style>
+</head>
+<body>
+
+    <div class="lab-bg"></div>
+
+    <div id="game-area">
+        <div id="start-screen" class="overlay">
+            <h1 style="font-family: 'Cinzel'; font-size: 3rem; color: var(--gold); text-shadow: 0 0 10px var(--magic-purple);">Potion Master</h1>
+            <p style="font-size: 1.2rem; max-width: 600px;">The Grand Wizard demands new potions!<br>Use your multiplication skills to mix the correct ingredients.</p>
+            <button class="magic-btn" onclick="startGame()">Open Grimoire</button>
+        </div>
+
+        <div id="game-over-screen" class="overlay hidden">
+            <h1 style="color: #ff5252;">Cauldron Exploded!</h1>
+            <p>You mixed the wrong ingredients.</p>
+            <p style="font-size: 1.5rem; color: var(--gold);">Potions Brewed: <span id="final-score">0</span></p>
+            <button class="magic-btn" onclick="startGame()">Brew Again</button>
+        </div>
+
+        <div class="stats-scroll">
+            <div class="stat-item">Brewed: <span id="score">0</span></div>
+            <div class="stat-item">Level: <span id="level">1</span></div>
+            <div class="stat-item">Vials: <span id="lives" style="color: #d50000;">❤️❤️❤️</span></div>
+        </div>
+
+        <div class="cauldron-container">
+            <div class="cauldron">
+                <div class="cauldron-rim"></div>
+                <div class="liquid"></div>
+            </div>
+        </div>
+
+        <div class="recipe-book">
+            <div id="topic-title" class="recipe-title">Simple Brew</div>
+            <div id="question-text" class="math-problem">Loading...</div>
+        </div>
+
+        <div id="answers-grid" class="shelf-grid">
+            </div>
+    </div>
+
+<script>
+    // --- PARTICLE EFFECTS ---
+    function createDust() {
+        const bg = document.querySelector('.lab-bg');
+        const p = document.createElement('div');
+        p.className = 'dust';
+        const size = Math.random() * 5 + 2;
+        p.style.width = size + 'px';
+        p.style.height = size + 'px';
+        p.style.left = Math.random() * 100 + '%';
+        p.style.top = Math.random() * 100 + '%';
+        bg.appendChild(p);
+        setTimeout(() => p.remove(), 5000);
+    }
+    setInterval(createDust, 300);
+
+    // --- AUDIO SYSTEM (Synthesized) ---
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    function playSound(type) {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        const now = audioCtx.currentTime;
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        if (type === 'bubble') {
+            // Bubbling sound
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(400, now);
+            osc.frequency.linearRampToValueAtTime(800, now + 0.1);
+            gain.gain.setValueAtTime(0.1, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+            osc.start();
+            osc.stop(now + 0.2);
+        } else if (type === 'magic') {
+            // Magical chime (Correct)
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(600, now);
+            osc.frequency.exponentialRampToValueAtTime(1200, now + 0.3);
+            gain.gain.setValueAtTime(0.1, now);
+            gain.gain.linearRampToValueAtTime(0, now + 0.5);
+            osc.start();
+            osc.stop(now + 0.5);
+            
+            // Harmony
+            const osc2 = audioCtx.createOscillator();
+            const gain2 = audioCtx.createGain();
+            osc2.connect(gain2);
+            gain2.connect(audioCtx.destination);
+            osc2.type = 'sine';
+            osc2.frequency.setValueAtTime(900, now);
+            gain2.gain.setValueAtTime(0.05, now);
+            gain2.gain.linearRampToValueAtTime(0, now + 0.5);
+            osc2.start();
+            osc2.stop(now + 0.5);
+
+        } else if (type === 'explode') {
+            // Low boom (Wrong)
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(100, now);
+            osc.frequency.exponentialRampToValueAtTime(30, now + 0.5);
+            gain.gain.setValueAtTime(0.2, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+            osc.start();
+            osc.stop(now + 0.5);
+        }
+    }
+
+    // --- GAME LOGIC ---
+    let state = {
+        score: 0,
+        level: 1,
+        lives: 3,
+        active: false
+    };
+
+    function startGame() {
+        state = { score: 0, level: 1, lives: 3, active: true };
+        updateHUD();
+        document.getElementById('start-screen').classList.add('hidden');
+        document.getElementById('game-over-screen').classList.add('hidden');
+        playSound('bubble');
+        generateRecipe();
+    }
+
+    function updateHUD() {
+        document.getElementById('score').innerText = state.score;
+        document.getElementById('level').innerText = state.level;
+        document.getElementById('lives').innerText = "❤️".repeat(state.lives);
+    }
+
+    function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+    function fmt(n) { return n.toLocaleString(); }
+
+    // --- QUESTION GENERATORS ---
+
+    // 1. Simple Multiplication (Times Tables)
+    function getSimpleMulti() {
+        let maxFactor = Math.min(9 + Math.floor(state.level/2), 12); // Starts at 9, goes to 12
+        let a = rand(2, maxFactor);
+        let b = rand(2, 9);
+        return {
+            title: "Simple Brew",
+            text: `<span class="math-problem">${a} × ${b} = ?</span>`,
+            correct: a * b
+        };
+    }
+
+    // 2. Let's Multiply (Larger numbers)
+    function getAdvancedMulti() {
+        // Level 3+: 2-digit x 1-digit
+        // Level 6+: Tens/Hundreds
+        let type = Math.random();
+        let a, b;
+        
+        if (state.level < 5 || type > 0.5) {
+            // 23 x 4 type
+            a = rand(12, 50 + (state.level * 5));
+            b = rand(2, 5);
+        } else {
+            // 40 x 60 type (Round numbers)
+            a = rand(2, 9) * 10;
+            b = rand(2, 9) * (state.level > 7 ? 10 : 1);
+        }
+
+        return {
+            title: "Advanced Alchemy",
+            text: `<span class="math-problem">${a} × ${b} = ?</span>`,
+            correct: a * b
+        };
+    }
+
+    // 3. Word Problems
+    function getWordProblem() {
+        let a = rand(3, 12);
+        let b = rand(4, 15);
+        let ans = a * b;
+
+        const templates = [
+            `A potion requires <b>${a}</b> spider eyes. How many eyes for <b>${b}</b> potions?`,
+            `The wizard buys <b>${a}</b> scrolls. Each scroll costs <b>${b}</b> gold coins. Total cost?`,
+            `There are <b>${a}</b> shelves. Each shelf holds <b>${b}</b> bottles. How many bottles total?`,
+            `A dragon eats <b>${a}</b> sheep every day. How many sheep in <b>${b}</b> days?`
+        ];
+        
+        return {
+            title: "Merchant's Request",
+            text: `<span class="word-problem">${templates[rand(0, templates.length-1)]}</span>`,
+            correct: ans
+        };
+    }
+
+    function generateRecipe() {
+        if (!state.active) return;
+
+        let roll = Math.random();
+        let q;
+
+        // Difficulty Progression
+        if (state.level <= 2) {
+            q = getSimpleMulti();
+        } else if (state.level <= 5) {
+            q = roll > 0.3 ? getSimpleMulti() : getWordProblem();
+        } else {
+            if (roll < 0.4) q = getSimpleMulti();
+            else if (roll < 0.7) q = getAdvancedMulti();
+            else q = getWordProblem();
+        }
+
+        renderQuestion(q);
+    }
+
+    function renderQuestion(data) {
+        document.getElementById('topic-title').innerText = data.title;
+        document.getElementById('question-text').innerHTML = data.text;
+
+        // Generate Answers
+        let answers = [data.correct];
+        while (answers.length < 4) {
+            let fake;
+            let range = Math.max(5, Math.floor(data.correct * 0.2));
+            
+            // Intelligent distractors
+            let strategy = Math.random();
+            if (strategy < 0.33) {
+                fake = data.correct + rand(1, range);
+            } else if (strategy < 0.66) {
+                fake = data.correct - rand(1, range);
+            } else {
+                // Try to fake a "close" multiplication error (e.g. 6x7=42, fake 36)
+                fake = data.correct + (Math.random() > 0.5 ? 10 : -10);
+            }
+
+            if (fake > 0 && !answers.includes(fake)) {
+                answers.push(fake);
+            }
+        }
+        
+        answers.sort(() => Math.random() - 0.5);
+
+        const grid = document.getElementById('answers-grid');
+        grid.innerHTML = '';
+
+        answers.forEach(ans => {
+            let btn = document.createElement('button');
+            btn.className = 'potion-btn';
+            btn.innerHTML = `<div class="potion-bottle">${fmt(ans)}</div>`;
+            btn.onclick = () => checkAnswer(btn, ans, data.correct);
+            grid.appendChild(btn);
+        });
+    }
+
+    function checkAnswer(btn, val, correct) {
+        if (!state.active) return;
+        
+        // Disable buttons
+        let all = document.querySelectorAll('.potion-btn');
+        all.forEach(b => b.disabled = true);
+
+        if (val === correct) {
+            btn.classList.add('correct-anim');
+            playSound('magic');
+            state.score++;
+            
+            if (state.score % 5 === 0) {
+                state.level++;
+                playSound('bubble'); // Level up hint
+            }
+            updateHUD();
+            setTimeout(generateRecipe, 1000);
+        } else {
+            btn.classList.add('wrong-anim');
+            playSound('explode');
+            state.lives--;
+            updateHUD();
+
+            // Highlight correct
+            all.forEach(b => {
+                if (parseInt(b.innerText.replace(/,/g, '')) === correct) {
+                    b.classList.add('correct-anim');
+                    b.querySelector('.potion-bottle').style.background = '#76ff03';
+                    b.querySelector('.potion-bottle').style.color = '#000';
+                }
+            });
+
+            if (state.lives <= 0) {
+                setTimeout(endGame, 1000);
+            } else {
+                setTimeout(generateRecipe, 1500);
+            }
+        }
+    }
+
+    function endGame() {
+        state.active = false;
+        document.getElementById('final-score').innerText = state.score;
+        document.getElementById('game-over-screen').classList.remove('hidden');
+    }
+
+</script>
+</body>
+</html>

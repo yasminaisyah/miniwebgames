@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Word Wizard: Tower of Knowledge</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Lato:wght@400;700&display=swap');
+
+        :root {
+            --primary: #8b5cf6;
+            --secondary: #ec4899;
+            --accent: #fbbf24;
+            --dark: #0f172a;
+            --glass: rgba(15, 23, 42, 0.85);
+        }
+
+        body {
+            font-family: 'Lato', sans-serif;
+            background-color: var(--dark);
+            color: white;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        h1, h2, h3, .fantasy-font {
+            font-family: 'Cinzel', serif;
+        }
+
+        /* Particles Canvas */
+        #particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: radial-gradient(circle at center, #1e293b 0%, #020617 100%);
+        }
+
+        /* Glassmorphism Panels */
+        .glass-panel {
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.2);
+            border-radius: 1rem;
+        }
+
+        /* Animations */
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        @keyframes spellCast {
+            0% { transform: scale(1); opacity: 1; left: 20%; }
+            100% { transform: scale(2); opacity: 0; left: 80%; }
+        }
+
+        @keyframes damagePopup {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-50px); opacity: 0; }
+        }
+
+        .animate-float { animation: float 3s ease-in-out infinite; }
+        .shake-element { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+        
+        /* Spell projectile */
+        .spell-projectile {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background: radial-gradient(circle, #fff, var(--primary));
+            border-radius: 50%;
+            box-shadow: 0 0 20px var(--primary);
+            z-index: 50;
+            pointer-events: none;
+            display: none;
+        }
+
+        /* UI Elements */
+        .btn-magic {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border: 2px solid rgba(255,255,255,0.2);
+            transition: all 0.3s;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+        }
+        .btn-magic:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 15px var(--secondary);
+            filter: brightness(1.2);
+        }
+        .btn-magic:active {
+            transform: translateY(1px);
+        }
+
+        .health-bar-container {
+            background: #334155;
+            border-radius: 999px;
+            overflow: hidden;
+            height: 1.5rem;
+            border: 2px solid rgba(0,0,0,0.3);
+        }
+        .health-bar-fill {
+            height: 100%;
+            transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Characters */
+        .character-sprite {
+            font-size: 5rem;
+            filter: drop-shadow(0 0 10px rgba(255,255,255,0.3));
+        }
+        .enemy-sprite {
+            font-size: 6rem;
+            filter: drop-shadow(0 0 15px rgba(239, 68, 68, 0.5));
+            transition: transform 0.2s;
+        }
+
+    </style>
+</head>
+<body class="h-screen flex items-center justify-center">
+
+    <canvas id="particles"></canvas>
+
+    <!-- START SCREEN -->
+    <div id="start-screen" class="glass-panel p-8 max-w-md w-full text-center relative z-10 mx-4">
+        <div class="mb-6 text-6xl">🧙‍♂️</div>
+        <h1 class="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 mb-2">Word Wizard</h1>
+        <h2 class="text-xl text-gray-300 mb-6">The Tower of Knowledge</h2>
+        <p class="mb-8 text-gray-400 text-sm">Defeat monsters by solving English puzzles. Don't let your health drop to zero!</p>
+        
+        <div class="space-y-4">
+            <button onclick="startGame()" class="btn-magic w-full py-4 rounded-xl text-xl font-bold tracking-wider uppercase">
+                Enter the Tower
+            </button>
+        </div>
+    </div>
+
+    <!-- GAME UI -->
+    <div id="game-ui" class="hidden w-full max-w-2xl mx-auto h-full flex flex-col p-4 relative z-10">
+        
+        <!-- Header / Stats -->
+        <div class="flex justify-between items-center bg-slate-900/80 p-3 rounded-xl border border-slate-700 mb-4">
+            <div class="text-left">
+                <div class="text-xs text-gray-400 uppercase tracking-widest">Level</div>
+                <div id="level-display" class="text-xl font-bold text-yellow-400 fantasy-font">1: The Slime</div>
+            </div>
+            <div class="text-right">
+                <div class="text-xs text-gray-400 uppercase tracking-widest">Score</div>
+                <div id="score-display" class="text-xl font-bold text-white font-mono">0</div>
+            </div>
+        </div>
+
+        <!-- Battle Arena -->
+        <div class="flex-1 relative flex items-center justify-between px-4 mb-4">
+            
+            <!-- Player -->
+            <div class="text-center relative">
+                <div class="character-sprite animate-float">🧙‍♂️</div>
+                <div class="w-24 mt-2">
+                    <div class="health-bar-container">
+                        <div id="player-hp" class="health-bar-fill bg-green-500" style="width: 100%"></div>
+                    </div>
+                </div>
+                <div id="damage-player" class="absolute top-0 left-0 w-full text-red-500 font-bold text-2xl opacity-0 pointer-events-none">-1 ❤️</div>
+            </div>
+
+            <!-- VS Effect -->
+            <div id="spell-container" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full h-10 pointer-events-none">
+                <!-- Projectiles appear here via JS -->
+            </div>
+
+            <!-- Enemy -->
+            <div class="text-center relative">
+                <div id="enemy-sprite" class="enemy-sprite animate-float">🦠</div>
+                <div class="w-32 mt-2">
+                    <div class="health-bar-container">
+                        <div id="enemy-hp" class="health-bar-fill bg-red-600" style="width: 100%"></div>
+                    </div>
+                </div>
+                <div id="damage-enemy" class="absolute top-0 left-0 w-full text-yellow-400 font-bold text-2xl opacity-0 pointer-events-none">CRITICAL!</div>
+            </div>
+        </div>
+
+        <!-- Question Panel -->
+        <div class="glass-panel p-6 flex-none">
+            <div class="flex justify-between items-start mb-4">
+                <span id="q-category" class="px-2 py-1 text-xs rounded bg-slate-700 text-slate-300">Spelling</span>
+                <span id="q-progress" class="text-xs text-slate-400">Enemy HP: 100%</span>
+            </div>
+            
+            <h3 id="question-text" class="text-xl md:text-2xl font-bold mb-6 text-center leading-relaxed">
+                Loading question...
+            </h3>
+
+            <!-- Options Container -->
+            <div id="options-container" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <!-- Options injected by JS -->
+            </div>
+            
+            <div id="feedback-msg" class="h-6 text-center mt-3 font-bold text-sm tracking-wide"></div>
+        </div>
+    </div>
+
+    <!-- GAME OVER SCREEN -->
+    <div id="game-over-screen" class="hidden glass-panel p-8 max-w-md w-full text-center relative z-20 mx-4">
+        <div id="end-emoji" class="mb-6 text-6xl">💀</div>
+        <h1 id="end-title" class="text-4xl font-bold mb-2">Game Over</h1>
+        <p class="mb-6 text-gray-300">You reached Level <span id="end-level" class="text-yellow-400">1</span></p>
+        <div class="bg-slate-800 rounded-lg p-4 mb-8">
+            <div class="text-sm text-gray-400">Final Score</div>
+            <div id="end-score" class="text-3xl font-bold text-white">0</div>
+        </div>
+        <button onclick="resetGame()" class="btn-magic w-full py-3 rounded-xl text-lg font-bold">Try Again</button>
+    </div>
+
+    <script>
+        // --- GAME DATA ---
+        
+        // Define levels and enemies
+        const levelConfig = [
+            { level: 1, name: "The Slime of Spelling", emoji: "🦠", hp: 3, category: 'Spelling' },
+            { level: 2, name: "The Goblin of Grammar", emoji: "👺", hp: 4, category: 'Grammar' },
+            { level: 3, name: "The Wolf of Words", emoji: "🐺", hp: 5, category: 'Vocab' },
+            { level: 4, name: "The Knight of Knowledge", emoji: "🤖", hp: 6, category: 'Advanced' },
+            { level: 5, name: "The Dragon Lord", emoji: "🐉", hp: 8, category: 'Master' }
+        ];
+
+        // Massive Question Bank
+        const questionBank = [
+            // LEVEL 1: Spelling (Easy)
+            { id: 101, level: 1, type: 'mcq', q: "Which word is spelled correctly?", options: ["Recieve", "Receive", "Riceive", "Receeve"], a: 1 },
+            { id: 102, level: 1, type: 'mcq', q: "Select the correct spelling:", options: ["Definately", "Definetly", "Definitely", "Defanitely"], a: 2 },
+            { id: 103, level: 1, type: 'mcq', q: "Choose the correct word:", options: ["Occurred", "Occured", "Ocurred", "Occurrad"], a: 0 },
+            { id: 104, level: 1, type: 'mcq', q: "Find the correct spelling:", options: ["Seperate", "Seprate", "Seperat", "Separate"], a: 3 },
+            { id: 105, level: 1, type: 'mcq', q: "Which is correct?", options: ["Tommorrow", "Tomorrow", "Tomorow", "Toomorrow"], a: 1 },
+            { id: 106, level: 1, type: 'mcq', q: "Choose the right spelling:", options: ["Wierd", "Weird", "Wired", "Weired"], a: 1 },
+            { id: 107, level: 1, type: 'mcq', q: "Select the correct form:", options: ["Until", "Untill", "Untile", "Unntil"], a: 0 },
+            { id: 108, level: 1, type: 'mcq', q: "Which is spelled right?", options: ["Fourty", "Fourtey", "Forty", "Fourtie"], a: 2 },
+            
+            // LEVEL 2: Grammar (Articles, Prepositions, Tenses)
+            { id: 201, level: 2, type: 'mcq', q: "I _____ to the store yesterday.", options: ["go", "gone", "went", "going"], a: 2 },
+            { id: 202, level: 2, type: 'mcq', q: "She is good _____ playing piano.", options: ["in", "at", "on", "with"], a: 1 },
+            { id: 203, level: 2, type: 'mcq', q: "Look at those clouds! It _____ rain.", options: ["is going to", "will", "shall", "can"], a: 0 },
+            { id: 204, level: 2, type: 'mcq', q: "I have lived here _____ 2010.", options: ["for", "since", "during", "from"], a: 1 },
+            { id: 205, level: 2, type: 'mcq', q: "He runs _____ than his brother.", options: ["fast", "faster", "fastly", "more fast"], a: 1 },
+            { id: 206, level: 2, type: 'mcq', q: "Please turn _____ the lights before you leave.", options: ["out", "off", "away", "over"], a: 1 },
+            { id: 207, level: 2, type: 'mcq', q: "If I _____ you, I would accept the offer.", options: ["was", "am", "were", "be"], a: 2 },
+            { id: 208, level: 2, type: 'mcq', q: "They didn't have _____ money left.", options: ["many", "some", "no", "any"], a: 3 },
+
+            // LEVEL 3: Vocabulary (Synonyms, Antonyms, Associations)
+            { id: 301, level: 3, type: 'mcq', q: "Synonym for 'Happy':", options: ["Elated", "Sorrowful", "Dull", "Angry"], a: 0 },
+            { id: 302, level: 3, type: 'mcq', q: "Antonym for 'Brave':", options: ["Strong", "Cowardly", "Bold", "Heroic"], a: 1 },
+            { id: 303, level: 3, type: 'mcq', q: "Which word does NOT belong?", options: ["Apple", "Banana", "Carrot", "Grape"], a: 2 },
+            { id: 304, level: 3, type: 'mcq', q: "Synonym for 'Huge':", options: ["Tiny", "Gigantic", "Weak", "Soft"], a: 1 },
+            { id: 305, level: 3, type: 'mcq', q: "A person who writes books is an:", options: ["Editor", "Author", "Auditor", "Actor"], a: 1 },
+            { id: 306, level: 3, type: 'mcq', q: "Antonym for 'Artificial':", options: ["Fake", "Synthetic", "Natural", "Constructed"], a: 2 },
+            { id: 307, level: 3, type: 'mcq', q: "Synonym for 'Difficult':", options: ["Easy", "Simple", "Arduous", "Plain"], a: 2 },
+            { id: 308, level: 3, type: 'mcq', q: "To 'commence' means to:", options: ["Stop", "Begin", "Pause", "Finish"], a: 1 },
+
+            // LEVEL 4: Idioms & Advanced
+            { id: 401, level: 4, type: 'mcq', q: "'Break a leg' means:", options: ["Get hurt", "Good luck", "Give up", "Dance well"], a: 1 },
+            { id: 402, level: 4, type: 'mcq', q: "'Piece of cake' means:", options: ["Very easy", "Delicious", "Dessert", "Hard work"], a: 0 },
+            { id: 403, level: 4, type: 'mcq', q: "To 'hit the hay' means:", options: ["Feed horses", "Go to sleep", "Start a fight", "Work on a farm"], a: 1 },
+            { id: 404, level: 4, type: 'mcq', q: "'Under the weather' means:", options: ["Raining", "Sick", "Sunny", "Cold"], a: 1 },
+            { id: 405, level: 4, type: 'mcq', q: "Which is a palindrome?", options: ["Hello", "Racecar", "World", "Banana"], a: 1 },
+            { id: 406, level: 4, type: 'mcq', q: "To 'let the cat out of the bag' means:", options: ["Lose a pet", "Reveal a secret", "Go shopping", "Make a mess"], a: 1 },
+            { id: 407, level: 4, type: 'mcq', q: "The 'protagonist' is the:", options: ["Villain", "Main Character", "Narrator", "Author"], a: 1 },
+            
+            // LEVEL 5: Master
+            { id: 501, level: 5, type: 'mcq', q: "Choose the correct analogy. Fire : Hot :: Ice : ?", options: ["Cold", "Water", "Steam", "Hard"], a: 0 },
+            { id: 502, level: 5, type: 'mcq', q: "What is the past participle of 'Swim'?", options: ["Swam", "Swum", "Swimmed", "Sweming"], a: 1 },
+            { id: 503, level: 5, type: 'mcq', q: "Which word implies 'uncertainty'?", options: ["Ambiguous", "Distinct", "Obvious", "Lucid"], a: 0 },
+            { id: 504, level: 5, type: 'mcq', q: "'Once in a blue moon' means:", options: ["Every month", "Rarely", "At night", "Often"], a: 1 },
+            { id: 505, level: 5, type: 'mcq', q: "Identify the noun: 'He runs quickly.'", options: ["He", "Runs", "Quickly", "None"], a: 0 },
+        ];
+
+        // --- GAME STATE ---
+        let state = {
+            levelIndex: 0,
+            score: 0,
+            playerMaxHp: 3,
+            playerHp: 3,
+            enemyMaxHp: 3,
+            enemyHp: 3,
+            usedQuestions: new Set(),
+            isAnimating: false,
+            currentQuestion: null
+        };
+
+        // --- DOM ELEMENTS ---
+        const screens = {
+            start: document.getElementById('start-screen'),
+            game: document.getElementById('game-ui'),
+            end: document.getElementById('game-over-screen')
+        };
+        
+        const ui = {
+            level: document.getElementById('level-display'),
+            score: document.getElementById('score-display'),
+            playerHp: document.getElementById('player-hp'),
+            enemyHp: document.getElementById('enemy-hp'),
+            enemySprite: document.getElementById('enemy-sprite'),
+            question: document.getElementById('question-text'),
+            options: document.getElementById('options-container'),
+            feedback: document.getElementById('feedback-msg'),
+            category: document.getElementById('q-category'),
+            progress: document.getElementById('q-progress'),
+            spellContainer: document.getElementById('spell-container'),
+            damagePlayer: document.getElementById('damage-player'),
+            damageEnemy: document.getElementById('damage-enemy')
+        };
+
+        // --- AUDIO (Synthesized for single file) ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            if (type === 'correct') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(440, audioCtx.currentTime); // A4
+                osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.1); // A5
+                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            } else if (type === 'wrong') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                osc.frequency.linearRampToValueAtTime(100, audioCtx.currentTime + 0.2);
+                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gainNode.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            } else if (type === 'win') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(523.25, audioCtx.currentTime);
+                osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1);
+                osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.2);
+                gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gainNode.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.6);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.6);
+            }
+        }
+
+        // --- GAME LOGIC ---
+
+        function startGame() {
+            state.score = 0;
+            state.levelIndex = 0;
+            state.playerHp = 3;
+            state.usedQuestions.clear();
+            
+            screens.start.classList.add('hidden');
+            screens.end.classList.add('hidden');
+            screens.game.classList.remove('hidden');
+            screens.game.classList.add('flex');
+
+            startLevel();
+        }
+
+        function startLevel() {
+            const config = levelConfig[state.levelIndex];
+            state.enemyMaxHp = config.hp;
+            state.enemyHp = config.hp;
+            
+            ui.enemySprite.textContent = config.emoji;
+            ui.level.textContent = `${config.level}: ${config.name}`;
+            ui.category.textContent = config.category;
+            
+            updateUI();
+            nextQuestion();
+        }
+
+        function getQuestion() {
+            const currentLevel = levelConfig[state.levelIndex].level;
+            // Filter questions by level and not used
+            const pool = questionBank.filter(q => q.level === currentLevel && !state.usedQuestions.has(q.id));
+            
+            if (pool.length === 0) {
+                // Should not happen with large bank, but fallback: clear usage for this level
+                const usedInLevel = questionBank.filter(q => q.level === currentLevel).map(q => q.id);
+                usedInLevel.forEach(id => state.usedQuestions.delete(id));
+                return questionBank.find(q => q.level === currentLevel);
+            }
+
+            const randomIndex = Math.floor(Math.random() * pool.length);
+            return pool[randomIndex];
+        }
+
+        function nextQuestion() {
+            state.isAnimating = false;
+            ui.feedback.textContent = "";
+            ui.options.innerHTML = "";
+            
+            const q = getQuestion();
+            state.currentQuestion = q;
+            state.usedQuestions.add(q.id);
+
+            ui.question.textContent = q.q;
+
+            q.options.forEach((opt, index) => {
+                const btn = document.createElement('button');
+                btn.className = "btn-magic p-4 rounded-lg font-medium text-lg text-white hover:bg-white/10";
+                btn.textContent = opt;
+                btn.onclick = () => handleAnswer(index, btn);
+                ui.options.appendChild(btn);
+            });
+        }
+
+        function handleAnswer(selectedIndex, btnElement) {
+            if (state.isAnimating) return;
+            state.isAnimating = true;
+
+            const correct = state.currentQuestion.a === selectedIndex;
+            const buttons = ui.options.querySelectorAll('button');
+            
+            // Visual Feedback on Buttons
+            buttons.forEach((btn, idx) => {
+                btn.disabled = true;
+                if (idx === state.currentQuestion.a) {
+                    btn.classList.add('bg-green-600', 'border-green-400');
+                    btn.style.background = '#22c55e';
+                } else if (idx === selectedIndex && !correct) {
+                    btn.classList.add('bg-red-600', 'border-red-400');
+                    btn.style.background = '#ef4444';
+                } else {
+                    btn.style.opacity = '0.5';
+                }
+            });
+
+            if (correct) {
+                handleCorrectAnswer();
+            } else {
+                handleWrongAnswer();
+            }
+        }
+
+        function handleCorrectAnswer() {
+            playSound('correct');
+            ui.feedback.textContent = "Correct! Casting Spell...";
+            ui.feedback.classList.add('text-green-400');
+            ui.feedback.classList.remove('text-red-400');
+
+            // Cast Spell Animation
+            const projectile = document.createElement('div');
+            projectile.className = 'spell-projectile';
+            projectile.style.display = 'block';
+            ui.spellContainer.appendChild(projectile);
+
+            // Animate projectile
+            projectile.animate([
+                { left: '20%', transform: 'scale(1)', opacity: 1 },
+                { left: '80%', transform: 'scale(2)', opacity: 0 }
+            ], {
+                duration: 600,
+                easing: 'ease-in'
+            }).onfinish = () => {
+                projectile.remove();
+                // Enemy Hit Effect
+                ui.enemySprite.classList.add('shake-element');
+                setTimeout(() => ui.enemySprite.classList.remove('shake-element'), 500);
+                
+                // Show Damage Text
+                const damageText = ui.damageEnemy;
+                damageText.style.animation = 'none';
+                damageText.offsetHeight; /* trigger reflow */
+                damageText.textContent = "HIT!";
+                damageText.style.animation = 'damagePopup 1s forwards';
+
+                // Logic
+                state.score += 100 * state.levelIndex;
+                state.enemyHp--;
+                updateUI();
+                
+                checkTurnEnd();
+            };
+        }
+
+        function handleWrongAnswer() {
+            playSound('wrong');
+            ui.feedback.textContent = "Wrong! You take damage!";
+            ui.feedback.classList.add('text-red-400');
+            ui.feedback.classList.remove('text-green-400');
+
+            setTimeout(() => {
+                // Player Hit Effect
+                document.body.classList.add('shake-element');
+                setTimeout(() => document.body.classList.remove('shake-element'), 500);
+
+                // Show Damage Text
+                const damageText = ui.damagePlayer;
+                damageText.style.animation = 'none';
+                damageText.offsetHeight; /* trigger reflow */
+                damageText.style.animation = 'damagePopup 1s forwards';
+
+                state.playerHp--;
+                updateUI();
+                checkTurnEnd();
+            }, 500);
+        }
+
+        function checkTurnEnd() {
+            if (state.playerHp <= 0) {
+                setTimeout(gameOver, 1000);
+            } else if (state.enemyHp <= 0) {
+                setTimeout(levelUp, 1000);
+            } else {
+                setTimeout(nextQuestion, 1500);
+            }
+        }
+
+        function levelUp() {
+            playSound('win');
+            if (state.levelIndex < levelConfig.length - 1) {
+                state.levelIndex++;
+                state.playerHp = Math.min(state.playerHp + 1, 3); // Heal 1 HP
+                
+                // Show Level Up Message overlay? (Simplified for single file: just alert or quick transition)
+                ui.options.innerHTML = `<div class="text-center text-yellow-400 text-2xl font-bold py-4">VICTORY!<br><span class="text-sm text-white">Proceeding to next floor...</span></div>`;
+                
+                setTimeout(startLevel, 2000);
+            } else {
+                gameWin();
+            }
+        }
+
+        function updateUI() {
+            ui.score.textContent = state.score;
+            
+            // Health Bars
+            const pPct = (state.playerHp / 3) * 100;
+            ui.playerHp.style.width = `${pPct}%`;
+            ui.playerHp.className = `health-bar-fill ${pPct < 40 ? 'bg-red-500' : 'bg-green-500'}`;
+
+            const ePct = (state.enemyHp / state.enemyMaxHp) * 100;
+            ui.enemyHp.style.width = `${ePct}%`;
+            
+            ui.progress.textContent = `Enemy HP: ${Math.round(ePct)}%`;
+        }
+
+        function gameOver() {
+            screens.game.classList.add('hidden');
+            screens.game.classList.remove('flex');
+            screens.end.classList.remove('hidden');
+            
+            document.getElementById('end-title').textContent = "Game Over";
+            document.getElementById('end-emoji').textContent = "💀";
+            document.getElementById('end-level').textContent = state.levelIndex + 1;
+            document.getElementById('end-score').textContent = state.score;
+        }
+
+        function gameWin() {
+            screens.game.classList.add('hidden');
+            screens.game.classList.remove('flex');
+            screens.end.classList.remove('hidden');
+
+            document.getElementById('end-title').textContent = "Tower Conquered!";
+            document.getElementById('end-emoji').textContent = "👑";
+            document.getElementById('end-level').textContent = "MAX";
+            document.getElementById('end-score').textContent = state.score + 5000;
+        }
+
+        function resetGame() {
+            startGame();
+        }
+
+        // --- PARTICLE BACKGROUND SYSTEM ---
+        const canvas = document.getElementById('particles');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        class Particle {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.size = Math.random() * 2 + 0.1;
+                this.speedX = Math.random() * 1 - 0.5;
+                this.speedY = Math.random() * 1 - 0.5;
+                this.color = `rgba(${Math.random() > 0.5 ? '139, 92, 246' : '236, 72, 153'}, ${Math.random() * 0.5})`;
+            }
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                if (this.size > 0.2) this.size -= 0.01;
+                if (this.x < 0 || this.x > canvas.width || this.y < 0 || this.y > canvas.height || this.size <= 0.2) {
+                    this.x = Math.random() * canvas.width;
+                    this.y = Math.random() * canvas.height;
+                    this.size = Math.random() * 3 + 1;
+                }
+            }
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function initParticles() {
+            for (let i = 0; i < 50; i++) {
+                particles.push(new Particle());
+            }
+        }
+
+        function animateParticles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update();
+                particles[i].draw();
+            }
+            requestAnimationFrame(animateParticles);
+        }
+
+        initParticles();
+        animateParticles();
+
+    </script>
+</body>
+</html>

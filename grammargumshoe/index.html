@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grammar Gumshoe: The Noir Case</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Special+Elite&display=swap');
+
+        :root {
+            --bg-color: #1a1a1a;
+            --paper-color: #f0f0e6;
+            --ink-color: #2b2b2b;
+            --accent-red: #a83232;
+            --accent-gold: #c5a059;
+            --highlight: #e8e8e8;
+        }
+
+        * { box-sizing: border-box; user-select: none; }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            background-image: repeating-linear-gradient(45deg, #111 25%, transparent 25%, transparent 75%, #111 75%, #111), repeating-linear-gradient(45deg, #111 25%, #1a1a1a 25%, #1a1a1a 75%, #111 75%, #111);
+            background-position: 0 0, 10px 10px;
+            background-size: 20px 20px;
+            font-family: 'Courier Prime', monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: var(--ink-color);
+            overflow: hidden;
+        }
+
+        /* --- UI CONTAINER --- */
+        #game-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            height: 90vh;
+            perspective: 1000px;
+        }
+
+        /* --- THE FOLDER (Main Board) --- */
+        .folder {
+            background-color: #d1c7ac;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 20px;
+            border-radius: 5px;
+            box-shadow: 0 15px 30px rgba(0,0,0,0.7);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .folder::before {
+            content: "CONFIDENTIAL";
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-15deg);
+            font-family: 'Special Elite', cursive;
+            font-size: 6rem;
+            color: rgba(168, 50, 50, 0.1);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .folder-tab {
+            position: absolute;
+            top: -30px;
+            left: 20px;
+            width: 150px;
+            height: 40px;
+            background-color: #d1c7ac;
+            border-radius: 10px 10px 0 0;
+            display: flex;
+            align-items: center;
+            padding-left: 15px;
+            font-weight: bold;
+            color: #5c5542;
+            box-shadow: 0 -2px 5px rgba(0,0,0,0.3);
+        }
+
+        /* --- SCREENS --- */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.3s;
+            z-index: 2;
+        }
+
+        .hidden {
+            display: none !important;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* --- START SCREEN --- */
+        h1 {
+            font-family: 'Special Elite', cursive;
+            font-size: 3rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 0px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            margin-bottom: 40px;
+            border-bottom: 2px solid var(--accent-red);
+            padding-bottom: 10px;
+        }
+
+        .btn {
+            background: var(--ink-color);
+            color: var(--paper-color);
+            border: none;
+            padding: 15px 30px;
+            font-family: 'Courier Prime', monospace;
+            font-size: 1.2rem;
+            cursor: pointer;
+            box-shadow: 3px 3px 0px var(--accent-red);
+            transition: transform 0.1s, box-shadow 0.1s;
+            margin: 10px;
+        }
+
+        .btn:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 5px 5px 0px var(--accent-red);
+        }
+
+        .btn:active {
+            transform: translate(0, 0);
+            box-shadow: 0px 0px 0px var(--accent-red);
+        }
+
+        /* --- GAMEPLAY SCREEN --- */
+        .hud {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #999;
+            padding-bottom: 10px;
+            font-weight: bold;
+        }
+
+        .timer-bar-container {
+            width: 100%;
+            height: 10px;
+            background: #bbb;
+            margin-bottom: 30px;
+            border: 2px solid var(--ink-color);
+        }
+
+        .timer-bar {
+            height: 100%;
+            background: var(--accent-red);
+            width: 100%;
+            transition: width 0.1s linear;
+        }
+
+        .case-file {
+            background: #fff;
+            padding: 20px;
+            width: 100%;
+            box-shadow: 1px 1px 5px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .paper-clip {
+            position: absolute;
+            top: -10px;
+            right: 20px;
+            width: 15px;
+            height: 35px;
+            border: 3px solid #555;
+            border-radius: 10px;
+            border-bottom: none;
+            z-index: 10;
+        }
+
+        .question-text {
+            font-size: 1.3rem;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+
+        .clue-label {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            color: #777;
+            margin-bottom: 5px;
+        }
+
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            width: 100%;
+        }
+
+        .option-card {
+            background: white;
+            border: 2px solid var(--ink-color);
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: bold;
+            position: relative;
+        }
+
+        .option-card:hover {
+            background: var(--ink-color);
+            color: white;
+        }
+
+        /* Feedback Animations */
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+            100% { transform: translateX(0); }
+        }
+
+        .shake { animation: shake 0.3s; border-color: var(--accent-red); color: var(--accent-red); }
+        .correct-anim { background-color: #4caf50 !important; color: white !important; border-color: #4caf50; }
+
+        /* --- GAME OVER --- */
+        .stamp {
+            border: 5px solid var(--accent-red);
+            color: var(--accent-red);
+            font-size: 2.5rem;
+            font-weight: bold;
+            padding: 10px 20px;
+            text-transform: uppercase;
+            transform: rotate(-10deg);
+            opacity: 0;
+            animation: stamp-in 0.5s forwards 0.3s;
+            margin-bottom: 20px;
+            font-family: 'Special Elite', cursive;
+        }
+
+        @keyframes stamp-in {
+            0% { transform: scale(3) rotate(-10deg); opacity: 0; }
+            100% { transform: scale(1) rotate(-10deg); opacity: 0.8; }
+        }
+
+        .stats {
+            background: white;
+            padding: 20px;
+            border: 1px dashed #333;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        
+        .level-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: var(--ink-color);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 50%;
+            font-size: 0.8rem;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div class="folder">
+            <div class="folder-tab">CASE #<span id="case-number">001</span></div>
+
+            <div id="start-screen" class="screen">
+                <h1>GRAMMAR GUMSHOE</h1>
+                <div class="subtitle">Identify the suspect. Solve the case.</div>
+                <p style="max-width: 400px; text-align: center; font-size: 0.9rem; margin-bottom: 30px;">
+                    Detective, the files are a mess. We need you to identify the correct grammatical structure to close these cases. Be quick, the trail is going cold.
+                </p>
+                <button class="btn" onclick="startGame()">OPEN FILE</button>
+            </div>
+
+            <div id="game-screen" class="screen hidden">
+                <div class="hud">
+                    <span>SCORE: <span id="score-display">0</span></span>
+                    <span>LEVEL: <span id="level-display">1</span></span>
+                </div>
+                
+                <div class="timer-bar-container">
+                    <div id="timer-bar" class="timer-bar"></div>
+                </div>
+
+                <div class="case-file">
+                    <div class="paper-clip"></div>
+                    <div class="clue-label">The Witness Statement:</div>
+                    <div class="question-text" id="question-text">
+                        Loading case data...
+                    </div>
+                </div>
+
+                <div class="clue-label" style="align-self: flex-start; margin-left: 5px;">Potential Leads:</div>
+                <div class="options-grid" id="options-grid">
+                    </div>
+            </div>
+
+            <div id="end-screen" class="screen hidden">
+                <div class="stamp" id="end-stamp">CASE CLOSED</div>
+                <h2>Performance Report</h2>
+                <div class="stats">
+                    <p>Final Score: <span id="final-score">0</span></p>
+                    <p>Cases Solved: <span id="cases-solved">0</span></p>
+                    <p>Detective Rank: <strong id="rank-display">Rookie</strong></p>
+                </div>
+                <button class="btn" onclick="startGame()">NEW INVESTIGATION</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- GAME DATA (No repeats logic relies on ID) ---
+        const questionBank = [
+            // Level 1: Basics (Plurals, Simple Tenses)
+            { id: 1, type: 'fill', q: "The cat _____ on the mat.", a: "sat", opts: ["sat", "sitted", "sitting", "sate"], level: 1 },
+            { id: 2, type: 'fill', q: "I have three _____ in my pocket.", a: "pennies", opts: ["pennys", "pennies", "penny", "penis"], level: 1 },
+            { id: 3, type: 'fill', q: "She _____ to the store yesterday.", a: "went", opts: ["go", "goes", "went", "gone"], level: 1 },
+            { id: 4, type: 'grammar', q: "Which sentence is correct?", a: "They are happy.", opts: ["They is happy.", "They are happy.", "They be happy.", "They am happy."], level: 1 },
+            { id: 5, type: 'fill', q: "He doesn't have _____ money.", a: "any", opts: ["no", "any", "many", "none"], level: 1 },
+            { id: 6, type: 'fill', q: "My brother is _____ than me.", a: "taller", opts: ["more tall", "taller", "tallest", "tall"], level: 1 },
+            { id: 7, type: 'fill', q: "_____ is your name?", a: "What", opts: ["Who", "What", "When", "Why"], level: 1 },
+            { id: 8, type: 'fill', q: "Please listen _____ me.", a: "to", opts: ["at", "with", "to", "for"], level: 1 },
+            
+            // Level 2: Intermediate (Irregulars, Prepositions)
+            { id: 9, type: 'fill', q: "I have _____ that movie already.", a: "seen", opts: ["saw", "see", "seen", "seeing"], level: 2 },
+            { id: 10, type: 'fill', q: "If it rains, I _____ stay home.", a: "will", opts: ["would", "will", "did", "am"], level: 2 },
+            { id: 11, type: 'fill', q: "She is good _____ playing piano.", a: "at", opts: ["in", "on", "at", "with"], level: 2 },
+            { id: 12, type: 'fill', q: "The book was _____ by Mark Twain.", a: "written", opts: ["wrote", "write", "written", "writing"], level: 2 },
+            { id: 13, type: 'grammar', q: "Find the error: 'She don't like apples.'", a: "don't", opts: ["She", "don't", "like", "apples"], level: 2 },
+            { id: 14, type: 'fill', q: "I look forward to _____ you.", a: "meeting", opts: ["meet", "meeting", "met", "meets"], level: 2 },
+            { id: 15, type: 'fill', q: "This is the boy _____ dad is a pilot.", a: "whose", opts: ["who", "whom", "whose", "who's"], level: 2 },
+            
+            // Level 3: Advanced (Conditionals, Phrasal Verbs)
+            { id: 16, type: 'fill', q: "If I were you, I _____ accept the offer.", a: "would", opts: ["will", "would", "shall", "can"], level: 3 },
+            { id: 17, type: 'fill', q: "She accused him _____ stealing the money.", a: "of", opts: ["for", "on", "of", "about"], level: 3 },
+            { id: 18, type: 'fill', q: "By next year, I _____ graduated.", a: "will have", opts: ["will", "have", "will have", "had"], level: 3 },
+            { id: 19, type: 'grammar', q: "Which is a synonym for 'Happy'?", a: "Elated", opts: ["Elated", "Morose", "Sullen", "Apathetic"], level: 3 },
+            { id: 20, type: 'fill', q: "We ran out of gas. We need to _____.", a: "fill up", opts: ["fill in", "fill up", "fill out", "fill over"], level: 3 },
+            { id: 21, type: 'fill', q: "Neither the players nor the coach _____ happy.", a: "was", opts: ["were", "was", "are", "have"], level: 3 },
+            { id: 22, type: 'fill', q: "I'd rather you _____ do that.", a: "didn't", opts: ["don't", "won't", "didn't", "not"], level: 3 },
+            { id: 23, type: 'fill', q: "Despite _____ tired, he kept working.", a: "being", opts: ["be", "is", "being", "of being"], level: 3 },
+            { id: 24, type: 'grammar', q: "Choose the correct spelling.", a: "Accommodate", opts: ["Acommodate", "Accommodate", "Acomodate", "Accomodate"], level: 3 }
+        ];
+
+        // --- GAME STATE ---
+        let state = {
+            score: 0,
+            level: 1,
+            timeLeft: 0,
+            maxTime: 1000, // Initial time unit
+            timerInterval: null,
+            currentQuestion: null,
+            usedQuestionIds: [],
+            gameActive: false
+        };
+
+        // --- DOM ELEMENTS ---
+        const screens = {
+            start: document.getElementById('start-screen'),
+            game: document.getElementById('game-screen'),
+            end: document.getElementById('end-screen')
+        };
+        const els = {
+            score: document.getElementById('score-display'),
+            level: document.getElementById('level-display'),
+            timerBar: document.getElementById('timer-bar'),
+            question: document.getElementById('question-text'),
+            options: document.getElementById('options-grid'),
+            caseNum: document.getElementById('case-number'),
+            finalScore: document.getElementById('final-score'),
+            casesSolved: document.getElementById('cases-solved'),
+            rank: document.getElementById('rank-display')
+        };
+
+        // --- AUDIO (Simple Beeps using AudioContext for single file purity) ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            if (type === 'correct') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.1);
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.1);
+            } else if (type === 'wrong') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                osc.frequency.linearRampToValueAtTime(100, audioCtx.currentTime + 0.2);
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gainNode.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.2);
+            }
+        }
+
+        // --- GAME LOGIC ---
+
+        function showScreen(screenName) {
+            Object.values(screens).forEach(s => s.classList.add('hidden'));
+            screens[screenName].classList.remove('hidden');
+        }
+
+        function startGame() {
+            state.score = 0;
+            state.level = 1;
+            state.usedQuestionIds = [];
+            state.gameActive = true;
+            state.maxTime = 1000; 
+            
+            els.score.innerText = "0";
+            els.level.innerText = "1";
+            els.caseNum.innerText = Math.floor(Math.random() * 899) + 100;
+
+            showScreen('game');
+            nextLevel(); // Loads first question
+            startTimer();
+        }
+
+        function nextLevel() {
+            // Difficulty Scaling
+            if (state.score > 500) state.level = 2;
+            if (state.score > 1200) state.level = 3;
+            els.level.innerText = state.level;
+
+            // Filter questions by level and usage
+            let possibleQuestions = questionBank.filter(q => 
+                q.level <= state.level && !state.usedQuestionIds.includes(q.id)
+            );
+
+            // If we run out of questions, reset the used list (Endless mode)
+            if (possibleQuestions.length === 0) {
+                state.usedQuestionIds = [];
+                possibleQuestions = questionBank.filter(q => q.level <= state.level);
+            }
+
+            // Pick random
+            const qIndex = Math.floor(Math.random() * possibleQuestions.length);
+            state.currentQuestion = possibleQuestions[qIndex];
+            state.usedQuestionIds.push(state.currentQuestion.id);
+
+            renderQuestion();
+            
+            // Reset Time based on level difficulty
+            // Level 1: Slow burn. Level 3: Fast burn.
+            state.timeLeft = 100; 
+        }
+
+        function renderQuestion() {
+            const q = state.currentQuestion;
+            els.question.innerText = `"${q.q}"`;
+            
+            els.options.innerHTML = '';
+            
+            // Shuffle options
+            let opts = [...q.opts];
+            opts.sort(() => Math.random() - 0.5);
+
+            opts.forEach(opt => {
+                const btn = document.createElement('div');
+                btn.className = 'option-card';
+                btn.innerText = opt;
+                btn.onclick = () => checkAnswer(opt, btn);
+                els.options.appendChild(btn);
+            });
+        }
+
+        function checkAnswer(selected, btnElement) {
+            if (!state.gameActive) return;
+
+            if (selected === state.currentQuestion.a) {
+                // Correct
+                playSound('correct');
+                btnElement.classList.add('correct-anim');
+                state.score += 100 + (Math.floor(state.timeLeft)); // Time bonus
+                els.score.innerText = state.score;
+                
+                // Slight delay before next question
+                setTimeout(() => {
+                    nextLevel();
+                }, 400);
+            } else {
+                // Wrong
+                playSound('wrong');
+                btnElement.classList.add('shake');
+                state.timeLeft -= 20; // Time Penalty
+                if(state.timeLeft < 0) state.timeLeft = 0;
+            }
+        }
+
+        function startTimer() {
+            if (state.timerInterval) clearInterval(state.timerInterval);
+            
+            state.timerInterval = setInterval(() => {
+                if (!state.gameActive) return;
+
+                // Decay rate increases with score/level
+                let decay = 0.2 + (state.level * 0.1);
+                state.timeLeft -= decay;
+
+                els.timerBar.style.width = `${state.timeLeft}%`;
+
+                if (state.timeLeft <= 0) {
+                    gameOver();
+                }
+            }, 50);
+        }
+
+        function getRank(score) {
+            if (score < 500) return "Desk Sergeant";
+            if (score < 1000) return "Private Investigator";
+            if (score < 2000) return "Lead Detective";
+            return "Master Sleuth";
+        }
+
+        function gameOver() {
+            state.gameActive = false;
+            clearInterval(state.timerInterval);
+            
+            els.finalScore.innerText = state.score;
+            els.casesSolved.innerText = state.usedQuestionIds.length;
+            els.rank.innerText = getRank(state.score);
+            
+            // Randomize stamp rotation for effect
+            const rotation = Math.floor(Math.random() * 20) - 10;
+            document.getElementById('end-stamp').style.transform = `rotate(${rotation}deg)`;
+
+            showScreen('end');
+        }
+
+    </script>
+</body>
+</html>

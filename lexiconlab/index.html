@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lexicon Lab: Word Alchemy</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Lato:wght@400;700&display=swap');
+
+        :root {
+            --bg-dark: #120a1f;
+            --shelf-wood: #3e2723;
+            --liquid-color: #00ff9d;
+            --glow: #00ff9d;
+            --gold: #ffd700;
+            --scroll-paper: #f4e4bc;
+        }
+
+        * { box-sizing: border-box; user-select: none; }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-dark);
+            font-family: 'Cinzel', serif;
+            color: white;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-image: radial-gradient(circle at 50% 30%, #2a1b3d, #000);
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* --- BACKGROUND DECOR --- */
+        .torch {
+            position: absolute;
+            top: 50px;
+            width: 20px;
+            height: 60px;
+            background: #555;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.8);
+        }
+        .torch.left { left: 50px; }
+        .torch.right { right: 50px; }
+        .torch::after {
+            content: '';
+            position: absolute;
+            top: -20px; left: 0; width: 100%; height: 30px;
+            background: orange;
+            border-radius: 50% 50% 20% 20%;
+            filter: blur(5px);
+            animation: flicker 0.5s infinite alternate;
+        }
+        @keyframes flicker { 0% { opacity: 0.8; transform: scale(1); } 100% { opacity: 1; transform: scale(1.1); } }
+
+        /* --- SCROLL (Question) --- */
+        .scroll-container {
+            margin-top: 20px;
+            width: 90%;
+            max-width: 500px;
+            height: 140px;
+            background: var(--scroll-paper);
+            color: #3e2723;
+            border-radius: 5px;
+            position: relative;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 20px;
+            animation: unroll 0.8s ease-out;
+            z-index: 10;
+        }
+
+        .scroll-container::before, .scroll-container::after {
+            content: '';
+            position: absolute;
+            width: 110%;
+            height: 20px;
+            background: #5d4037;
+            border-radius: 10px;
+            z-index: -1;
+        }
+        .scroll-container::before { top: -10px; }
+        .scroll-container::after { bottom: -10px; }
+
+        .definition-text {
+            font-family: 'Lato', sans-serif;
+            font-size: 1.1rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .hint-text {
+            font-size: 0.8rem;
+            color: #666;
+            font-style: italic;
+        }
+
+        /* --- SHELVES (Ingredients) --- */
+        .shelves-area {
+            width: 100%;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            padding: 20px;
+            z-index: 5;
+        }
+
+        .shelf-row {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            background: linear-gradient(to bottom, #5d4037, #3e2723);
+            padding: 10px 40px;
+            border-radius: 5px;
+            box-shadow: 0 10px 10px rgba(0,0,0,0.5);
+            border-bottom: 5px solid #281815;
+            min-width: 300px;
+        }
+
+        .ingredient-jar {
+            width: 70px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 10px 10px 5px 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            position: relative;
+            transition: transform 0.2s, background 0.2s;
+            font-family: 'Lato', sans-serif;
+            font-weight: bold;
+            font-size: 0.9rem;
+            text-shadow: 1px 1px 2px black;
+            box-shadow: inset 0 -10px 20px rgba(0,0,0,0.5);
+        }
+
+        .ingredient-jar::before {
+            content: '';
+            position: absolute;
+            top: -5px; left: 10%; width: 80%; height: 5px;
+            background: #8d6e63;
+            border-radius: 2px;
+        }
+
+        /* Random liquid colors for jars */
+        .jar-red { background: linear-gradient(to top, rgba(255,0,0,0.4) 0%, transparent 80%); }
+        .jar-blue { background: linear-gradient(to top, rgba(0,0,255,0.4) 0%, transparent 80%); }
+        .jar-green { background: linear-gradient(to top, rgba(0,255,0,0.4) 0%, transparent 80%); }
+        .jar-purple { background: linear-gradient(to top, rgba(255,0,255,0.4) 0%, transparent 80%); }
+
+        .ingredient-jar:hover { transform: translateY(-5px); box-shadow: 0 0 15px var(--glow); border-color: white; }
+        .ingredient-jar:active { transform: scale(0.95); }
+        
+        .disabled-jar { opacity: 0.3; pointer-events: none; filter: grayscale(1); }
+
+        /* --- CAULDRON --- */
+        .cauldron-area {
+            position: relative;
+            width: 200px;
+            height: 180px;
+            margin-bottom: 40px;
+            display: flex;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        .cauldron-pot {
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 30% 30%, #444, #111);
+            border-radius: 10px 10px 50% 50%;
+            position: relative;
+            box-shadow: inset -10px -10px 20px rgba(0,0,0,0.8), 0 10px 20px rgba(0,0,0,0.5);
+            border-top: 10px solid #555;
+            display: flex;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .liquid {
+            position: absolute;
+            top: 20px;
+            width: 80%;
+            height: 30px;
+            background: var(--liquid-color);
+            border-radius: 50%;
+            box-shadow: 0 0 20px var(--glow);
+            animation: liquid-pulse 2s infinite alternate;
+        }
+
+        .bubble {
+            position: absolute;
+            background: var(--liquid-color);
+            border-radius: 50%;
+            opacity: 0.6;
+            animation: rise 2s infinite;
+        }
+
+        @keyframes liquid-pulse { 0% { opacity: 0.8; transform: scaleX(1); } 100% { opacity: 1; transform: scaleX(1.05); } }
+        @keyframes rise { 0% { transform: translateY(0) scale(1); opacity: 0.8; } 100% { transform: translateY(-100px) scale(0); opacity: 0; } }
+
+        /* --- CURRENT MIX DISPLAY --- */
+        .mix-display {
+            position: absolute;
+            top: -50px;
+            background: rgba(0,0,0,0.7);
+            padding: 10px 20px;
+            border-radius: 20px;
+            border: 1px solid var(--gold);
+            font-family: 'Lato', sans-serif;
+            font-size: 1.2rem;
+            color: var(--gold);
+            min-width: 100px;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .mix-display.visible { opacity: 1; }
+
+        /* --- BREW BUTTON --- */
+        .brew-btn {
+            position: absolute;
+            bottom: -60px;
+            background: var(--gold);
+            color: #3e2723;
+            border: none;
+            padding: 10px 30px;
+            font-family: 'Cinzel', serif;
+            font-weight: bold;
+            font-size: 1.2rem;
+            cursor: pointer;
+            box-shadow: 0 5px 0 #bfa002;
+            border-radius: 5px;
+            transition: all 0.1s;
+        }
+        .brew-btn:active { transform: translateY(4px); box-shadow: none; }
+
+        /* --- HUD --- */
+        .hud {
+            position: absolute;
+            top: 20px;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 40px;
+            font-size: 1.2rem;
+            color: var(--gold);
+            z-index: 20;
+            text-shadow: 0 2px 4px black;
+        }
+
+        /* --- SCREENS --- */
+        .modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            text-align: center;
+        }
+        .modal h1 { font-size: 3rem; color: var(--gold); margin: 0; }
+        .modal p { font-family: 'Lato'; color: #ccc; margin: 20px; max-width: 400px; }
+        .modal button {
+            background: transparent;
+            border: 2px solid var(--gold);
+            color: var(--gold);
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            font-family: 'Cinzel';
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .modal button:hover { background: var(--gold); color: black; }
+        .hidden { display: none; }
+
+        /* Feedback Effects */
+        .shake { animation: shake 0.5s; }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
+        
+        .success-flash { animation: success 0.5s; }
+        @keyframes success { 0% { background-color: var(--bg-dark); } 50% { background-color: #004400; } 100% { background-color: var(--bg-dark); } }
+
+    </style>
+</head>
+<body>
+
+    <div class="hud">
+        <span>Level: <span id="level-display">1</span></span>
+        <span>Score: <span id="score-display">0</span></span>
+    </div>
+
+    <div id="start-screen" class="modal">
+        <h1>LEXICON LAB</h1>
+        <p>The Kingdom needs new words. Combine prefixes, roots, and suffixes to satisfy the definition on the scroll.</p>
+        <button onclick="startGame()">ENTER LAB</button>
+    </div>
+
+    <div id="end-screen" class="modal hidden">
+        <h1 id="end-title">LAB EXPLOSION</h1>
+        <p>You brewed <span id="final-count">0</span> potions correctly.</p>
+        <button onclick="startGame()">TRY AGAIN</button>
+    </div>
+
+    <div id="game-container">
+        
+        <div class="torch left"></div>
+        <div class="torch right"></div>
+
+        <div class="scroll-container">
+            <div class="definition-text" id="definition-text">Loading...</div>
+            <div class="hint-text" id="hint-text"></div>
+        </div>
+
+        <div class="shelves-area" id="shelves">
+            </div>
+
+        <div class="cauldron-area">
+            <div class="mix-display" id="mix-display"></div>
+            <div class="cauldron-pot" id="cauldron" onclick="resetMix()">
+                <div class="liquid"></div>
+                </div>
+            <button class="brew-btn" onclick="checkBrew()">BREW</button>
+        </div>
+
+    </div>
+
+    <script>
+        // --- DATA: MORPHOLOGY RECIPES ---
+        // Structure: { parts: ['pre', 'view'], def: "To see beforehand" }
+        const recipeBook = [
+            // Level 1: Simple Prefixes/Suffixes
+            { id: 1, parts: ["Re", "Play"], def: "To play again", level: 1 },
+            { id: 2, parts: ["Un", "Happy"], def: "Not happy", level: 1 },
+            { id: 3, parts: ["Help", "Ful"], def: "Full of help; useful", level: 1 },
+            { id: 4, parts: ["Play", "Er"], def: "A person who plays", level: 1 },
+            { id: 5, parts: ["Dis", "Agree"], def: "To not have the same opinion", level: 1 },
+            { id: 6, parts: ["Slow", "Ly"], def: "In a slow manner", level: 1 },
+            { id: 7, parts: ["Pre", "View"], def: "To see something before", level: 1 },
+            
+            // Level 2: Roots + Affixes
+            { id: 8, parts: ["Bi", "Cycle"], def: "A vehicle with two wheels", level: 2 },
+            { id: 9, parts: ["Sub", "Marine"], def: "A ship that goes under the sea", level: 2 },
+            { id: 10, parts: ["Tele", "Phone"], def: "Device to hear sound from far away", level: 2 },
+            { id: 11, parts: ["Home", "Less"], def: "Without a home", level: 2 },
+            { id: 12, parts: ["Act", "Or"], def: "A person who acts", level: 2 },
+            { id: 13, parts: ["Mis", "Understand"], def: "To understand incorrectly", level: 2 },
+
+            // Level 3: 3-Part Words or Complex
+            { id: 14, parts: ["Un", "Break", "Able"], def: "Cannot be broken", level: 3 },
+            { id: 15, parts: ["Dis", "Respect", "Ful"], def: "Showing a lack of respect", level: 3 },
+            { id: 16, parts: ["Auto", "Bio", "Graphy"], def: "A life story written by oneself", level: 3 },
+            { id: 17, parts: ["Re", "Construct", "Ion"], def: "The act of building again", level: 3 },
+            { id: 18, parts: ["In", "Vis", "Ible"], def: "Cannot be seen", level: 3 },
+            { id: 19, parts: ["Trans", "Port", "Ation"], def: "The act of moving across locations", level: 3 }
+        ];
+
+        // --- STATE ---
+        let state = {
+            level: 1,
+            score: 0,
+            currentRecipe: null,
+            currentMix: [], // What player put in pot
+            usedIds: [],
+            lives: 3
+        };
+
+        // --- DOM ---
+        const els = {
+            def: document.getElementById('definition-text'),
+            hint: document.getElementById('hint-text'),
+            shelves: document.getElementById('shelves'),
+            mix: document.getElementById('mix-display'),
+            level: document.getElementById('level-display'),
+            score: document.getElementById('score-display'),
+            cauldron: document.getElementById('cauldron'),
+            container: document.getElementById('game-container')
+        };
+
+        // --- AUDIO (Synth) ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSfx(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            const now = audioCtx.currentTime;
+
+            if (type === 'drop') { // Water droplet sound
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, now);
+                osc.frequency.exponentialRampToValueAtTime(400, now + 0.1);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'brew') { // Magical shimmer
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(200, now);
+                osc.frequency.linearRampToValueAtTime(600, now + 0.3);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.5);
+                osc.start(now);
+                osc.stop(now + 0.5);
+            } else if (type === 'fail') { // Low buzz
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(100, now);
+                osc.frequency.linearRampToValueAtTime(50, now + 0.3);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            }
+        }
+
+        // --- BUBBLES ---
+        function createBubbles() {
+            const pot = els.cauldron;
+            setInterval(() => {
+                const b = document.createElement('div');
+                b.className = 'bubble';
+                const size = Math.random() * 10 + 5;
+                b.style.width = size + 'px';
+                b.style.height = size + 'px';
+                b.style.left = (Math.random() * 60 + 20) + '%';
+                b.style.top = '40px';
+                pot.appendChild(b);
+                setTimeout(() => b.remove(), 2000);
+            }, 500);
+        }
+        createBubbles();
+
+        // --- GAME LOGIC ---
+
+        function startGame() {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('end-screen').classList.add('hidden');
+            state.score = 0;
+            state.level = 1;
+            state.lives = 3;
+            state.usedIds = [];
+            els.score.innerText = 0;
+            els.level.innerText = 1;
+            
+            loadLevel();
+        }
+
+        function loadLevel() {
+            // Determine Level
+            if (state.score >= 500) state.level = 2;
+            if (state.score >= 1200) state.level = 3;
+            els.level.innerText = state.level;
+
+            // Pick Recipe
+            let pool = recipeBook.filter(r => r.level <= state.level && !state.usedIds.includes(r.id));
+            if (pool.length === 0) {
+                // Reset pool if empty (Endless)
+                state.usedIds = [];
+                pool = recipeBook.filter(r => r.level <= state.level);
+            }
+
+            const recipe = pool[Math.floor(Math.random() * pool.length)];
+            state.currentRecipe = recipe;
+            state.usedIds.push(recipe.id);
+            state.currentMix = [];
+            updateMixDisplay();
+
+            // Setup UI
+            els.def.innerText = `"${recipe.def}"`;
+            els.hint.innerText = `Length: ${recipe.parts.length} parts`;
+            
+            generateIngredients(recipe);
+        }
+
+        function generateIngredients(targetRecipe) {
+            els.shelves.innerHTML = '';
+            
+            // 1. Get correct ingredients
+            let ingredients = [...targetRecipe.parts];
+            
+            // 2. Get distractors (random parts from other recipes)
+            const allParts = recipeBook.flatMap(r => r.parts);
+            // Add 4-6 distractors depending on level
+            const distractorCount = 3 + state.level;
+            
+            for(let i=0; i<distractorCount; i++) {
+                ingredients.push(allParts[Math.floor(Math.random() * allParts.length)]);
+            }
+
+            // Remove duplicates
+            ingredients = [...new Set(ingredients)];
+            // Shuffle
+            ingredients.sort(() => Math.random() - 0.5);
+
+            // Create Rows
+            const row1 = document.createElement('div'); row1.className = 'shelf-row';
+            const row2 = document.createElement('div'); row2.className = 'shelf-row';
+            
+            const styles = ['jar-red', 'jar-blue', 'jar-green', 'jar-purple'];
+
+            ingredients.forEach((ing, index) => {
+                const jar = document.createElement('div');
+                jar.className = `ingredient-jar ${styles[Math.floor(Math.random() * styles.length)]}`;
+                jar.innerText = ing;
+                jar.onclick = (e) => addToPot(ing, e.target);
+                
+                if (index < ingredients.length / 2) row1.appendChild(jar);
+                else row2.appendChild(jar);
+            });
+
+            els.shelves.appendChild(row1);
+            els.shelves.appendChild(row2);
+        }
+
+        function addToPot(text, element) {
+            if (state.currentMix.length >= state.currentRecipe.parts.length) return; // Full
+
+            state.currentMix.push(text);
+            element.classList.add('disabled-jar'); // Visual feedback
+            playSfx('drop');
+            updateMixDisplay();
+        }
+
+        function resetMix() {
+            state.currentMix = [];
+            updateMixDisplay();
+            // Re-enable all jars
+            document.querySelectorAll('.ingredient-jar').forEach(el => el.classList.remove('disabled-jar'));
+        }
+
+        function updateMixDisplay() {
+            if (state.currentMix.length > 0) {
+                els.mix.innerText = state.currentMix.join(" + ");
+                els.mix.classList.add('visible');
+            } else {
+                els.mix.classList.remove('visible');
+            }
+        }
+
+        function checkBrew() {
+            if (state.currentMix.length === 0) return;
+
+            const target = state.currentRecipe.parts.join("").toLowerCase();
+            const actual = state.currentMix.join("").toLowerCase();
+
+            if (target === actual) {
+                // Correct
+                playSfx('brew');
+                state.score += 100 * state.level;
+                els.score.innerText = state.score;
+                document.body.classList.add('success-flash');
+                setTimeout(() => document.body.classList.remove('success-flash'), 500);
+                
+                // Change Liquid Color momentarily
+                document.documentElement.style.setProperty('--liquid-color', '#ffeb3b'); // Gold
+                setTimeout(() => document.documentElement.style.setProperty('--liquid-color', '#00ff9d'), 1000);
+
+                setTimeout(loadLevel, 1000);
+            } else {
+                // Wrong
+                playSfx('fail');
+                els.container.classList.add('shake');
+                setTimeout(() => els.container.classList.remove('shake'), 500);
+                resetMix();
+                
+                // Penalty?
+                state.score -= 50;
+                if(state.score < 0) state.score = 0;
+                els.score.innerText = state.score;
+            }
+        }
+
+    </script>
+</body>
+</html>

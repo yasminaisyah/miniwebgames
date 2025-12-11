@@ -1,0 +1,663 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deep Sea Vocab Voyage</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Bubblegum+Sans&family=Roboto:wght@400;700&display=swap');
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: linear-gradient(to bottom, #006994, #001e36);
+            font-family: 'Roboto', sans-serif;
+            user-select: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* UI Overlays */
+        .hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-family: 'Bubblegum Sans', cursive;
+            text-shadow: 2px 2px 0px #000;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .hud-score { font-size: 24px; color: #ffd700; }
+        .hud-depth { font-size: 20px; color: #87ceeb; margin-top: 5px; }
+
+        /* The Mission Box */
+        .mission-panel {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.6);
+            border: 2px solid #4facfe;
+            border-radius: 15px;
+            padding: 10px 30px;
+            text-align: center;
+            color: white;
+            z-index: 10;
+            box-shadow: 0 0 20px rgba(79, 172, 254, 0.5);
+            transition: transform 0.3s ease;
+        }
+
+        .mission-label {
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #4facfe;
+        }
+
+        .mission-target {
+            font-family: 'Bubblegum Sans', cursive;
+            font-size: 32px;
+            color: #fff;
+            margin-top: 5px;
+        }
+
+        /* Oxygen Bar */
+        .oxygen-container {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 300px;
+            height: 20px;
+            background: rgba(0,0,0,0.5);
+            border-radius: 10px;
+            border: 2px solid white;
+            overflow: hidden;
+            z-index: 10;
+        }
+
+        .oxygen-bar {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #ff4e50, #f9d423);
+            transition: width 0.2s linear;
+        }
+
+        .oxygen-label {
+            position: absolute;
+            bottom: 55px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+            letter-spacing: 1px;
+            z-index: 10;
+        }
+
+        /* Screens */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 15, 30, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            color: white;
+        }
+
+        .hidden { display: none !important; }
+
+        h1 {
+            font-family: 'Bubblegum Sans', cursive;
+            font-size: 60px;
+            margin: 0 0 20px 0;
+            background: -webkit-linear-gradient(#00f260, #0575e6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0px 4px 10px rgba(0,0,0,0.5);
+        }
+
+        button {
+            padding: 15px 40px;
+            font-size: 24px;
+            font-family: 'Bubblegum Sans', cursive;
+            color: white;
+            background: linear-gradient(45deg, #11998e, #38ef7d);
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(56, 239, 125, 0.4);
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 25px rgba(56, 239, 125, 0.6);
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        .tutorial {
+            font-size: 18px;
+            max-width: 500px;
+            text-align: center;
+            line-height: 1.6;
+            margin-bottom: 30px;
+            color: #ccc;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="start-screen" class="screen">
+            <h1>Deep Sea Vocab</h1>
+            <p class="tutorial">Dive into the abyss! Your submarine needs to collect specific words to power its engine.<br><br>Move your mouse (or drag finger) to guide the diver.<br>Collect the CORRECT words.<br>Avoid the WRONG words.</p>
+            <button onclick="startGame()">Start Dive</button>
+        </div>
+
+        <div id="game-over-screen" class="screen hidden">
+            <h1>Out of Oxygen!</h1>
+            <p id="final-score" class="tutorial" style="font-size: 30px; color: white;">Depth Reached: 0m</p>
+            <button onclick="resetGame()">Dive Again</button>
+        </div>
+
+        <div id="game-ui" class="hidden">
+            <div class="hud">
+                <div class="hud-score" id="score-display">Score: 0</div>
+                <div class="hud-depth" id="depth-display">Depth: 0m</div>
+            </div>
+
+            <div class="mission-panel" id="mission-panel">
+                <div class="mission-label">Current Mission</div>
+                <div class="mission-target" id="mission-text">Loading...</div>
+            </div>
+
+            <div class="oxygen-label">OXYGEN LEVEL</div>
+            <div class="oxygen-container">
+                <div class="oxygen-bar" id="oxygen-bar"></div>
+            </div>
+        </div>
+
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <script>
+        // --- GAME CONFIGURATION ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+
+        // Game State
+        let isPlaying = false;
+        let score = 0;
+        let depth = 0; // Represents level
+        let oxygen = 100;
+        let lastTime = 0;
+        let spawnTimer = 0;
+        let spawnInterval = 2000; // Decreases as depth increases
+        let gameSpeed = 2; // Increases as depth increases
+
+        // Entities
+        let player = { x: 0, y: 0, radius: 25, angle: 0 };
+        let words = [];
+        let particles = [];
+        let bubbles = [];
+
+        // Logic
+        let currentMission = {}; // { type: 'noun', text: 'Find Nouns' }
+        let collectedCount = 0;
+        let requiredForLevelUp = 5;
+
+        // Audio Context
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+
+        // --- WORD DATABASE (Endless Categories) ---
+        const wordData = {
+            partsOfSpeech: {
+                nouns: ["Apple", "London", "Happiness", "Cat", "Ocean", "Doctor", "Idea", "Tree", "Computer", "Music", "Ghost", "Piano", "Rocket", "Silence", "Dream", "Tiger", "Book", "River", "King", "Freedom"],
+                verbs: ["Run", "Jump", "Think", "Swim", "Eat", "Sleep", "Create", "Drive", "Fly", "Write", "Sing", "Dance", "Climb", "Study", "Build", "Break", "Laugh", "Cry", "Cook", "Paint"],
+                adjectives: ["Happy", "Blue", "Fast", "Shiny", "Loud", "Soft", "Ancient", "Brave", "Cold", "Bright", "Delicious", "Empty", "Heavy", "Kind", "Lucky", "Modern", "Proud", "Rich", "Smooth", "Wild"],
+                adverbs: ["Quickly", "Loudly", "Happily", "Sadly", "Never", "Always", "Soon", "Here", "There", "Softly", "Bravely", "Lazily", "Yesterday", "Today", "Slowly", "Well", "Badly", "Easily", "Often", "Rarely"]
+            },
+            tense: {
+                past: ["Walked", "Ran", "Ate", "Slept", "Went", "Saw", "Bought", "Thought", "Drank", "Flew", "Made", "Took", "Wrote", "Said", "Came"],
+                present: ["Walk", "Run", "Eat", "Sleep", "Go", "See", "Buy", "Think", "Drink", "Fly", "Make", "Take", "Write", "Say", "Come"]
+            },
+            synonyms: [
+                { target: "Happy", correct: ["Joyful", "Glad", "Cheerful", "Merry"], wrong: ["Sad", "Angry", "Bored", "Tired"] },
+                { target: "Big", correct: ["Huge", "Large", "Giant", "Massive"], wrong: ["Small", "Tiny", "Little", "Mini"] },
+                { target: "Fast", correct: ["Quick", "Rapid", "Swift", "Speedy"], wrong: ["Slow", "Sluggish", "Late", "Lazy"] },
+                { target: "Beautiful", correct: ["Pretty", "Lovely", "Stunning", "Cute"], wrong: ["Ugly", "Gross", "Plain", "Bad"] },
+                { target: "Smart", correct: ["Clever", "Bright", "Wise", "Sharp"], wrong: ["Dumb", "Stupid", "Slow", "Silly"] }
+            ]
+        };
+
+        // --- SOUND SYSTEM ---
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'collect') {
+                // Happy high ping
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, now);
+                osc.frequency.exponentialRampToValueAtTime(1200, now + 0.1);
+                gainNode.gain.setValueAtTime(0.1, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'damage') {
+                // Low buzz error
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.linearRampToValueAtTime(100, now + 0.3);
+                gainNode.gain.setValueAtTime(0.1, now);
+                gainNode.gain.linearRampToValueAtTime(0.01, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            } else if (type === 'levelup') {
+                // Victory chime
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.setValueAtTime(600, now + 0.1);
+                osc.frequency.setValueAtTime(800, now + 0.2);
+                gainNode.gain.setValueAtTime(0.1, now);
+                gainNode.gain.linearRampToValueAtTime(0, now + 0.5);
+                osc.start(now);
+                osc.stop(now + 0.5);
+            } else if (type === 'bubble') {
+                // Subtle pop
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(200 + Math.random()*200, now);
+                gainNode.gain.setValueAtTime(0.05, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+                osc.start(now);
+                osc.stop(now + 0.05);
+            }
+        }
+
+        // --- GAME LOGIC ---
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // Mouse Tracker
+        window.addEventListener('mousemove', (e) => {
+            // Easing towards mouse
+            const dx = e.clientX - player.x;
+            const dy = e.clientY - player.y;
+            player.angle = Math.atan2(dy, dx);
+        });
+
+        // Touch Tracker
+        window.addEventListener('touchmove', (e) => {
+            const touch = e.touches[0];
+            const dx = touch.clientX - player.x;
+            const dy = touch.clientY - player.y;
+            player.angle = Math.atan2(dy, dx);
+            // On touch, move directly or with easing in loop
+            // We'll handle movement in loop using a target variable
+            targetX = touch.clientX;
+            targetY = touch.clientY;
+        }, {passive: false});
+
+        let targetX = width / 2;
+        let targetY = height / 2;
+
+        window.addEventListener('mousemove', (e) => {
+            targetX = e.clientX;
+            targetY = e.clientY;
+        });
+
+        function startGame() {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-over-screen').classList.add('hidden');
+            document.getElementById('game-ui').classList.remove('hidden');
+            
+            // Reset stats
+            score = 0;
+            depth = 0;
+            oxygen = 100;
+            words = [];
+            particles = [];
+            bubbles = [];
+            isPlaying = true;
+            gameSpeed = 2;
+            spawnInterval = 2000;
+            collectedCount = 0;
+            
+            // Set first mission
+            setNewMission();
+            
+            // Start Loop
+            lastTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function setNewMission() {
+            collectedCount = 0;
+            depth += 10;
+            gameSpeed += 0.2;
+            if(spawnInterval > 800) spawnInterval -= 100;
+
+            // Update UI
+            document.getElementById('depth-display').innerText = `Depth: ${depth}m`;
+            
+            // Randomly choose a mission type
+            const rand = Math.random();
+            
+            if (rand < 0.4) {
+                // Part of Speech mission
+                const types = ['nouns', 'verbs', 'adjectives', 'adverbs'];
+                const selected = types[Math.floor(Math.random() * types.length)];
+                currentMission = {
+                    type: 'pos',
+                    target: selected,
+                    text: `Collect all ${selected.toUpperCase()}`
+                };
+            } else if (rand < 0.7) {
+                // Tense mission
+                const types = ['past', 'present'];
+                const selected = types[Math.floor(Math.random() * types.length)];
+                currentMission = {
+                    type: 'tense',
+                    target: selected,
+                    text: `Collect ${selected.toUpperCase()} TENSE verbs`
+                };
+            } else {
+                // Synonym mission
+                const synData = wordData.synonyms[Math.floor(Math.random() * wordData.synonyms.length)];
+                currentMission = {
+                    type: 'synonym',
+                    data: synData,
+                    text: `Find synonyms for "${synData.target.toUpperCase()}"`
+                };
+            }
+
+            const missionPanel = document.getElementById('mission-text');
+            missionPanel.innerText = currentMission.text;
+            
+            // Pop effect
+            const panel = document.getElementById('mission-panel');
+            panel.style.transform = "translateX(-50%) scale(1.2)";
+            setTimeout(() => panel.style.transform = "translateX(-50%) scale(1)", 200);
+        }
+
+        function spawnWord() {
+            let text = "";
+            let isCorrect = false;
+
+            // 50% chance to spawn a correct word, 50% wrong
+            // To make it endless but fair, we adjust probability slightly
+            isCorrect = Math.random() > 0.6; 
+
+            if (currentMission.type === 'pos') {
+                if (isCorrect) {
+                    const list = wordData.partsOfSpeech[currentMission.target];
+                    text = list[Math.floor(Math.random() * list.length)];
+                } else {
+                    // Pick a random OTHER category
+                    const allTypes = ['nouns', 'verbs', 'adjectives', 'adverbs'];
+                    const wrongTypes = allTypes.filter(t => t !== currentMission.target);
+                    const wrongType = wrongTypes[Math.floor(Math.random() * wrongTypes.length)];
+                    const list = wordData.partsOfSpeech[wrongType];
+                    text = list[Math.floor(Math.random() * list.length)];
+                }
+            } else if (currentMission.type === 'tense') {
+                if (isCorrect) {
+                    const list = wordData.tense[currentMission.target];
+                    text = list[Math.floor(Math.random() * list.length)];
+                } else {
+                    const wrongType = currentMission.target === 'past' ? 'present' : 'past';
+                    const list = wordData.tense[wrongType];
+                    text = list[Math.floor(Math.random() * list.length)];
+                }
+            } else if (currentMission.type === 'synonym') {
+                if (isCorrect) {
+                    const list = currentMission.data.correct;
+                    text = list[Math.floor(Math.random() * list.length)];
+                } else {
+                    const list = currentMission.data.wrong;
+                    text = list[Math.floor(Math.random() * list.length)];
+                }
+            }
+
+            // Entity properties
+            // Spawn from right, move left
+            const y = Math.random() * (height - 100) + 50;
+            const size = 20 + Math.random() * 10;
+            
+            words.push({
+                x: width + 50,
+                y: y,
+                text: text,
+                isCorrect: isCorrect,
+                speed: gameSpeed + Math.random(),
+                size: size,
+                oscillationOffset: Math.random() * 10
+            });
+        }
+
+        function createParticles(x, y, color) {
+            for(let i=0; i<8; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 5,
+                    vy: (Math.random() - 0.5) * 5,
+                    life: 1.0,
+                    color: color
+                });
+            }
+        }
+
+        function createBubble() {
+            bubbles.push({
+                x: Math.random() * width,
+                y: height + 10,
+                radius: Math.random() * 5 + 2,
+                speed: Math.random() * 2 + 1
+            });
+        }
+
+        function gameLoop(timestamp) {
+            if (!isPlaying) return;
+
+            const dt = timestamp - lastTime;
+            lastTime = timestamp;
+
+            // 1. Update Player Position (Smooth lerp)
+            player.x += (targetX - player.x) * 0.1;
+            player.y += (targetY - player.y) * 0.1;
+
+            // 2. Spawning
+            spawnTimer += dt;
+            if (spawnTimer > spawnInterval) {
+                spawnWord();
+                spawnTimer = 0;
+            }
+
+            // Random ambient bubbles
+            if(Math.random() < 0.05) createBubble();
+
+            // 3. Clear Canvas
+            ctx.clearRect(0, 0, width, height);
+
+            // 4. Draw Ambient Bubbles
+            ctx.fillStyle = "rgba(255, 255, 255, 0.2)";
+            for (let i = bubbles.length - 1; i >= 0; i--) {
+                let b = bubbles[i];
+                b.y -= b.speed;
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+                ctx.fill();
+                if (b.y < -10) bubbles.splice(i, 1);
+            }
+
+            // 5. Update & Draw Words (Fish)
+            for (let i = words.length - 1; i >= 0; i--) {
+                let w = words[i];
+                w.x -= w.speed;
+                // Bobbing motion
+                let bob = Math.sin(timestamp / 200 + w.oscillationOffset) * 20;
+                let renderY = w.y + bob;
+
+                // Collision Detection
+                const dist = Math.hypot(player.x - w.x, player.y - renderY);
+                if (dist < player.radius + w.size) {
+                    // Collision!
+                    if (w.isCorrect) {
+                        score += 100;
+                        oxygen = Math.min(oxygen + 10, 100);
+                        collectedCount++;
+                        playSound('collect');
+                        createParticles(w.x, renderY, '#00ff00');
+                        
+                        // Check Level Up
+                        if (collectedCount >= requiredForLevelUp) {
+                            playSound('levelup');
+                            setNewMission();
+                        }
+                    } else {
+                        oxygen -= 25;
+                        playSound('damage');
+                        createParticles(w.x, renderY, '#ff0000');
+                        // Screen shake effect could go here
+                        document.getElementById('game-container').style.transform = `translate(${Math.random()*10-5}px, ${Math.random()*10-5}px)`;
+                        setTimeout(()=> document.getElementById('game-container').style.transform = 'translate(0,0)', 100);
+                    }
+                    words.splice(i, 1);
+                    document.getElementById('score-display').innerText = `Score: ${score}`;
+                    continue;
+                }
+
+                // Cleanup off-screen
+                if (w.x < -100) words.splice(i, 1);
+
+                // Draw Fish/Word
+                ctx.font = `bold ${20}px 'Roboto'`;
+                let textWidth = ctx.measureText(w.text).width;
+                
+                // Draw Fish Body bubble
+                ctx.fillStyle = w.isCorrect ? "rgba(0, 255, 128, 0.2)" : "rgba(255, 255, 255, 0.1)"; // Slight hint (actually remove hint for difficulty?) 
+                // Let's not give color hints, that defeats the purpose. Keep them uniform.
+                ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
+                ctx.beginPath();
+                ctx.ellipse(w.x, renderY, textWidth/1.5 + 20, 30, 0, 0, Math.PI*2);
+                ctx.fill();
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Draw Text
+                ctx.fillStyle = "#fff";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(w.text, w.x, renderY);
+            }
+
+            // 6. Draw Player (Submarine/Diver)
+            ctx.save();
+            ctx.translate(player.x, player.y);
+            // Rotate slightly based on movement
+            ctx.rotate((targetY - player.y) * 0.005);
+            
+            // Submarine Body
+            ctx.fillStyle = "#ffd700";
+            ctx.beginPath();
+            ctx.ellipse(0, 0, 40, 20, 0, 0, Math.PI*2);
+            ctx.fill();
+            // Cockpit
+            ctx.fillStyle = "#87ceeb";
+            ctx.beginPath();
+            ctx.arc(10, -5, 10, 0, Math.PI*2);
+            ctx.fill();
+            // Propeller
+            ctx.fillStyle = "#ccc";
+            ctx.fillRect(-45, -5, 10, 10);
+            
+            // Headlamp light
+            ctx.beginPath();
+            ctx.moveTo(40, 0);
+            ctx.lineTo(200, -50);
+            ctx.lineTo(200, 50);
+            ctx.fillStyle = "rgba(255, 255, 200, 0.1)";
+            ctx.fill();
+            
+            ctx.restore();
+
+            // 7. Particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= 0.05;
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 5, 0, Math.PI*2);
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+
+            // 8. Oxygen Logic
+            oxygen -= 0.05; // Constant drain
+            document.getElementById('oxygen-bar').style.width = oxygen + "%";
+            
+            if (oxygen <= 0) {
+                gameOver();
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function gameOver() {
+            isPlaying = false;
+            document.getElementById('game-ui').classList.add('hidden');
+            document.getElementById('game-over-screen').classList.remove('hidden');
+            document.getElementById('final-score').innerText = `Final Score: ${score}\nDepth Reached: ${depth}m`;
+        }
+
+        function resetGame() {
+            startGame();
+        }
+
+    </script>
+</body>
+</html>
+```

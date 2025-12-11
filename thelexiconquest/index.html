@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Lexicon Quest</title>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #ec4899;
+            --accent: #8b5cf6;
+            --background: #0f172a;
+            --surface: #1e293b;
+            --text: #f8fafc;
+            --success: #22c55e;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        body {
+            background-color: var(--background);
+            background-image: 
+                radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
+                radial-gradient(at 50% 0%, hsla(225,39%,30%,1) 0, transparent 50%), 
+                radial-gradient(at 100% 0%, hsla(339,49%,30%,1) 0, transparent 50%);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow-x: hidden;
+        }
+
+        /* --- UI Components --- */
+        .container {
+            width: 100%;
+            max-width: 600px;
+            padding: 1rem;
+            position: relative;
+        }
+
+        .card {
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(12px);
+            border-radius: 1.5rem;
+            padding: 2rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.2s;
+            width: 100%;
+            margin-top: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            margin-top: 0.5rem;
+        }
+
+        .btn-outline:hover {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        /* --- Screens --- */
+        .screen {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        /* --- Welcome Screen --- */
+        .title-large {
+            font-size: 3rem;
+            font-weight: 800;
+            text-align: center;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(to right, #818cf8, #c084fc, #f472b6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 30px rgba(139, 92, 246, 0.3);
+        }
+
+        .level-badges {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+
+        .badge {
+            background: rgba(255,255,255,0.05);
+            padding: 0.5rem 1rem;
+            border-radius: 999px;
+            font-size: 0.8rem;
+            border: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* --- Game HUD --- */
+        .hud {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding: 1rem;
+            background: rgba(0,0,0,0.2);
+            border-radius: 1rem;
+        }
+
+        .stat-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .stat-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            opacity: 0.7;
+            letter-spacing: 1px;
+        }
+
+        .stat-value {
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+
+        .hearts {
+            color: var(--danger);
+            font-size: 1.2rem;
+            letter-spacing: 2px;
+        }
+
+        /* Sound Toggle Button */
+        .sound-btn {
+            background: none;
+            border: 1px solid rgba(255,255,255,0.2);
+            color: var(--text);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .sound-btn:hover {
+            background: rgba(255,255,255,0.1);
+            border-color: var(--primary);
+        }
+
+        .progress-bar-container {
+            width: 100%;
+            height: 6px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 3px;
+            margin-top: 1rem;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: var(--success);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        /* --- Level Specifics --- */
+        .level-indicator {
+            text-align: center;
+            color: var(--secondary);
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .question-text {
+            font-size: 1.5rem;
+            text-align: center;
+            margin: 1.5rem 0;
+            font-weight: 600;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Level 1: Scramble */
+        .scramble-box {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: center;
+            margin: 2rem 0;
+        }
+
+        .letter-tile {
+            width: 40px;
+            height: 40px;
+            background: var(--surface);
+            border: 2px solid var(--primary);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            box-shadow: 0 4px 0 var(--primary-dark);
+        }
+
+        .input-group {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 0.75rem;
+            border-radius: 0.75rem;
+            border: 2px solid rgba(255,255,255,0.1);
+            background: rgba(0,0,0,0.2);
+            color: white;
+            font-size: 1.1rem;
+            text-align: center;
+            outline: none;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--primary);
+        }
+
+        /* Level 2 & 3: Options */
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .option-btn {
+            background: rgba(255,255,255,0.05);
+            border: 2px solid transparent;
+            padding: 1rem;
+            border-radius: 1rem;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 1rem;
+        }
+
+        .option-btn:hover {
+            background: rgba(255,255,255,0.1);
+            transform: scale(1.02);
+        }
+
+        .option-btn.correct {
+            background: rgba(34, 197, 94, 0.2);
+            border-color: var(--success);
+        }
+
+        .option-btn.wrong {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: var(--danger);
+        }
+
+        /* --- Animations --- */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        .shake {
+            animation: shake 0.3s ease-in-out;
+        }
+
+        .feedback-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.7);
+            border-radius: 1.5rem;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            z-index: 10;
+        }
+
+        .feedback-overlay.active {
+            opacity: 1;
+        }
+
+        .feedback-content {
+            font-size: 4rem;
+            transform: scale(0.5);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .feedback-overlay.active .feedback-content {
+            transform: scale(1);
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .options-grid {
+                grid-template-columns: 1fr;
+            }
+            .title-large {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- SCREEN: WELCOME -->
+        <div id="screen-welcome" class="screen active card" style="text-align: center;">
+            <div style="font-size: 4rem; margin-bottom: 1rem;">🧙‍♂️</div>
+            <h1 class="title-large">The Lexicon<br>Quest</h1>
+            <p style="opacity: 0.8; margin-bottom: 2rem;">Endless Adventure Mode</p>
+            
+            <div class="level-badges">
+                <div class="badge">🌲 Spelling</div>
+                <div class="badge">🌉 Grammar</div>
+                <div class="badge">🏔️ Synonyms</div>
+            </div>
+
+            <button class="btn" onclick="game.start()">Start Adventure</button>
+        </div>
+
+        <!-- SCREEN: GAME -->
+        <div id="screen-game" class="screen card">
+            <div class="level-indicator" id="level-title">Level 1: The Scrambled Forest</div>
+            
+            <div class="hud">
+                <div class="stat-box">
+                    <span class="stat-label">Score</span>
+                    <span class="stat-value" id="score-display">0</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-label">Health</span>
+                    <span class="hearts" id="health-display">❤️❤️❤️</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-label">Level</span>
+                    <span class="stat-value"><span id="current-level-num">1</span></span>
+                </div>
+                <div class="stat-box">
+                    <button class="sound-btn" id="sound-toggle" onclick="game.toggleSound()" title="Toggle Sound">
+                        🔊
+                    </button>
+                </div>
+            </div>
+
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="level-progress"></div>
+            </div>
+
+            <div id="game-content">
+                <!-- Content injected by JS -->
+            </div>
+
+            <div class="feedback-overlay" id="feedback-overlay">
+                <div class="feedback-content" id="feedback-icon">✨</div>
+            </div>
+        </div>
+
+        <!-- SCREEN: GAME OVER / WIN -->
+        <div id="screen-end" class="screen card" style="text-align: center;">
+            <div style="font-size: 4rem; margin-bottom: 1rem;" id="end-emoji">🏆</div>
+            <h1 class="title-large" id="end-title">Victory!</h1>
+            <p id="end-message" style="margin-bottom: 2rem; font-size: 1.1rem; opacity: 0.9;">You have conquered the dictionary!</p>
+            
+            <div style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 1rem; margin-bottom: 2rem;">
+                <div style="font-size: 0.8rem; text-transform: uppercase; opacity: 0.7;">Final Score</div>
+                <div style="font-size: 2.5rem; font-weight: 800; color: var(--success);" id="final-score">0</div>
+            </div>
+
+            <button class="btn" onclick="game.start()">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA: Question Bank (Expanded) ---
+        const questionBank = {
+            level1: [ // Scramble (Spelling)
+                { word: "ANCIENT", hint: "Very old, from a long time ago." },
+                { word: "ISLAND", hint: "Land surrounded by water." },
+                { word: "JOURNEY", hint: "An act of traveling from one place to another." },
+                { word: "LIBRARY", hint: "A place containing collections of books." },
+                { word: "MYSTERY", hint: "Something difficult to explain or understand." },
+                { word: "NATURE", hint: "The physical world, including plants and animals." },
+                { word: "PLANET", hint: "A celestial body orbiting a star." },
+                { word: "RHYTHM", hint: "A strong, regular, repeated pattern of sound." },
+                { word: "SCIENCE", hint: "The study of the physical and natural world." },
+                { word: "SUMMER", hint: "The warmest season of the year." },
+                { word: "FRIEND", hint: "A person whom one knows and likes." },
+                { word: "SCHOOL", hint: "An institution for educating children." },
+                { word: "GARDEN", hint: "A piece of ground used for growing flowers." },
+                { word: "LITTLE", hint: "Small in size." },
+                { word: "PEOPLE", hint: "Human beings in general." },
+                { word: "WINDOW", hint: "An opening in a wall to let in light." },
+                { word: "YELLOW", hint: "The color of lemons and the sun." },
+                { word: "DOCTOR", hint: "A person who treats sick people." },
+                { word: "ORANGE", hint: "A citrus fruit or a color." },
+                { word: "FAMILY", hint: "Parents and children." },
+                { word: "BRIDGE", hint: "A structure carrying a road over water." },
+                { word: "CASTLE", hint: "A large fortified building." },
+                { word: "FOREST", hint: "A large area covered chiefly with trees." },
+                { word: "GALAXY", hint: "A system of millions or billions of stars." },
+                { word: "OCEAN", hint: "A very large expanse of sea." }
+            ],
+            level2: [ // Grammar (Fill in the blank)
+                { q: "She _____ to the store yesterday.", a: "went", opts: ["goed", "went", "goes", "gone"] },
+                { q: "They _____ playing football now.", a: "are", opts: ["is", "am", "are", "be"] },
+                { q: "I have _____ seen that movie.", a: "already", opts: ["yet", "already", "still", "ever"] },
+                { q: "This is the _____ book I have ever read.", a: "best", opts: ["good", "better", "best", "goodest"] },
+                { q: "We _____ visit our grandparents next week.", a: "will", opts: ["did", "will", "have", "are"] },
+                { q: "He is interested _____ learning Spanish.", a: "in", opts: ["on", "at", "in", "for"] },
+                { q: "_____ you like some coffee?", a: "Would", opts: ["Do", "Are", "Would", "Have"] },
+                { q: "The cat is hiding _____ the table.", a: "under", opts: ["under", "between", "into", "of"] },
+                { q: "If it rains, we _____ stay inside.", a: "will", opts: ["would", "will", "did", "had"] },
+                { q: "She sings _____ than her brother.", a: "better", opts: ["good", "well", "better", "best"] },
+                { q: "I am _____ to the park.", a: "going", opts: ["go", "going", "goes", "went"] },
+                { q: "The dog _____ the bone.", a: "ate", opts: ["eat", "ate", "eaten", "eating"] },
+                { q: "_____ is your name?", a: "What", opts: ["Who", "What", "Where", "When"] },
+                { q: "He _____ a doctor.", a: "is", opts: ["are", "is", "am", "be"] },
+                { q: "They _____ happy.", a: "look", opts: ["look", "looks", "looking", "looked"] },
+                { q: "I _____ a new car.", a: "bought", opts: ["buy", "bought", "buys", "buying"] },
+                { q: "She _____ play the piano.", a: "can", opts: ["can", "cans", "canning", "canned"] },
+                { q: "We _____ dinner.", a: "are eating", opts: ["is eating", "are eating", "am eating", "eats"] },
+                { q: "The sun _____ in the east.", a: "rises", opts: ["rise", "rises", "rising", "rose"] },
+                { q: "He _____ late yesterday.", a: "arrived", opts: ["arrive", "arrived", "arrives", "arriving"] }
+            ],
+            level3: [ // Synonyms (Vocab)
+                { q: "Happy", a: "Joyful", opts: ["Sad", "Joyful", "Angry", "Bored"] },
+                { q: "Big", a: "Enormous", opts: ["Tiny", "Enormous", "Small", "Weak"] },
+                { q: "Fast", a: "Rapid", opts: ["Slow", "Rapid", "Lazy", "Calm"] },
+                { q: "Smart", a: "Intelligent", opts: ["Silly", "Intelligent", "Dull", "Funny"] },
+                { q: "Beautiful", a: "Gorgeous", opts: ["Ugly", "Gorgeous", "Plain", "Messy"] },
+                { q: "Difficult", a: "Hard", opts: ["Easy", "Hard", "Simple", "Soft"] },
+                { q: "Start", a: "Begin", opts: ["End", "Begin", "Finish", "Stop"] },
+                { q: "Scared", a: "Afraid", opts: ["Brave", "Afraid", "Bold", "Calm"] },
+                { q: "Rich", a: "Wealthy", opts: ["Poor", "Wealthy", "Weak", "Sad"] },
+                { q: "Funny", a: "Hilarious", opts: ["Serious", "Hilarious", "Boring", "Sad"] },
+                { q: "Small", a: "Tiny", opts: ["Huge", "Tiny", "Giant", "Large"] },
+                { q: "Angry", a: "Furious", opts: ["Happy", "Furious", "Calm", "Peaceful"] },
+                { q: "Tired", a: "Exhausted", opts: ["Energetic", "Exhausted", "Lively", "Active"] },
+                { q: "Cold", a: "Chilly", opts: ["Hot", "Chilly", "Warm", "Burning"] },
+                { q: "Hot", a: "Boiling", opts: ["Freezing", "Boiling", "Cool", "Icy"] },
+                { q: "Dark", a: "Gloomy", opts: ["Bright", "Gloomy", "Sunny", "Light"] },
+                { q: "Noisy", a: "Loud", opts: ["Quiet", "Loud", "Silent", "Peaceful"] },
+                { q: "Quiet", a: "Silent", opts: ["Loud", "Silent", "Noisy", "Talkative"] },
+                { q: "Strong", a: "Powerful", opts: ["Weak", "Powerful", "Frail", "Soft"] },
+                { q: "Weak", a: "Frail", opts: ["Strong", "Frail", "Tough", "Hard"] }
+            ]
+        };
+
+        // --- SOUND ENGINE (Web Audio API) ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        const Sound = {
+            init: () => {
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+            },
+            
+            playTone: (freq, type, duration, delay = 0, vol = 0.1) => {
+                if (!game.state.soundEnabled) return;
+                
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                const now = audioCtx.currentTime + delay;
+                
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, now);
+                
+                // Envelope
+                gain.gain.setValueAtTime(vol, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+                
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                
+                osc.start(now);
+                osc.stop(now + duration);
+            },
+
+            click: () => Sound.playTone(800, 'sine', 0.05, 0, 0.05),
+            
+            correct: () => {
+                // Happy major arpeggio
+                Sound.playTone(523.25, 'sine', 0.1, 0);     // C
+                Sound.playTone(659.25, 'sine', 0.1, 0.08);  // E
+                Sound.playTone(783.99, 'sine', 0.3, 0.16);  // G
+                Sound.playTone(1046.50, 'sine', 0.4, 0.24); // C (High)
+            },
+
+            wrong: () => {
+                // Discordant buzz
+                Sound.playTone(150, 'sawtooth', 0.3, 0, 0.08);
+                Sound.playTone(140, 'sawtooth', 0.3, 0.1, 0.08);
+            },
+
+            win: () => {
+                // Fanfare
+                [523, 659, 784, 1046, 784, 1046].forEach((freq, i) => {
+                    Sound.playTone(freq, 'square', 0.2, i * 0.1, 0.05);
+                });
+            },
+
+            lose: () => {
+                // Sad slide
+                Sound.playTone(400, 'triangle', 0.4, 0);
+                Sound.playTone(380, 'triangle', 0.4, 0.3);
+                Sound.playTone(300, 'triangle', 0.8, 0.6);
+            }
+        };
+
+        // --- GAME ENGINE ---
+        const game = {
+            state: {
+                level: 1,
+                currentLevelType: 1, // 1=Scramble, 2=Grammar, 3=Synonym
+                score: 0,
+                health: 3,
+                questionsAnswered: 0,
+                questionsPerLevel: 5,
+                currentQuestion: null,
+                // We keep a live deck of available questions here
+                availableQuestions: {
+                    level1: [],
+                    level2: [],
+                    level3: []
+                },
+                currentLevelPool: [],
+                gameOver: false,
+                soundEnabled: true
+            },
+
+            // UI Elements
+            ui: {
+                screens: {
+                    welcome: document.getElementById('screen-welcome'),
+                    game: document.getElementById('screen-game'),
+                    end: document.getElementById('screen-end')
+                },
+                hud: {
+                    score: document.getElementById('score-display'),
+                    health: document.getElementById('health-display'),
+                    levelNum: document.getElementById('current-level-num'),
+                    levelTitle: document.getElementById('level-title'),
+                    progress: document.getElementById('level-progress'),
+                    soundBtn: document.getElementById('sound-toggle')
+                },
+                content: document.getElementById('game-content'),
+                feedback: {
+                    overlay: document.getElementById('feedback-overlay'),
+                    icon: document.getElementById('feedback-icon')
+                },
+                end: {
+                    emoji: document.getElementById('end-emoji'),
+                    title: document.getElementById('end-title'),
+                    message: document.getElementById('end-message'),
+                    score: document.getElementById('final-score')
+                }
+            },
+
+            toggleSound() {
+                this.state.soundEnabled = !this.state.soundEnabled;
+                this.ui.hud.soundBtn.innerText = this.state.soundEnabled ? '🔊' : '🔇';
+                // Initialize context if user clicks toggle first
+                if (this.state.soundEnabled) Sound.init();
+            },
+
+            // Initialize Game
+            start() {
+                Sound.init(); 
+                Sound.click();
+                this.state.score = 0;
+                this.state.health = 3;
+                this.state.level = 1;
+                this.state.gameOver = false;
+                
+                // --- Initialize the Infinite Deck ---
+                // We create deep copies so we can remove items as they are used
+                this.state.availableQuestions = {
+                    level1: JSON.parse(JSON.stringify(questionBank.level1)),
+                    level2: JSON.parse(JSON.stringify(questionBank.level2)),
+                    level3: JSON.parse(JSON.stringify(questionBank.level3))
+                };
+
+                // Shuffle the decks immediately
+                this.state.availableQuestions.level1.sort(() => Math.random() - 0.5);
+                this.state.availableQuestions.level2.sort(() => Math.random() - 0.5);
+                this.state.availableQuestions.level3.sort(() => Math.random() - 0.5);
+
+                this.switchScreen('game');
+                this.startLevel(1);
+            },
+
+            switchScreen(screenName) {
+                Object.values(this.ui.screens).forEach(el => el.classList.remove('active'));
+                this.ui.screens[screenName].classList.add('active');
+            },
+
+            startLevel(levelNum) {
+                this.state.level = levelNum;
+                this.state.questionsAnswered = 0;
+                this.ui.hud.levelNum.innerText = levelNum;
+                this.ui.hud.progress.style.width = '0%';
+                
+                // Determine Level Type Cyclically: 1, 2, 3, 1, 2, 3...
+                // (levelNum - 1) % 3 gives 0, 1, 2. Add 1 to get 1, 2, 3.
+                let type = ((levelNum - 1) % 3) + 1;
+                
+                // --- Safety Check: Ensure this type has questions left ---
+                let poolKey = 'level' + type;
+                if (this.state.availableQuestions[poolKey].length === 0) {
+                    // This type is empty. Try to find ANY type with questions.
+                    const remainingTypes = [1, 2, 3].filter(t => this.state.availableQuestions['level'+t].length > 0);
+                    
+                    if (remainingTypes.length === 0) {
+                        // All pools empty. The user has beaten the entire game!
+                        this.endGame(true, true); // true=Win, true=Ultimate Win
+                        return;
+                    }
+                    
+                    // Switch to a type that actually has questions
+                    type = remainingTypes[0];
+                }
+
+                this.state.currentLevelType = type;
+                this.state.currentLevelPool = this.state.availableQuestions['level' + type];
+                
+                // Set Titles
+                const titles = {
+                    1: "The Scrambled Forest",
+                    2: "The Grammar Bridge",
+                    3: "The Synonym Peak"
+                };
+                this.ui.hud.levelTitle.innerText = `Level ${levelNum}: ${titles[type]}`;
+
+                this.updateStats();
+                this.nextQuestion();
+            },
+
+            nextQuestion() {
+                if (this.state.gameOver) return;
+
+                // Check Level Progression (default 5 questions per level)
+                // If pool is smaller than 5, we just finish what's left
+                const limit = Math.min(this.state.questionsPerLevel, this.state.currentLevelPool.length + this.state.questionsAnswered);
+                
+                if (this.state.questionsAnswered >= this.state.questionsPerLevel) {
+                    // Level Complete
+                    this.showFeedback('🎉', () => this.startLevel(this.state.level + 1));
+                    return;
+                }
+
+                // Get Question from the LIVE DECK
+                if (this.state.currentLevelPool.length === 0) {
+                    // Pool ran out mid-level? Just advance level.
+                    this.showFeedback('🎉', () => this.startLevel(this.state.level + 1));
+                    return;
+                }
+                
+                // Pop the question so it's gone forever from this session
+                this.state.currentQuestion = this.state.currentLevelPool.pop();
+                this.renderQuestion();
+            },
+
+            renderQuestion() {
+                const q = this.state.currentQuestion;
+                const container = this.ui.content;
+                container.innerHTML = ''; // Clear
+
+                if (this.state.currentLevelType === 1) {
+                    // --- SCRAMBLE MECHANIC ---
+                    const scrambled = q.word.split('').sort(() => Math.random() - 0.5).join('');
+                    
+                    const hintEl = document.createElement('div');
+                    hintEl.className = 'question-text';
+                    hintEl.innerHTML = `<span style="font-size: 1rem; opacity: 0.8;">Hint: ${q.hint}</span>`;
+                    
+                    const lettersBox = document.createElement('div');
+                    lettersBox.className = 'scramble-box';
+                    scrambled.split('').forEach(char => {
+                        const tile = document.createElement('div');
+                        tile.className = 'letter-tile';
+                        tile.innerText = char;
+                        lettersBox.appendChild(tile);
+                    });
+
+                    const inputGroup = document.createElement('div');
+                    inputGroup.className = 'input-group';
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.placeholder = 'Type the word...';
+                    input.autofocus = true;
+                    
+                    const btn = document.createElement('button');
+                    btn.className = 'btn';
+                    btn.style.marginTop = '0';
+                    btn.style.width = 'auto';
+                    btn.innerText = 'Go';
+                    btn.onclick = () => this.checkAnswer(input.value);
+
+                    input.addEventListener('keypress', (e) => {
+                        if (e.key === 'Enter') this.checkAnswer(input.value);
+                    });
+
+                    inputGroup.appendChild(input);
+                    inputGroup.appendChild(btn);
+
+                    container.appendChild(hintEl);
+                    container.appendChild(lettersBox);
+                    container.appendChild(inputGroup);
+                    
+                    setTimeout(() => input.focus(), 100);
+
+                } else {
+                    // --- MULTIPLE CHOICE MECHANIC ---
+                    const qText = document.createElement('div');
+                    qText.className = 'question-text';
+                    qText.innerText = this.state.currentLevelType === 3 
+                        ? `Synonym for: "${q.q}"` 
+                        : q.q;
+
+                    const grid = document.createElement('div');
+                    grid.className = 'options-grid';
+
+                    // Shuffle options
+                    const options = [...q.opts].sort(() => Math.random() - 0.5);
+
+                    options.forEach(opt => {
+                        const btn = document.createElement('button');
+                        btn.className = 'option-btn';
+                        btn.innerText = opt;
+                        btn.onclick = (e) => this.checkAnswer(opt, e.target);
+                        grid.appendChild(btn);
+                    });
+
+                    container.appendChild(qText);
+                    container.appendChild(grid);
+                }
+            },
+
+            checkAnswer(userAnswer, btnElement = null) {
+                if(this.state.gameOver) return;
+
+                const currentQ = this.state.currentQuestion;
+                let isCorrect = false;
+
+                if (this.state.currentLevelType === 1) {
+                    isCorrect = userAnswer.trim().toUpperCase() === currentQ.word.toUpperCase();
+                } else {
+                    isCorrect = userAnswer === currentQ.a;
+                }
+
+                if (isCorrect) {
+                    // Correct!
+                    Sound.correct();
+                    if (btnElement) btnElement.classList.add('correct');
+                    this.state.score += 100 + (this.state.level * 10); // Bonus for higher levels
+                    this.state.questionsAnswered++;
+                    
+                    // Update Progress
+                    const pct = (this.state.questionsAnswered / this.state.questionsPerLevel) * 100;
+                    this.ui.hud.progress.style.width = `${pct}%`;
+
+                    this.updateStats();
+                    this.showFeedback('✅', () => this.nextQuestion());
+                } else {
+                    // Wrong!
+                    Sound.wrong();
+                    if (btnElement) btnElement.classList.add('wrong');
+                    
+                    // Visual Shake
+                    this.ui.screens.game.classList.add('shake');
+                    setTimeout(() => this.ui.screens.game.classList.remove('shake'), 300);
+
+                    this.state.health--;
+                    this.updateStats();
+
+                    if (this.state.health <= 0) {
+                        this.endGame(false);
+                    }
+                }
+            },
+
+            updateStats() {
+                this.ui.hud.score.innerText = this.state.score;
+                this.ui.hud.health.innerHTML = '❤️'.repeat(this.state.health);
+            },
+
+            showFeedback(icon, callback) {
+                const overlay = this.ui.feedback.overlay;
+                const iconEl = this.ui.feedback.icon;
+                iconEl.innerText = icon;
+                overlay.classList.add('active');
+
+                setTimeout(() => {
+                    overlay.classList.remove('active');
+                    if (callback) callback();
+                }, 800);
+            },
+
+            endGame(isWin, ultimateWin = false) {
+                this.state.gameOver = true;
+                if(isWin) Sound.win(); else Sound.lose();
+                
+                setTimeout(() => {
+                    this.switchScreen('end');
+                    this.ui.end.score.innerText = this.state.score;
+                    
+                    if (isWin) {
+                        this.ui.end.emoji.innerText = ultimateWin ? "👑" : "🏆";
+                        this.ui.end.title.innerText = ultimateWin ? "Legendary!" : "Victory!";
+                        this.ui.end.message.innerText = ultimateWin 
+                            ? "Unbelievable! You answered every single question in the game!" 
+                            : "You have conquered the dictionary!";
+                        this.ui.end.title.style.background = "linear-gradient(to right, #4ade80, #3b82f6)";
+                        this.ui.end.title.style.webkitBackgroundClip = "text";
+                    } else {
+                        this.ui.end.emoji.innerText = "💀";
+                        this.ui.end.title.innerText = "Game Over";
+                        this.ui.end.message.innerText = `You reached Level ${this.state.level}. Try again!`;
+                        this.ui.end.title.style.background = "var(--danger)";
+                        this.ui.end.title.style.webkitBackgroundClip = "text";
+                    }
+                }, 500);
+            }
+        };
+
+        console.log("Lexicon Quest Loaded");
+
+    </script>
+</body>
+</html>

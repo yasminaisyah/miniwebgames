@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steam-Sort: Grammar Factory</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Roboto+Mono:wght@500;700&display=swap');
+
+        :root {
+            --metal: #2c3e50;
+            --rust: #c0392b;
+            --gold: #f39c12;
+            --steam: #bdc3c7;
+            --green: #27ae60;
+            --belt: #34495e;
+        }
+
+        * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #1a1a1a;
+            font-family: 'Roboto Mono', monospace;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #game-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            height: 100vh;
+            background: radial-gradient(circle at center, #444, #111);
+            border-left: 5px solid var(--metal);
+            border-right: 5px solid var(--metal);
+            overflow: hidden;
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+        }
+
+        /* --- UI OVERLAYS --- */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            background: rgba(0,0,0,0.9);
+            transition: opacity 0.3s;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .hidden { opacity: 0; pointer-events: none; }
+
+        h1 {
+            font-family: 'Black Ops One', cursive;
+            font-size: 3rem;
+            color: var(--gold);
+            text-shadow: 0 0 10px var(--rust);
+            margin-bottom: 10px;
+            line-height: 1;
+        }
+
+        p { color: var(--steam); margin-bottom: 30px; font-size: 1.1rem; }
+
+        button {
+            background: var(--rust);
+            color: white;
+            border: 4px solid var(--metal);
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            font-family: 'Black Ops One', cursive;
+            cursor: pointer;
+            text-transform: uppercase;
+            box-shadow: 0 5px 0 #80261c;
+            transition: transform 0.1s;
+        }
+
+        button:active { transform: translateY(5px); box-shadow: none; }
+
+        /* --- GAME HUD --- */
+        .hud-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 80px;
+            background: var(--metal);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+            border-bottom: 4px solid #000;
+            z-index: 50;
+        }
+
+        .hud-stat {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .hud-label { font-size: 0.7rem; color: var(--steam); }
+        .hud-value { font-size: 1.5rem; font-weight: bold; color: var(--gold); }
+
+        /* --- CONVEYOR BELT --- */
+        .belt-track {
+            position: absolute;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 120px;
+            height: calc(100% - 200px);
+            background: repeating-linear-gradient(
+                180deg,
+                var(--belt),
+                var(--belt) 40px,
+                #2c3e50 40px,
+                #2c3e50 42px
+            );
+            animation: scrollBelt 2s linear infinite;
+            border-left: 2px dashed #555;
+            border-right: 2px dashed #555;
+            z-index: 5;
+        }
+
+        @keyframes scrollBelt { from { background-position: 0 0; } to { background-position: 0 84px; } }
+
+        /* --- THE SORTER (Target Zone) --- */
+        .sorter-zone {
+            position: absolute;
+            bottom: 100px;
+            left: 0;
+            width: 100%;
+            height: 100px;
+            z-index: 10;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .target-box {
+            width: 140px;
+            height: 100px;
+            border: 4px solid var(--gold);
+            background: rgba(243, 156, 18, 0.1);
+            box-shadow: 0 0 20px var(--gold);
+            border-radius: 10px;
+        }
+
+        /* --- BINS (Left/Right) --- */
+        .bin-container {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 120px;
+            display: flex;
+        }
+
+        .bin {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Black Ops One', cursive;
+            font-size: 1.5rem;
+            color: rgba(255,255,255,0.3);
+            border-top: 5px solid #000;
+            transition: background 0.2s;
+            position: relative;
+        }
+
+        .bin-left { background: #440000; border-right: 2px solid #000; }
+        .bin-right { background: #000044; border-left: 2px solid #000; }
+        
+        .bin-label {
+            position: absolute;
+            top: -30px;
+            background: #000;
+            color: white;
+            padding: 5px 10px;
+            font-size: 0.8rem;
+            border-radius: 5px 5px 0 0;
+            font-family: 'Roboto Mono';
+        }
+
+        .active-bin { filter: brightness(1.5); color: white; }
+
+        /* --- WORD CRATE --- */
+        .crate {
+            position: absolute;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100px;
+            height: 60px;
+            background: #e0e0e0;
+            border: 3px solid #555;
+            border-radius: 5px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            color: #222;
+            font-size: 1rem;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            z-index: 20;
+            text-align: center;
+            line-height: 1;
+            padding: 5px;
+        }
+
+        .crate::before {
+            content: '';
+            position: absolute;
+            top: 2px; left: 2px; right: 2px; bottom: 2px;
+            border: 1px dashed #999;
+            pointer-events: none;
+        }
+
+        /* --- ANIMATIONS --- */
+        .fly-left { animation: flyLeft 0.5s forwards ease-in; }
+        .fly-right { animation: flyRight 0.5s forwards ease-in; }
+        .burn { animation: burn 0.5s forwards; background: red !important; color: white; }
+
+        @keyframes flyLeft { to { transform: translate(-300%, 100%) rotate(-45deg); opacity: 0; } }
+        @keyframes flyRight { to { transform: translate(300%, 100%) rotate(45deg); opacity: 0; } }
+        @keyframes burn { 0% { transform: translate(-50%, -50%) scale(1); } 50% { transform: translate(-50%, -50%) scale(1.2); } 100% { transform: translate(-50%, -50%) scale(0); opacity: 0; } }
+
+        /* --- STEAM PARTICLES --- */
+        .steam {
+            position: absolute;
+            background: rgba(255,255,255,0.1);
+            border-radius: 50%;
+            pointer-events: none;
+            animation: rise 3s linear forwards;
+        }
+        @keyframes rise { to { transform: translateY(-100px) scale(2); opacity: 0; } }
+
+        /* Level transition curtain */
+        #curtain {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: repeating-linear-gradient(45deg, #000, #000 20px, #ffd700 20px, #ffd700 40px);
+            z-index: 90;
+            transform: translateY(-100%);
+            transition: transform 0.5s ease-in-out;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #curtain h2 { 
+            background: #000; padding: 20px; color: white; border: 4px solid white;
+            font-family: 'Black Ops One'; font-size: 2rem;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="game-wrapper">
+        
+        <div class="hud-bar">
+            <div class="hud-stat">
+                <span class="hud-label">PRESSURE</span>
+                <span class="hud-value" id="score">0</span>
+            </div>
+            <div class="hud-stat">
+                <span class="hud-label">SECTOR</span>
+                <span class="hud-value" id="level">1</span>
+            </div>
+            <div class="hud-stat">
+                <span class="hud-label">INTEGRITY</span>
+                <span class="hud-value" id="lives" style="color: var(--rust)">100%</span>
+            </div>
+        </div>
+
+        <div class="belt-track"></div>
+
+        <div class="sorter-zone">
+            <div class="target-box"></div>
+        </div>
+
+        <div class="bin-container">
+            <div class="bin bin-left" id="btn-left">
+                <div class="bin-label" id="label-left">NOUN</div>
+                <span id="text-left">LEFT</span>
+            </div>
+            <div class="bin bin-right" id="btn-right">
+                <div class="bin-label" id="label-right">VERB</div>
+                <span id="text-right">RIGHT</span>
+            </div>
+        </div>
+
+        <div id="start-screen" class="screen">
+            <h1>STEAM SORT</h1>
+            <p>Sort the words before the factory explodes.</p>
+            <p style="font-size: 0.8rem; color: #aaa;">Controls: Left/Right Arrow Keys</p>
+            <button onclick="startGame()">IGNITE</button>
+        </div>
+
+        <div id="game-over-screen" class="screen hidden">
+            <h1>SYSTEM FAILURE</h1>
+            <p>Final Pressure: <span id="final-score">0</span></p>
+            <button onclick="startGame()">REBOOT</button>
+        </div>
+
+        <div id="curtain">
+            <h2 id="curtain-text">SECTOR 2</h2>
+        </div>
+
+    </div>
+
+    <script>
+        /* --- GAME CONFIGURATION --- */
+        const levels = [
+            {
+                id: 1,
+                name: "Basic Parts",
+                leftLabel: "NOUN",
+                rightLabel: "VERB",
+                leftType: "noun",
+                rightType: "verb",
+                speed: 3, // pixels per frame
+                spawnRate: 1500, // ms
+                words: [
+                    {t:"Dog", c:"noun"}, {t:"Run", c:"verb"}, {t:"Apple", c:"noun"}, {t:"Jump", c:"verb"},
+                    {t:"Table", c:"noun"}, {t:"Sleep", c:"verb"}, {t:"Car", c:"noun"}, {t:"Eat", c:"verb"},
+                    {t:"Computer", c:"noun"}, {t:"Code", c:"verb"}, {t:"Sky", c:"noun"}, {t:"Fly", c:"verb"},
+                    {t:"Thinking", c:"noun"}, {t:"Think", c:"verb"}, {t:"Idea", c:"noun"}, {t:"Create", c:"verb"}
+                ]
+            },
+            {
+                id: 2,
+                name: "Descriptions",
+                leftLabel: "ADJECTIVE",
+                rightLabel: "ADVERB",
+                leftType: "adj",
+                rightType: "adv",
+                speed: 4,
+                spawnRate: 1300,
+                words: [
+                    {t:"Quick", c:"adj"}, {t:"Quickly", c:"adv"}, {t:"Happy", c:"adj"}, {t:"Happily", c:"adv"},
+                    {t:"Loud", c:"adj"}, {t:"Loudly", c:"adv"}, {t:"Bad", c:"adj"}, {t:"Badly", c:"adv"},
+                    {t:"Easy", c:"adj"}, {t:"Easily", c:"adv"}, {t:"Gentle", c:"adj"}, {t:"Gently", c:"adv"},
+                    {t:"Beautiful", c:"adj"}, {t:"Slowly", c:"adv"}
+                ]
+            },
+            {
+                id: 3,
+                name: "Quality Control",
+                leftLabel: "CORRECT",
+                rightLabel: "WRONG",
+                leftType: "correct",
+                rightType: "wrong",
+                speed: 5.5,
+                spawnRate: 1100,
+                words: [
+                    {t:"Receive", c:"correct"}, {t:"Recieve", c:"wrong"},
+                    {t:"Necessary", c:"correct"}, {t:"Neccessary", c:"wrong"},
+                    {t:"Separate", c:"correct"}, {t:"Seperate", c:"wrong"},
+                    {t:"Until", c:"correct"}, {t:"Untill", c:"wrong"},
+                    {t:"Definitely", c:"correct"}, {t:"Definately", c:"wrong"},
+                    {t:"A lot", c:"correct"}, {t:"Alot", c:"wrong"},
+                    {t:"Weird", c:"correct"}, {t:"Wierd", c:"wrong"}
+                ]
+            },
+            {
+                id: 4,
+                name: "Time Travel",
+                leftLabel: "PAST",
+                rightLabel: "FUTURE",
+                leftType: "past",
+                rightType: "future",
+                speed: 7,
+                spawnRate: 900,
+                words: [
+                    {t:"Went", c:"past"}, {t:"Will Go", c:"future"},
+                    {t:"Ate", c:"past"}, {t:"Will Eat", c:"future"},
+                    {t:"Saw", c:"past"}, {t:"Will See", c:"future"},
+                    {t:"Did", c:"past"}, {t:"Will Do", c:"future"},
+                    {t:"Was", c:"past"}, {t:"Will Be", c:"future"},
+                    {t:"Ran", c:"past"}, {t:"Gonna Run", c:"future"}
+                ]
+            }
+        ];
+
+        /* --- STATE MANAGEMENT --- */
+        let state = {
+            active: false,
+            score: 0,
+            lives: 100,
+            currentLevelIdx: 0,
+            crates: [], // Array of DOM elements
+            lastSpawn: 0,
+            animationFrame: null,
+            itemsSortedInLevel: 0
+        };
+
+        const wrapper = document.getElementById('game-wrapper');
+        const hudScore = document.getElementById('score');
+        const hudLevel = document.getElementById('level');
+        const hudLives = document.getElementById('lives');
+        
+        // --- AUDIO ENGINE (Synth) ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'clack') { // Spawn sound
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(100, now);
+                osc.frequency.exponentialRampToValueAtTime(50, now + 0.1);
+                gain.gain.setValueAtTime(0.05, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'sort') { // Success
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.exponentialRampToValueAtTime(800, now + 0.1);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'fail') { // Fail
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(100, now);
+                osc.frequency.linearRampToValueAtTime(50, now + 0.3);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            }
+        }
+
+        /* --- GAME LOGIC --- */
+
+        function startGame() {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-over-screen').classList.add('hidden');
+            
+            state.active = true;
+            state.score = 0;
+            state.lives = 100;
+            state.currentLevelIdx = 0;
+            state.itemsSortedInLevel = 0;
+            state.crates.forEach(c => c.remove());
+            state.crates = [];
+            
+            updateHUD();
+            loadLevel(0);
+            gameLoop();
+        }
+
+        function loadLevel(idx) {
+            state.currentLevelIdx = idx;
+            const lvl = levels[idx];
+            
+            // UI Updates
+            hudLevel.innerText = lvl.id;
+            document.getElementById('label-left').innerText = lvl.leftLabel;
+            document.getElementById('label-right').innerText = lvl.rightLabel;
+            
+            state.itemsSortedInLevel = 0;
+
+            // Curtain Animation
+            const curtain = document.getElementById('curtain');
+            document.getElementById('curtain-text').innerText = "SECTOR " + lvl.id;
+            curtain.style.transform = "translateY(0)";
+            setTimeout(() => {
+                curtain.style.transform = "translateY(-100%)";
+            }, 1000);
+        }
+
+        function spawnCrate() {
+            const lvl = levels[state.currentLevelIdx];
+            const wordData = lvl.words[Math.floor(Math.random() * lvl.words.length)];
+            
+            const el = document.createElement('div');
+            el.className = 'crate';
+            el.innerText = wordData.t;
+            el.dataset.category = wordData.c;
+            
+            // Positioning: Start at top (80px is HUD height)
+            // Store Y pos in dataset or object
+            const crateObj = {
+                el: el,
+                y: 80,
+                category: wordData.c,
+                active: true
+            };
+
+            el.style.top = '80px';
+            wrapper.appendChild(el);
+            state.crates.push(crateObj);
+            playSound('clack');
+        }
+
+        function gameLoop(timestamp) {
+            if (!state.active) return;
+
+            if (!state.lastSpawn) state.lastSpawn = timestamp;
+            const lvl = levels[state.currentLevelIdx];
+
+            // Spawning Logic
+            if (timestamp - state.lastSpawn > lvl.spawnRate) {
+                spawnCrate();
+                state.lastSpawn = timestamp;
+            }
+
+            // Movement Logic
+            const targetZoneY = wrapper.clientHeight - 150; // Roughly where the target box is
+            const deathZoneY = wrapper.clientHeight; 
+
+            for (let i = state.crates.length - 1; i >= 0; i--) {
+                const crate = state.crates[i];
+                if (!crate.active) continue;
+
+                crate.y += lvl.speed;
+                crate.el.style.top = crate.y + 'px';
+
+                // Check if missed
+                if (crate.y > deathZoneY) {
+                    failCrate(crate);
+                    state.crates.splice(i, 1);
+                }
+            }
+
+            state.animationFrame = requestAnimationFrame(gameLoop);
+        }
+
+        function failCrate(crate) {
+            crate.active = false;
+            crate.el.classList.add('burn'); // Turn red
+            playSound('fail');
+            state.lives -= 10;
+            updateHUD();
+            
+            setTimeout(() => {
+                if(crate.el.parentNode) crate.el.remove();
+            }, 500);
+
+            if (state.lives <= 0) gameOver();
+        }
+
+        function sortInput(direction) {
+            if (!state.active) return;
+            
+            // Visual Feedback on Bins
+            const btn = direction === 'left' ? document.getElementById('btn-left') : document.getElementById('btn-right');
+            btn.classList.add('active-bin');
+            setTimeout(() => btn.classList.remove('active-bin'), 100);
+
+            // Find the lowest active crate
+            // We want the one closest to the target zone (bottom)
+            // Target Zone is roughly: wrapper height - 200px to wrapper height - 100px
+            const targetY = wrapper.clientHeight - 150;
+            
+            // Filter crates that are "sortable" (passed a certain threshold but not dead)
+            let sortable = state.crates.filter(c => c.active && c.y > 80); 
+            
+            // Sort by Y (highest Y = lowest on screen)
+            sortable.sort((a, b) => b.y - a.y);
+
+            if (sortable.length === 0) return;
+
+            const targetCrate = sortable[0]; // The one closest to bottom
+            const lvl = levels[state.currentLevelIdx];
+            
+            let correct = false;
+            if (direction === 'left' && (targetCrate.category === lvl.leftType)) correct = true;
+            if (direction === 'right' && (targetCrate.category === lvl.rightType)) correct = true;
+
+            if (correct) {
+                // Success Animation
+                targetCrate.active = false;
+                targetCrate.el.classList.add(direction === 'left' ? 'fly-left' : 'fly-right');
+                state.score += 10;
+                state.itemsSortedInLevel++;
+                playSound('sort');
+                updateHUD();
+
+                // Clean up DOM
+                setTimeout(() => {
+                    if(targetCrate.el.parentNode) targetCrate.el.remove();
+                }, 500);
+
+                // Remove from array
+                const index = state.crates.indexOf(targetCrate);
+                if (index > -1) state.crates.splice(index, 1);
+
+                // Check Level Up
+                if (state.itemsSortedInLevel > 10 && state.currentLevelIdx < levels.length - 1) {
+                    loadLevel(state.currentLevelIdx + 1);
+                }
+
+            } else {
+                // Wrong sort
+                failCrate(targetCrate);
+                // Remove from array
+                const index = state.crates.indexOf(targetCrate);
+                if (index > -1) state.crates.splice(index, 1);
+            }
+        }
+
+        function updateHUD() {
+            hudScore.innerText = state.score;
+            hudLives.innerText = state.lives + "%";
+            hudLives.style.color = state.lives < 30 ? 'red' : 'var(--gold)';
+        }
+
+        function gameOver() {
+            state.active = false;
+            cancelAnimationFrame(state.animationFrame);
+            document.getElementById('final-score').innerText = state.score;
+            document.getElementById('game-over-screen').classList.remove('hidden');
+        }
+
+        // Input Listeners
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') sortInput('left');
+            if (e.key === 'ArrowRight') sortInput('right');
+        });
+
+        // Touch for Mobile
+        wrapper.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // prevent scrolling
+            const touchX = e.touches[0].clientX;
+            const width = window.innerWidth;
+            if (touchX < width / 2) sortInput('left');
+            else sortInput('right');
+        });
+
+    </script>
+</body>
+</html>

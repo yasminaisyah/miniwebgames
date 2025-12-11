@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geo-Drill: Journey to the Core</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Russo+One&family=Roboto+Mono:wght@500&display=swap');
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #1a1510;
+            font-family: 'Roboto Mono', monospace;
+            user-select: none;
+            touch-action: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #000;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* UI */
+        .ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: calc(100% - 40px);
+            pointer-events: none;
+            z-index: 10;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .hud-box {
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #888;
+            padding: 10px 15px;
+            border-radius: 8px;
+            color: white;
+            box-shadow: 0 4px 0 #444;
+        }
+
+        .label {
+            font-size: 12px;
+            color: #aaa;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .value {
+            font-family: 'Russo One', sans-serif;
+            font-size: 24px;
+            color: #fff;
+        }
+
+        /* Temperature Bar */
+        .temp-container {
+            position: absolute;
+            top: 100px;
+            left: 20px;
+            width: 30px;
+            height: 200px;
+            background: #222;
+            border: 2px solid #fff;
+            border-radius: 15px;
+            overflow: hidden;
+        }
+
+        .temp-bar {
+            width: 100%;
+            height: 0%;
+            background: linear-gradient(to top, #ffcc00, #ff0000);
+            position: absolute;
+            bottom: 0;
+            transition: height 0.1s;
+        }
+
+        .temp-icon {
+            position: absolute;
+            top: 70px;
+            left: 22px;
+            font-size: 24px;
+            color: white;
+            z-index: 12;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        /* Popup Text */
+        .popup {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Russo One', sans-serif;
+            color: #fff;
+            font-size: 32px;
+            text-shadow: 0 4px 0 #000;
+            pointer-events: none;
+            opacity: 0;
+            transition: transform 0.5s, opacity 0.5s;
+            z-index: 20;
+            text-align: center;
+        }
+
+        /* Screens */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(20, 10, 5, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+            color: white;
+            pointer-events: auto;
+        }
+
+        .hidden { display: none !important; }
+
+        h1 {
+            font-family: 'Russo One', sans-serif;
+            font-size: 50px;
+            margin-bottom: 20px;
+            color: #ffaa00;
+            text-shadow: 0 5px 0 #884400;
+            text-align: center;
+        }
+
+        .tutorial {
+            max-width: 500px;
+            text-align: center;
+            color: #ccc;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+
+        button {
+            padding: 15px 50px;
+            font-size: 24px;
+            font-family: 'Russo One', sans-serif;
+            background: #ffaa00;
+            color: #220000;
+            border: none;
+            border-bottom: 5px solid #cc8800;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: 0.1s;
+        }
+
+        button:active {
+            transform: translateY(4px);
+            border-bottom: 0;
+        }
+        
+        /* Mobile Controls Hints */
+        .touch-hint {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 40px;
+            box-sizing: border-box;
+            color: rgba(255,255,255,0.3);
+            font-size: 40px;
+            pointer-events: none;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+
+        <div class="ui-layer">
+            <div class="hud-box">
+                <div class="label">Depth</div>
+                <div class="value"><span id="depth-val">0</span>m</div>
+            </div>
+            <div class="hud-box" style="text-align: right;">
+                <div class="label">Score</div>
+                <div class="value" id="score-val">0</div>
+            </div>
+        </div>
+
+        <div class="temp-icon">🌡️</div>
+        <div class="temp-container">
+            <div class="temp-bar" id="temp-bar"></div>
+        </div>
+
+        <div id="popup-msg" class="popup">FOSSIL FOUND!</div>
+
+        <div class="touch-hint">
+            <span>&larr;</span>
+            <span>&rarr;</span>
+        </div>
+
+        <div id="start-screen" class="screen">
+            <h1>GEO-DRILL</h1>
+            <div class="tutorial">
+                <p>Journey to the center of the Earth!</p>
+                <p>
+                    <strong>Controls:</strong> Arrow Keys or Tap Sides to steer.<br>
+                    <strong>Goal:</strong> Dig deep, collect Fossils & Gems.<br>
+                    <strong>Warning:</strong> Watch your HEAT!
+                </p>
+                <p>
+                    🦴 <strong>Fossils:</strong> Points<br>
+                    💧 <strong>Water:</strong> Cools Drill<br>
+                    🔥 <strong>Magma:</strong> Overheats Drill!
+                </p>
+            </div>
+            <button onclick="startGame()">START DIGGING</button>
+        </div>
+
+        <div id="game-over-screen" class="screen hidden">
+            <h1 style="color: #ff4444;">DRILL MELTDOWN</h1>
+            <p style="font-size: 24px; color: white;">Depth Reached: <span id="final-depth">0</span>m</p>
+            <p style="font-size: 20px; color: #aaa;">Total Score: <span id="final-score">0</span></p>
+            <br>
+            <button onclick="startGame()">NEW DRILL</button>
+        </div>
+    </div>
+
+    <script>
+        // --- SETUP ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+
+        // Audio
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            const now = audioCtx.currentTime;
+
+            if (type === 'break') {
+                // Crunch sound
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(100, now);
+                osc.frequency.exponentialRampToValueAtTime(40, now + 0.1);
+                gainNode.gain.setValueAtTime(0.1, now);
+                gainNode.gain.linearRampToValueAtTime(0, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'gem') {
+                // High ping
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(1200, now);
+                osc.frequency.exponentialRampToValueAtTime(1800, now + 0.1);
+                gainNode.gain.setValueAtTime(0.1, now);
+                gainNode.gain.linearRampToValueAtTime(0, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            } else if (type === 'alarm') {
+                // Warning beep
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(800, now);
+                gainNode.gain.setValueAtTime(0.1, now);
+                gainNode.gain.linearRampToValueAtTime(0, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'steam') {
+                // Hiss (white noise approx)
+                // Web Audio noise is complex, using randomized sawtooth
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(800, now); // dummy freq
+                // Actually simple hiss not easy with osc, skip for simplicity or use falling sine
+                osc.frequency.linearRampToValueAtTime(200, now+0.2);
+                gainNode.gain.setValueAtTime(0.05, now);
+                gainNode.gain.linearRampToValueAtTime(0, now+0.2);
+                osc.start(now);
+                osc.stop(now+0.2);
+            }
+        }
+
+        // --- GAME CONSTANTS ---
+        const BLOCK_SIZE = 60;
+        const DRILL_SPEED_NORMAL = 4;
+        const DRILL_SPEED_ROCK = 1;
+        
+        // --- STATE ---
+        let isPlaying = false;
+        let score = 0;
+        let depth = 0; // in meters (pixels / 10)
+        let temperature = 0; // 0 to 100
+        
+        // Grid
+        let cols = 0;
+        let rows = 0; // visible rows
+        let blocks = []; // 2D array [col][row] - but essentially a rolling buffer
+        let scrollY = 0;
+        let generatedY = 0; // How far down have we generated world
+
+        // Player
+        let drill = {
+            x: 0, 
+            y: 100,
+            col: 3,
+            targetCol: 3,
+            moveTimer: 0
+        };
+
+        let particles = [];
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            cols = Math.ceil(width / BLOCK_SIZE);
+            rows = Math.ceil(height / BLOCK_SIZE) + 2;
+            drill.y = height * 0.2;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // --- INPUT ---
+        window.addEventListener('keydown', e => {
+            if (!isPlaying) return;
+            if (e.key === 'ArrowLeft') moveDrill(-1);
+            if (e.key === 'ArrowRight') moveDrill(1);
+        });
+
+        window.addEventListener('touchstart', e => {
+            if (!isPlaying) return;
+            const touchX = e.touches[0].clientX;
+            if (touchX < width / 2) moveDrill(-1);
+            else moveDrill(1);
+        }, {passive: false});
+
+        function moveDrill(dir) {
+            let newCol = drill.targetCol + dir;
+            if (newCol >= 0 && newCol < cols) {
+                drill.targetCol = newCol;
+            }
+        }
+
+        // --- WORLD GENERATION ---
+        function generateRow(yIndex) {
+            // Determine Layer
+            let depthM = yIndex * (BLOCK_SIZE / 10);
+            let layer = 'crust';
+            if (depthM > 500) layer = 'mantle';
+            if (depthM > 1500) layer = 'core';
+
+            let row = [];
+            for (let c = 0; c < cols; c++) {
+                let type = 'dirt';
+                let rand = Math.random();
+
+                // Layer Logic
+                if (layer === 'crust') {
+                    if (rand < 0.05) type = 'fossil';
+                    else if (rand < 0.1) type = 'water';
+                    else if (rand < 0.15) type = 'rock';
+                    else type = 'dirt';
+                } else if (layer === 'mantle') {
+                    if (rand < 0.08) type = 'magma';
+                    else if (rand < 0.12) type = 'gem';
+                    else if (rand < 0.20) type = 'rock';
+                    else type = 'hard_dirt';
+                } else { // Core
+                    if (rand < 0.15) type = 'magma';
+                    else if (rand < 0.2) type = 'diamond';
+                    else type = 'obsidian';
+                }
+
+                row.push({
+                    type: type,
+                    hp: getTypeHP(type),
+                    broken: false
+                });
+            }
+            return row;
+        }
+
+        function getTypeHP(type) {
+            if (type === 'rock') return 20;
+            if (type === 'hard_dirt') return 10;
+            if (type === 'obsidian') return 30;
+            return 5; // standard dirt
+        }
+
+        function initGame() {
+            blocks = [];
+            scrollY = 0;
+            generatedY = 0;
+            score = 0;
+            depth = 0;
+            temperature = 0;
+            drill.col = Math.floor(cols / 2);
+            drill.targetCol = drill.col;
+            
+            // Fill screen
+            for (let r = 0; r < rows; r++) {
+                blocks.push(generateRow(r));
+                generatedY++;
+            }
+        }
+
+        function startGame() {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-over-screen').classList.add('hidden');
+            resize();
+            initGame();
+            isPlaying = true;
+            loop();
+        }
+
+        // --- LOGIC ---
+        function update() {
+            // 1. Drill Movement (Lerp)
+            let targetX = drill.targetCol * BLOCK_SIZE + BLOCK_SIZE/2;
+            drill.x += (targetX - drill.x) * 0.2;
+
+            // 2. Vertical Scroll (Drilling)
+            // Identify block under drill
+            let gridY = Math.floor((scrollY + drill.y + 20) / BLOCK_SIZE);
+            let drillBlock = null;
+            
+            // Map circular buffer logic or infinite array?
+            // Infinite array index:
+            let rowIndex = gridY;
+            
+            // Ensure array has enough rows
+            while (blocks.length <= rowIndex + 2) {
+                blocks.push(generateRow(generatedY));
+                generatedY++;
+            }
+
+            // Interact with block
+            let rowData = blocks[rowIndex];
+            if (rowData && rowData[drill.targetCol]) {
+                let blk = rowData[drill.targetCol];
+                
+                if (!blk.broken) {
+                    // Mining logic
+                    blk.hp -= 1;
+                    if (blk.hp <= 0) {
+                        breakBlock(blk, rowIndex, drill.targetCol);
+                    }
+                    
+                    // Slow down based on hardness
+                    scrollY += (blk.type === 'dirt' ? DRILL_SPEED_NORMAL : DRILL_SPEED_ROCK);
+                    
+                    // Heat generation
+                    if (blk.type === 'rock' || blk.type === 'obsidian') temperature += 0.2;
+                    if (blk.type === 'magma') temperature += 2.0;
+                    else temperature += 0.05; // friction heat
+
+                } else {
+                    // Moving through empty space
+                    scrollY += DRILL_SPEED_NORMAL * 1.5;
+                    temperature -= 0.1; // Air cooling
+                }
+            }
+
+            // 3. World Cleanup (Remove old rows to save memory? JS handles arrays okay, but let's slice if huge)
+            if (blocks.length > 200) {
+                blocks = blocks.slice(blocks.length - 50);
+                scrollY -= (150 * BLOCK_SIZE); // Reset coords
+                generatedY = blocks.length; // rough fix, simplified scrolling for this demo
+                // Actually, simplistic endless scrolling often just keeps index increasing. 
+                // For this single-file demo, array size won't crash browser until hours of play.
+            }
+
+            // 4. Game Logic
+            depth = Math.floor(scrollY / 10);
+            
+            // Update UI
+            document.getElementById('depth-val').innerText = depth;
+            document.getElementById('score-val').innerText = score;
+            document.getElementById('temp-bar').style.height = temperature + "%";
+
+            // Temperature Checks
+            if (temperature > 100) gameOver();
+            if (temperature < 0) temperature = 0;
+            
+            // Visual warning
+            if (temperature > 80 && Math.random() < 0.1) playSound('alarm');
+        }
+
+        function breakBlock(blk, r, c) {
+            blk.broken = true;
+            let px = c * BLOCK_SIZE + BLOCK_SIZE/2;
+            let py = r * BLOCK_SIZE + BLOCK_SIZE/2 - scrollY; // approximate visual Y
+            
+            // Effects based on type
+            if (blk.type === 'fossil') {
+                score += 500;
+                playSound('gem');
+                showPopup("FOSSIL +500");
+                createParticles(px, drill.y + 20, '#ffffff', 10);
+            } else if (blk.type === 'water') {
+                temperature -= 30;
+                playSound('steam');
+                showPopup("COOLING");
+                createParticles(px, drill.y + 20, '#00ffff', 15);
+            } else if (blk.type === 'magma') {
+                temperature += 20;
+                playSound('break');
+                createParticles(px, drill.y + 20, '#ff0000', 10);
+            } else if (blk.type === 'gem' || blk.type === 'diamond') {
+                score += 1000;
+                playSound('gem');
+                showPopup("GEM FOUND!");
+                createParticles(px, drill.y + 20, '#ff00ff', 15);
+            } else {
+                playSound('break');
+                createParticles(px, drill.y + 20, '#885522', 5);
+            }
+        }
+
+        function createParticles(x, y, color, count) {
+            for(let i=0; i<count; i++) {
+                particles.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 10,
+                    vy: (Math.random() - 1) * 10,
+                    life: 1.0,
+                    color: color
+                });
+            }
+        }
+
+        function showPopup(text) {
+            const p = document.getElementById('popup-msg');
+            p.innerText = text;
+            p.style.opacity = 1;
+            p.style.transform = "translate(-50%, -150%) scale(1.2)";
+            setTimeout(() => {
+                p.style.opacity = 0;
+                p.style.transform = "translate(-50%, -50%) scale(1)";
+            }, 800);
+        }
+
+        function gameOver() {
+            isPlaying = false;
+            document.getElementById('final-depth').innerText = depth;
+            document.getElementById('final-score').innerText = score;
+            document.getElementById('game-over-screen').classList.remove('hidden');
+        }
+
+        // --- RENDER ---
+        function draw() {
+            ctx.clearRect(0, 0, width, height);
+            
+            // Determine visible range
+            let startRow = Math.floor(scrollY / BLOCK_SIZE);
+            let endRow = startRow + Math.ceil(height / BLOCK_SIZE) + 1;
+
+            // Draw Blocks
+            for (let r = startRow; r < endRow; r++) {
+                if (!blocks[r]) continue;
+                let y = r * BLOCK_SIZE - scrollY;
+                
+                for (let c = 0; c < cols; c++) {
+                    let blk = blocks[r][c];
+                    let x = c * BLOCK_SIZE;
+                    
+                    if (blk.broken) {
+                        // Background (Hole)
+                        ctx.fillStyle = "#110a05";
+                        ctx.fillRect(x, y, BLOCK_SIZE, BLOCK_SIZE);
+                        // Borders
+                        ctx.strokeStyle = "#2a1f15";
+                        ctx.strokeRect(x, y, BLOCK_SIZE, BLOCK_SIZE);
+                    } else {
+                        // Draw Block Content
+                        drawBlock(ctx, x, y, blk.type);
+                    }
+                }
+            }
+
+            // Draw Drill
+            ctx.save();
+            ctx.translate(drill.x, drill.y);
+            // Shake if drilling
+            if (isPlaying) ctx.translate(Math.random()*2-1, Math.random()*2-1);
+            
+            // Drill Body
+            ctx.fillStyle = "#ffaa00";
+            ctx.fillRect(-15, -30, 30, 40);
+            
+            // Drill Bit (Animated)
+            ctx.fillStyle = "#ccc";
+            let bitW = 20;
+            if (Date.now() % 100 < 50) bitW = 15; // Spinning effect
+            
+            // Gradient for bit
+            let grad = ctx.createLinearGradient(-10, 0, 10, 0);
+            grad.addColorStop(0, "#888");
+            grad.addColorStop(0.5, "#fff");
+            grad.addColorStop(1, "#888");
+            ctx.fillStyle = grad;
+            
+            ctx.beginPath();
+            ctx.moveTo(-bitW, 10);
+            ctx.lineTo(bitW, 10);
+            ctx.lineTo(0, 50);
+            ctx.fill();
+            
+            // Heat overlay
+            if (temperature > 50) {
+                ctx.fillStyle = `rgba(255, 0, 0, ${(temperature-50)/100})`;
+                ctx.globalCompositeOperation = 'overlay';
+                ctx.beginPath();
+                ctx.moveTo(-bitW, 10);
+                ctx.lineTo(bitW, 10);
+                ctx.lineTo(0, 50);
+                ctx.fill();
+                ctx.globalCompositeOperation = 'source-over';
+            }
+            
+            ctx.restore();
+
+            // Draw Particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.5; // gravity
+                p.life -= 0.05;
+                
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x, p.y, 4, 4);
+                ctx.globalAlpha = 1.0;
+                
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+        }
+
+        function drawBlock(ctx, x, y, type) {
+            let color = "#5c4033"; // dirt
+            
+            if (type === 'dirt') color = "#5c4033";
+            else if (type === 'hard_dirt') color = "#3e2b22";
+            else if (type === 'rock') color = "#555";
+            else if (type === 'obsidian') color = "#220022";
+            else if (type === 'magma') color = "#aa2200";
+            else if (type === 'water') color = "#004466";
+            
+            ctx.fillStyle = color;
+            ctx.fillRect(x, y, BLOCK_SIZE, BLOCK_SIZE);
+            
+            // Texture / Icon
+            ctx.fillStyle = "rgba(0,0,0,0.2)";
+            ctx.fillRect(x, y + BLOCK_SIZE - 5, BLOCK_SIZE, 5); // Shadow
+            
+            if (type === 'fossil') {
+                ctx.fillStyle = "#fff";
+                ctx.font = "20px Arial";
+                ctx.fillText("🦴", x + 15, y + 40);
+            } else if (type === 'water') {
+                ctx.fillStyle = "#00ffff";
+                ctx.font = "20px Arial";
+                ctx.fillText("💧", x + 15, y + 40);
+            } else if (type === 'magma') {
+                ctx.fillStyle = "#ffaa00";
+                // glow
+                ctx.shadowColor = "#ff0000";
+                ctx.shadowBlur = 10;
+                ctx.fillRect(x+10, y+10, BLOCK_SIZE-20, BLOCK_SIZE-20);
+                ctx.shadowBlur = 0;
+            } else if (type === 'gem') {
+                ctx.font = "20px Arial";
+                ctx.fillText("💎", x + 15, y + 40);
+            }
+        }
+
+        function loop() {
+            if (!isPlaying) return;
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+    </script>
+</body>
+</html>

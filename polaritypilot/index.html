@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Magno-Trek: Polarity Pilot</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Roboto+Mono:wght@400;700&display=swap');
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #101015;
+            font-family: 'Roboto Mono', monospace;
+            user-select: none;
+            cursor: none; /* Hide default cursor */
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: 
+                linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)),
+                repeating-linear-gradient(45deg, #151520 0, #151520 10px, #1a1a25 10px, #1a1a25 20px);
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* UI */
+        .ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .hud-panel {
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #555;
+            padding: 10px 20px;
+            border-radius: 5px;
+            color: white;
+            margin-bottom: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        .hud-title {
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+        }
+
+        .hud-value {
+            font-family: 'Black Ops One', cursive;
+            font-size: 24px;
+            color: #fff;
+        }
+
+        .polarity-indicator {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            text-align: center;
+            color: white;
+        }
+
+        .p-circle {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: 4px solid white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Black Ops One', cursive;
+            font-size: 30px;
+            margin: 0 auto 10px auto;
+            box-shadow: 0 0 20px rgba(255,255,255,0.2);
+            transition: transform 0.1s;
+        }
+
+        /* Screens */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 10, 15, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+            color: white;
+            pointer-events: auto;
+            cursor: default;
+        }
+
+        .hidden { display: none !important; }
+
+        h1 {
+            font-family: 'Black Ops One', cursive;
+            font-size: 60px;
+            margin-bottom: 20px;
+            background: linear-gradient(to right, #ff4444, #4444ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+        }
+
+        .tutorial {
+            max-width: 600px;
+            text-align: center;
+            line-height: 1.6;
+            color: #ccc;
+            margin-bottom: 40px;
+        }
+
+        button {
+            background: #333;
+            border: 2px solid #fff;
+            color: white;
+            padding: 15px 40px;
+            font-family: 'Black Ops One', cursive;
+            font-size: 24px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        button:hover {
+            background: #fff;
+            color: #000;
+            box-shadow: 0 0 20px white;
+        }
+
+        .key {
+            display: inline-block;
+            background: #222;
+            border: 1px solid #666;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            color: #fff;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+
+        <div class="ui-layer">
+            <div class="hud-panel">
+                <div class="hud-title">Health</div>
+                <div class="hud-value" id="health-val">100%</div>
+            </div>
+            <div class="hud-panel">
+                <div class="hud-title">Distance</div>
+                <div class="hud-value" id="dist-val">0m</div>
+            </div>
+        </div>
+
+        <div class="polarity-indicator">
+            <div class="p-circle" id="hud-polarity" style="background: #ff4444;">N</div>
+            <div style="font-size: 12px; color: #888;">CLICK TO SWAP POLARITY</div>
+        </div>
+
+        <div id="start-screen" class="screen">
+            <h1>MAGNO-TREK</h1>
+            <div class="tutorial">
+                <p>Pilot the <strong>Mag-Bot</strong> using magnetic fields.</p>
+                <p>
+                    <span style="color: #ff4444; font-weight: bold;">RED CURSOR (North):</span> REPELS the bot (Push).<br>
+                    <span style="color: #4444ff; font-weight: bold;">BLUE CURSOR (South):</span> ATTRACTS the bot (Pull).
+                </p>
+                <p><strong>Click Mouse</strong> to swap polarity instantly.</p>
+                <p>Avoid walls and mines. Reach the checkpoints.</p>
+            </div>
+            <button onclick="startGame()">INITIATE SEQUENCE</button>
+        </div>
+
+        <div id="game-over-screen" class="screen hidden">
+            <h1 style="color: #ff4444;">CRITICAL FAILURE</h1>
+            <p>Distance Reached: <span id="final-score">0</span>m</p>
+            <br>
+            <button onclick="startGame()">REBOOT SYSTEM</button>
+        </div>
+    </div>
+
+    <script>
+        // --- SETUP ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+
+        // Audio
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            const now = audioCtx.currentTime;
+
+            if (type === 'swap') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(200, now);
+                osc.frequency.exponentialRampToValueAtTime(800, now + 0.1);
+                gainNode.gain.setValueAtTime(0.05, now);
+                gainNode.gain.linearRampToValueAtTime(0, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'damage') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(100, now);
+                osc.frequency.linearRampToValueAtTime(50, now + 0.2);
+                gainNode.gain.setValueAtTime(0.1, now);
+                gainNode.gain.linearRampToValueAtTime(0, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            } else if (type === 'hum') {
+                // Magnetic hum logic handled in loop
+            }
+        }
+
+        // --- GAME STATE ---
+        let isPlaying = false;
+        let score = 0;
+        let health = 100;
+        let gameSpeed = 2;
+        
+        // Player (The Mag-Bot)
+        // Bot is inherently NORTH polarized (Red)
+        const bot = {
+            x: 0, y: 0,
+            vx: 0, vy: 0,
+            radius: 20,
+            color: '#ff4444', // Red (North)
+            mass: 1,
+            friction: 0.96
+        };
+
+        // Mouse (The Magnet Wand)
+        const mouse = {
+            x: 0, y: 0,
+            polarity: 'north', // 'north' (Red) or 'south' (Blue)
+            radius: 30
+        };
+
+        // World
+        let obstacles = []; // {x, y, w, h, type}
+        let particles = [];
+        let cameraY = 0;
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            bot.x = width / 2;
+            bot.y = height - 150;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // --- INPUT ---
+        window.addEventListener('mousemove', e => {
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+        });
+
+        window.addEventListener('mousedown', () => {
+            if (!isPlaying) return;
+            // Swap Polarity
+            mouse.polarity = mouse.polarity === 'north' ? 'south' : 'north';
+            updateCursorUI();
+            playSound('swap');
+            
+            // Visual Burst
+            createParticles(mouse.x, mouse.y, mouse.polarity === 'north' ? '#ff4444' : '#4444ff', 10);
+        });
+
+        function updateCursorUI() {
+            const el = document.getElementById('hud-polarity');
+            if (mouse.polarity === 'north') {
+                el.style.background = '#ff4444';
+                el.innerText = 'N';
+                el.style.boxShadow = "0 0 20px #ff4444";
+            } else {
+                el.style.background = '#4444ff';
+                el.innerText = 'S';
+                el.style.boxShadow = "0 0 20px #4444ff";
+            }
+        }
+
+        // --- LOGIC ---
+        function startGame() {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-over-screen').classList.add('hidden');
+            
+            bot.x = width / 2;
+            bot.y = height - 200;
+            bot.vx = 0; 
+            bot.vy = 0;
+            health = 100;
+            score = 0;
+            cameraY = 0;
+            gameSpeed = 2;
+            obstacles = [];
+            particles = [];
+            
+            // Initial Obstacles
+            spawnObstacleRow(height - 600);
+            
+            mouse.polarity = 'north'; // Start with Push
+            updateCursorUI();
+            
+            isPlaying = true;
+            loop();
+        }
+
+        function spawnObstacleRow(y) {
+            // Procedural generation
+            let type = Math.random();
+            
+            if (type < 0.3) {
+                // Moving Mine
+                obstacles.push({
+                    x: Math.random() * width,
+                    y: y,
+                    w: 30, h: 30, // Radius really
+                    type: 'mine',
+                    vx: (Math.random() - 0.5) * 4
+                });
+            } else {
+                // Static Walls
+                let gap = 150;
+                let wallX = Math.random() * (width - gap);
+                
+                // Left Wall
+                obstacles.push({ x: 0, y: y, w: wallX, h: 40, type: 'wall' });
+                // Right Wall
+                obstacles.push({ x: wallX + gap, y: y, w: width - (wallX + gap), h: 40, type: 'wall' });
+            }
+        }
+
+        function createParticles(x, y, color, count) {
+            for(let i=0; i<count; i++) {
+                particles.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 10,
+                    vy: (Math.random() - 0.5) * 10,
+                    life: 1.0,
+                    color: color
+                });
+            }
+        }
+
+        function updatePhysics() {
+            // 1. Magnetic Force
+            // F = k * (q1*q2) / r^2
+            // We simplify for game feel
+            
+            let dx = bot.x - mouse.x;
+            let dy = bot.y - mouse.y;
+            let dist = Math.sqrt(dx*dx + dy*dy);
+            
+            // Cap distance to prevent infinite force
+            let clampDist = Math.max(dist, 40); 
+            
+            // Force magnitude
+            let force = 2000 / (clampDist * clampDist * 0.05);
+            if (force > 3) force = 3; // Cap max force
+            
+            // Direction normalization
+            let nx = dx / dist;
+            let ny = dy / dist;
+            
+            // Apply Force
+            if (mouse.polarity === 'north') {
+                // Bot is North. Cursor is North.
+                // Like repels Like -> Push AWAY
+                bot.vx += nx * force;
+                bot.vy += ny * force;
+            } else {
+                // Bot is North. Cursor is South.
+                // Opposites Attract -> Pull TOWARDS
+                bot.vx -= nx * force;
+                bot.vy -= ny * force;
+            }
+
+            // 2. Movement & Friction
+            bot.x += bot.vx;
+            bot.y += bot.vy;
+            
+            bot.vx *= bot.friction;
+            bot.vy *= bot.friction;
+
+            // 3. Walls / Bounds
+            if (bot.x < bot.radius) { bot.x = bot.radius; bot.vx *= -0.5; }
+            if (bot.x > width - bot.radius) { bot.x = width - bot.radius; bot.vx *= -0.5; }
+            
+            // Camera Logic (Scroll Up)
+            // If bot moves up past center, move camera
+            let targetCamY = bot.y - height/2;
+            if (targetCamY < cameraY) {
+                // We are moving up (y is decreasing)
+                // Actually in canvas Y=0 is top. So if bot.y decreases, we are going "forward".
+                // Let's make "Distance" based on how much negative Y we travel.
+                cameraY = targetCamY;
+                score += Math.abs(bot.vy * 0.1); 
+            }
+            
+            // Auto-scroll (Pressure)
+            bot.y += 1.0; // Constant drift down (gravity/current)
+            if (bot.y > cameraY + height + 50) {
+                // Fell off screen
+                health = 0;
+            }
+
+            // 4. Obstacles
+            // cleanup old obstacles
+            obstacles = obstacles.filter(o => o.y < cameraY + height + 100);
+            
+            // Spawn new
+            let topObstacle = obstacles.reduce((min, o) => Math.min(min, o.y), cameraY + height);
+            if (topObstacle > cameraY - 100) {
+                spawnObstacleRow(cameraY - 200 - Math.random()*200);
+            }
+
+            // Collisions
+            obstacles.forEach(o => {
+                if (o.type === 'mine') {
+                    o.x += o.vx;
+                    if (o.x < 0 || o.x > width) o.vx *= -1;
+                    
+                    // Circle Collision
+                    let d = Math.hypot(bot.x - o.x, bot.y - o.y);
+                    if (d < bot.radius + 15) {
+                        damage(20);
+                        o.y = 99999; // remove
+                        createParticles(bot.x, bot.y, '#ffaa00', 20);
+                    }
+                } else if (o.type === 'wall') {
+                    // Rect Collision
+                    if (bot.x + bot.radius > o.x && bot.x - bot.radius < o.x + o.w &&
+                        bot.y + bot.radius > o.y && bot.y - bot.radius < o.y + o.h) {
+                        
+                        // Bounce logic simplified
+                        bot.vy *= -1;
+                        bot.y += 5; // push out
+                        damage(5);
+                        createParticles(bot.x, bot.y, '#ffffff', 5);
+                    }
+                }
+            });
+
+            // UI Updates
+            document.getElementById('health-val').innerText = Math.floor(health) + "%";
+            document.getElementById('dist-val').innerText = Math.floor(score) + "m";
+
+            if (health <= 0) gameOver();
+        }
+
+        function damage(amount) {
+            health -= amount;
+            playSound('damage');
+            // Shake
+            const c = document.getElementById('game-container');
+            c.style.transform = `translate(${Math.random()*10-5}px, ${Math.random()*10-5}px)`;
+            setTimeout(() => c.style.transform = "none", 50);
+        }
+
+        function gameOver() {
+            isPlaying = false;
+            document.getElementById('final-score').innerText = Math.floor(score);
+            document.getElementById('game-over-screen').classList.remove('hidden');
+        }
+
+        // --- RENDERING ---
+        function draw() {
+            ctx.clearRect(0, 0, width, height);
+            
+            ctx.save();
+            // Camera Transform
+            // We want bot.y to be somewhat centered, but we lock cameraY to max height reached
+            // Actually, let's just shift everything up by cameraY offset (which is negative)
+            // But we want coordinate 0 to be at top initially.
+            // Let's just track an offset.
+            
+            // Simple camera: offset everything by -cameraY + padding
+            let drawOffset = -cameraY; 
+            
+            // Draw Magnetic Field Lines (Background Effect)
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            let gridSize = 50;
+            let startY = Math.floor(cameraY / gridSize) * gridSize;
+            for(let x=0; x<width; x+=gridSize) {
+                for(let y=startY; y<startY+height+100; y+=gridSize) {
+                    // Draw little line pointing away/towards mouse
+                    let dx = x - mouse.x;
+                    let dy = (y - drawOffset) - mouse.y; // Correct for screen space mouse
+                    // Actually mouse is screen space. Grid is world space.
+                    // Let's just draw static grid for speed, warped by cam
+                    ctx.moveTo(x, y - cameraY);
+                    ctx.lineTo(x, y - cameraY + 10);
+                }
+            }
+            ctx.stroke();
+
+            ctx.translate(0, -cameraY); // Apply Camera
+
+            // Draw Obstacles
+            obstacles.forEach(o => {
+                if (o.type === 'mine') {
+                    ctx.fillStyle = "#ffaa00";
+                    ctx.beginPath();
+                    ctx.arc(o.x, o.y, 15, 0, Math.PI*2);
+                    ctx.fill();
+                    // Spikes
+                    ctx.strokeStyle = "#ffaa00";
+                    ctx.lineWidth = 2;
+                    for(let i=0; i<8; i++) {
+                        let a = (Date.now()/200) + (i * Math.PI/4);
+                        ctx.beginPath();
+                        ctx.moveTo(o.x, o.y);
+                        ctx.lineTo(o.x + Math.cos(a)*25, o.y + Math.sin(a)*25);
+                        ctx.stroke();
+                    }
+                } else {
+                    ctx.fillStyle = "#444";
+                    ctx.fillRect(o.x, o.y, o.w, o.h);
+                    ctx.strokeStyle = "#888";
+                    ctx.strokeRect(o.x, o.y, o.w, o.h);
+                    // Hazard stripes
+                    ctx.strokeStyle = "#000";
+                    ctx.beginPath();
+                    for(let i=0; i<o.w; i+=20) {
+                        ctx.moveTo(o.x + i, o.y);
+                        ctx.lineTo(o.x + i - 10, o.y + o.h);
+                    }
+                    ctx.stroke();
+                }
+            });
+
+            // Draw Bot
+            ctx.fillStyle = bot.color;
+            ctx.shadowColor = bot.color;
+            ctx.shadowBlur = 20;
+            ctx.beginPath();
+            ctx.arc(bot.x, bot.y, bot.radius, 0, Math.PI*2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            
+            // Bot Inner Detail (N symbol)
+            ctx.fillStyle = "white";
+            ctx.font = "bold 16px monospace";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText("N", bot.x, bot.y);
+
+            // Draw Particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= 0.05;
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 3, 0, Math.PI*2);
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+            
+            ctx.restore(); // Undo Camera
+
+            // Draw Mouse Cursor (Screen Space)
+            ctx.strokeStyle = mouse.polarity === 'north' ? '#ff4444' : '#4444ff';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(mouse.x, mouse.y, mouse.radius, 0, Math.PI*2);
+            ctx.stroke();
+            
+            // Force Line (Visual connection)
+            ctx.beginPath();
+            let botScreenY = bot.y - cameraY;
+            
+            // Gradient line
+            let grad = ctx.createLinearGradient(mouse.x, mouse.y, bot.x, botScreenY);
+            grad.addColorStop(0, mouse.polarity === 'north' ? '#ff4444' : '#4444ff');
+            grad.addColorStop(1, "rgba(0,0,0,0)");
+            
+            ctx.strokeStyle = grad;
+            ctx.lineWidth = 2;
+            ctx.moveTo(mouse.x, mouse.y);
+            ctx.lineTo(bot.x, botScreenY);
+            ctx.stroke();
+
+        }
+
+        function loop() {
+            if (!isPlaying) return;
+            updatePhysics();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+    </script>
+</body>
+</html>

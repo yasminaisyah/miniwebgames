@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bond Breaker: Atomic Lab</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Roboto+Mono:wght@700&display=swap');
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #1a1a24;
+            font-family: 'Roboto Mono', monospace;
+            user-select: none;
+            touch-action: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 50% 30%, #2a2a35 0%, #111 100%);
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* UI OVERLAY */
+        .ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .header {
+            width: 90%;
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+            color: white;
+            font-size: 20px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .lab-monitor {
+            background: #222;
+            border: 4px solid #444;
+            border-radius: 10px;
+            padding: 15px 30px;
+            margin-top: 10px;
+            text-align: center;
+            color: #00ffaa;
+            box-shadow: 0 0 15px rgba(0, 255, 170, 0.2);
+            transition: transform 0.2s;
+        }
+
+        .lab-title {
+            font-size: 14px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 5px;
+        }
+
+        .molecule-name {
+            font-family: 'Fredoka One', cursive;
+            font-size: 32px;
+            color: white;
+        }
+
+        .molecule-formula {
+            font-size: 24px;
+            color: #00ffaa;
+            margin-top: 5px;
+            font-weight: bold;
+        }
+
+        /* Start Screen */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+            color: white;
+            pointer-events: auto;
+        }
+
+        .hidden { display: none !important; }
+
+        h1 {
+            font-family: 'Fredoka One', cursive;
+            font-size: 50px;
+            color: #00ffaa;
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px rgba(0,255,170,0.5);
+            text-align: center;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #00ffaa, #00bbcc);
+            border: none;
+            padding: 15px 40px;
+            font-size: 24px;
+            font-family: 'Fredoka One', cursive;
+            color: #111;
+            border-radius: 50px;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+
+        .btn:hover { transform: scale(1.05); box-shadow: 0 0 20px #00ffaa; }
+        .btn:active { transform: scale(0.95); }
+
+        .tutorial {
+            color: #ccc;
+            text-align: center;
+            line-height: 1.6;
+            max-width: 500px;
+            margin-bottom: 20px;
+        }
+
+        .floater {
+            position: absolute;
+            font-family: 'Fredoka One', cursive;
+            color: #fff;
+            font-size: 24px;
+            pointer-events: none;
+            animation: floatUp 1s forwards;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-50px) scale(1.2); opacity: 0; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+
+        <div class="ui-layer">
+            <div class="header">
+                <div>SCORE: <span id="score-val">0</span></div>
+                <div>LEVEL: <span id="level-val">1</span></div>
+            </div>
+
+            <div class="lab-monitor" id="monitor">
+                <div class="lab-title">Required Synthesis</div>
+                <div class="molecule-name" id="target-name">Water</div>
+                <div class="molecule-formula" id="target-formula">H - O - H</div>
+            </div>
+        </div>
+
+        <div id="start-screen" class="screen">
+            <h1>BOND BREAKER</h1>
+            <div class="tutorial">
+                Welcome to the Atomic Lab.<br><br>
+                1. Look at the <strong>Required Synthesis</strong> at the top.<br>
+                2. <strong>Drag</strong> your mouse (or finger) across atoms to connect them.<br>
+                3. Create the bond in the correct order!<br><br>
+                Example: For <strong>H₂O</strong>, drag <strong>H &rarr; O &rarr; H</strong>.
+            </div>
+            <button class="btn" onclick="startGame()">Start Experiment</button>
+        </div>
+
+        <div id="game-over-screen" class="screen hidden">
+            <h1 style="color: #ff5555;">Reaction Failed</h1>
+            <p style="font-size: 24px;">Score: <span id="final-score">0</span></p>
+            <button class="btn" onclick="startGame()">Try Again</button>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+
+        const ATOM_TYPES = {
+            'H': { color: '#ffffff', shadow: '#aaaaaa', radius: 30, textColor: '#000000' }, 
+            'O': { color: '#ff5555', shadow: '#cc0000', radius: 35, textColor: '#ffffff' }, 
+            'C': { color: '#333333', shadow: '#000000', radius: 35, textColor: '#ffffff' }, 
+            'N': { color: '#55aaff', shadow: '#0055aa', radius: 35, textColor: '#ffffff' }, 
+        };
+
+        const MOLECULES = [
+            // Level 1: Pairs and Simple Trios
+            { name: "Hydrogen Gas", formula: "H-H", pattern: ['H', 'H'], difficulty: 1 },
+            { name: "Oxygen Gas", formula: "O=O", pattern: ['O', 'O'], difficulty: 1 },
+            { name: "Nitrogen Gas", formula: "N≡N", pattern: ['N', 'N'], difficulty: 1 },
+            { name: "Carbon Monoxide", formula: "C≡O", pattern: ['C', 'O'], difficulty: 1 },
+            { name: "Nitric Oxide", formula: "N=O", pattern: ['N', 'O'], difficulty: 1 },
+            
+            // Level 2: Trios and Simple Chains
+            { name: "Water", formula: "H₂O", pattern: ['H', 'O', 'H'], difficulty: 2 },
+            { name: "Carbon Dioxide", formula: "CO₂", pattern: ['O', 'C', 'O'], difficulty: 2 },
+            { name: "Nitrogen Dioxide", formula: "NO₂", pattern: ['O', 'N', 'O'], difficulty: 2 },
+            { name: "Hydrogen Cyanide", formula: "HCN", pattern: ['H', 'C', 'N'], difficulty: 2 },
+            
+            // Level 3: Longer Chains & Complex
+            { name: "Methane", formula: "CH₄", pattern: ['H', 'C', 'H', 'H', 'H'], difficulty: 3 }, 
+            { name: "Ammonia", formula: "NH₃", pattern: ['H', 'N', 'H', 'H'], difficulty: 3 },
+            { name: "Hydrogen Peroxide", formula: "H₂O₂", pattern: ['H', 'O', 'O', 'H'], difficulty: 3 },
+            { name: "Acetylene", formula: "C₂H₂", pattern: ['H', 'C', 'C', 'H'], difficulty: 3 },
+            { name: "Nitrous Oxide", formula: "N₂O", pattern: ['N', 'N', 'O'], difficulty: 3 }
+        ];
+
+        // --- GAME STATE ---
+        let isPlaying = false;
+        let score = 0;
+        let level = 1;
+        let grid = [];
+        let cols = 6;
+        let rows = 7;
+        let cellSize = 80;
+        let offsetX = 0;
+        let offsetY = 150;
+
+        let selectedAtoms = []; 
+        let isDragging = false;
+        
+        // NO REPEAT LOGIC
+        let currentMission = null;
+        let usedMissionNames = []; // History of played molecules
+
+        let particles = [];
+
+        // Audio
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            const now = audioCtx.currentTime;
+
+            if (type === 'pop') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, now);
+                osc.frequency.exponentialRampToValueAtTime(1200, now + 0.1);
+                gainNode.gain.setValueAtTime(0.1, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'success') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.setValueAtTime(600, now + 0.1);
+                osc.frequency.setValueAtTime(900, now + 0.2);
+                gainNode.gain.setValueAtTime(0.2, now);
+                gainNode.gain.linearRampToValueAtTime(0, now + 0.6);
+                osc.start(now);
+                osc.stop(now + 0.6);
+            } else if (type === 'fail') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.linearRampToValueAtTime(100, now + 0.2);
+                gainNode.gain.setValueAtTime(0.1, now);
+                gainNode.gain.linearRampToValueAtTime(0, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            } else if (type === 'transform') {
+                // Sound for the safety swap
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.linearRampToValueAtTime(800, now + 0.3);
+                gainNode.gain.setValueAtTime(0.1, now);
+                gainNode.gain.linearRampToValueAtTime(0, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            }
+        }
+
+        // --- SETUP ---
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            
+            cols = Math.floor(width / 70);
+            if (cols > 8) cols = 8;
+            if (cols < 5) cols = 5;
+            
+            cellSize = Math.min(80, width / cols);
+            rows = Math.floor((height - 200) / cellSize);
+            
+            offsetX = (width - (cols * cellSize)) / 2;
+            offsetY = 180;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        function initGrid() {
+            grid = [];
+            for (let c = 0; c < cols; c++) {
+                grid[c] = [];
+                for (let r = 0; r < rows; r++) {
+                    grid[c][r] = createRandomAtom(c, r);
+                    grid[c][r].y = -500 - (Math.random() * 500);
+                    grid[c][r].targetY = offsetY + r * cellSize + cellSize/2;
+                }
+            }
+        }
+
+        function createRandomAtom(c, r) {
+            let types = Object.keys(ATOM_TYPES);
+            
+            // Weight the probability towards the current mission
+            if (currentMission) {
+                types = types.concat(currentMission.pattern);
+                types = types.concat(currentMission.pattern);
+            }
+            
+            const type = types[Math.floor(Math.random() * types.length)];
+            return {
+                type: type,
+                x: offsetX + c * cellSize + cellSize/2,
+                y: offsetY + r * cellSize + cellSize/2,
+                targetY: offsetY + r * cellSize + cellSize/2,
+                vy: 0,
+                scale: 1,
+                removed: false
+            };
+        }
+
+        function ensureSolvability() {
+            if (!currentMission) return;
+            
+            // Collect all existing active atoms
+            let activeAtoms = [];
+            for(let c=0; c<cols; c++) {
+                for(let r=0; r<rows; r++) {
+                    if(!grid[c][r].removed) activeAtoms.push(grid[c][r]);
+                }
+            }
+            
+            // Check each required atom type
+            const neededTypes = [...new Set(currentMission.pattern)]; // Unique types needed
+            
+            let changed = false;
+
+            neededTypes.forEach(type => {
+                const count = activeAtoms.filter(a => a.type === type).length;
+                // If we have fewer than 3 of a required atom, FORCE CHANGE some atoms
+                if (count < 3) {
+                    const diff = 3 - count;
+                    // Find candidates to swap (don't swap atoms that are already the right type)
+                    const candidates = activeAtoms.filter(a => a.type !== type);
+                    
+                    for(let i=0; i<diff; i++) {
+                        if (candidates.length > 0) {
+                            const randIdx = Math.floor(Math.random() * candidates.length);
+                            const atom = candidates[randIdx];
+                            
+                            // Transform it
+                            atom.type = type;
+                            createParticles(atom.x, atom.y, '#ffffff'); // Visual pop
+                            
+                            // Remove from candidates so we don't pick it again
+                            candidates.splice(randIdx, 1);
+                            changed = true;
+                        }
+                    }
+                }
+            });
+
+            if (changed) playSound('transform');
+        }
+
+        function setMission() {
+            let maxDiff = Math.min(3, Math.ceil(level / 2) + 1); 
+            let pool = MOLECULES.filter(m => m.difficulty <= maxDiff);
+            
+            let available = pool.filter(m => !usedMissionNames.includes(m.name));
+            
+            if (available.length === 0) {
+                const lastPlayed = usedMissionNames[usedMissionNames.length - 1];
+                usedMissionNames = []; 
+                if (lastPlayed) usedMissionNames.push(lastPlayed);
+                available = pool.filter(m => m.name !== lastPlayed);
+                if (available.length === 0) available = pool;
+            }
+
+            let next = available[Math.floor(Math.random() * available.length)];
+            
+            currentMission = next;
+            usedMissionNames.push(next.name); 
+
+            // Update UI
+            document.getElementById('target-name').innerText = currentMission.name;
+            document.getElementById('target-formula').innerText = currentMission.formula;
+            
+            const mon = document.getElementById('monitor');
+            mon.style.transform = "scale(1.1)";
+            setTimeout(() => mon.style.transform = "scale(1)", 200);
+
+            // FIX: Ensure the board actually has the atoms we need!
+            setTimeout(ensureSolvability, 100);
+        }
+
+        function startGame() {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-over-screen').classList.add('hidden');
+            score = 0;
+            level = 1;
+            usedMissionNames = []; 
+            document.getElementById('score-val').innerText = score;
+            document.getElementById('level-val').innerText = level;
+            resize();
+            initGrid();
+            setMission(); // Set mission AFTER grid init so solvability check works
+            isPlaying = true;
+            loop();
+        }
+
+        // --- INTERACTION ---
+        function getAtomAtInput(x, y) {
+            for (let c = 0; c < cols; c++) {
+                for (let r = 0; r < rows; r++) {
+                    let atom = grid[c][r];
+                    if (atom.removed) continue;
+                    let dx = x - atom.x;
+                    let dy = y - atom.y;
+                    if (Math.sqrt(dx*dx + dy*dy) < ATOM_TYPES[atom.type].radius) {
+                        return {c, r};
+                    }
+                }
+            }
+            return null;
+        }
+
+        function handleInputStart(x, y) {
+            if (!isPlaying) return;
+            const hit = getAtomAtInput(x, y);
+            if (hit) {
+                isDragging = true;
+                selectedAtoms = [hit];
+                playSound('pop');
+            }
+        }
+
+        function handleInputMove(x, y) {
+            if (!isPlaying || !isDragging) return;
+            const hit = getAtomAtInput(x, y);
+            
+            if (hit) {
+                const last = selectedAtoms[selectedAtoms.length - 1];
+                
+                if (selectedAtoms.length > 1) {
+                    const prev = selectedAtoms[selectedAtoms.length - 2];
+                    if (hit.c === prev.c && hit.r === prev.r) {
+                        selectedAtoms.pop();
+                        playSound('pop');
+                        return;
+                    }
+                }
+
+                const alreadyInChain = selectedAtoms.find(a => a.c === hit.c && a.r === hit.r);
+                if (!alreadyInChain) {
+                    let dc = Math.abs(hit.c - last.c);
+                    let dr = Math.abs(hit.r - last.r);
+                    if (dc <= 1 && dr <= 1 && (dc+dr) > 0) {
+                        selectedAtoms.push(hit);
+                        playSound('pop');
+                    }
+                }
+            }
+        }
+
+        function handleInputEnd() {
+            if (!isPlaying || !isDragging) return;
+            isDragging = false;
+            validateChain();
+            selectedAtoms = [];
+        }
+
+        canvas.addEventListener('mousedown', e => handleInputStart(e.clientX, e.clientY));
+        canvas.addEventListener('mousemove', e => handleInputMove(e.clientX, e.clientY));
+        window.addEventListener('mouseup', handleInputEnd);
+
+        canvas.addEventListener('touchstart', e => {
+            e.preventDefault();
+            handleInputStart(e.touches[0].clientX, e.touches[0].clientY);
+        }, {passive: false});
+        canvas.addEventListener('touchmove', e => {
+            e.preventDefault();
+            handleInputMove(e.touches[0].clientX, e.touches[0].clientY);
+        }, {passive: false});
+        window.addEventListener('touchend', handleInputEnd);
+
+
+        // --- LOGIC ---
+        function validateChain() {
+            if (selectedAtoms.length === 0) return;
+            let chainTypes = selectedAtoms.map(pos => grid[pos.c][pos.r].type);
+            let target = currentMission.pattern;
+            let match = false;
+            
+            if (JSON.stringify(chainTypes) === JSON.stringify(target)) match = true;
+            if (!match && JSON.stringify(chainTypes) === JSON.stringify([...target].reverse())) match = true;
+
+            if (match) {
+                playSound('success');
+                score += 100 * level;
+                document.getElementById('score-val').innerText = score;
+                showFloatText(`+${100*level}`, grid[selectedAtoms[0].c][selectedAtoms[0].r].x, grid[selectedAtoms[0].c][selectedAtoms[0].r].y);
+
+                selectedAtoms.forEach(pos => {
+                    grid[pos.c][pos.r].removed = true;
+                    createParticles(grid[pos.c][pos.r].x, grid[pos.c][pos.r].y, ATOM_TYPES[grid[pos.c][pos.r].type].color);
+                });
+
+                if (score % 500 === 0) {
+                    level++;
+                    document.getElementById('level-val').innerText = level;
+                }
+                setTimeout(setMission, 500);
+
+            } else {
+                if (selectedAtoms.length > 1) playSound('fail');
+            }
+        }
+
+        function updatePhysics() {
+            for (let c = 0; c < cols; c++) {
+                for (let r = rows - 1; r >= 0; r--) {
+                    if (grid[c][r].removed) {
+                        for (let up = r - 1; up >= 0; up--) {
+                            if (!grid[c][up].removed) {
+                                grid[c][r] = grid[c][up];
+                                grid[c][up] = { removed: true }; 
+                                grid[c][r].targetY = offsetY + r * cellSize + cellSize/2;
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                for (let r = 0; r < rows; r++) {
+                    if (grid[c][r].removed) {
+                        grid[c][r] = createRandomAtom(c, r);
+                        grid[c][r].y = -100 - (Math.random() * 200); 
+                    }
+                    let atom = grid[c][r];
+                    let dy = atom.targetY - atom.y;
+                    if (Math.abs(dy) > 1) {
+                        atom.y += dy * 0.1; 
+                    } else {
+                        atom.y = atom.targetY;
+                    }
+                    atom.scale = 1 + Math.sin(Date.now() / 300 + c) * 0.05;
+                }
+            }
+        }
+
+        function createParticles(x, y, color) {
+            for(let i=0; i<10; i++) {
+                particles.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 10,
+                    vy: (Math.random() - 0.5) * 10,
+                    life: 1.0,
+                    color: color
+                });
+            }
+        }
+
+        function showFloatText(text, x, y) {
+            const el = document.createElement('div');
+            el.className = 'floater';
+            el.innerText = text;
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 1000);
+        }
+
+        // --- RENDER ---
+        function draw() {
+            ctx.clearRect(0, 0, width, height);
+            
+            ctx.strokeStyle = "rgba(255,255,255,0.05)";
+            ctx.lineWidth = 2;
+            for(let c=0; c<cols; c++) {
+                for(let r=0; r<rows; r++) {
+                    let cx = offsetX + c * cellSize + cellSize/2;
+                    let cy = offsetY + r * cellSize + cellSize/2;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, 5, 0, Math.PI*2);
+                    ctx.stroke();
+                }
+            }
+
+            if (isDragging && selectedAtoms.length > 0) {
+                ctx.beginPath();
+                let first = grid[selectedAtoms[0].c][selectedAtoms[0].r];
+                ctx.moveTo(first.x, first.y);
+                for(let i=1; i<selectedAtoms.length; i++) {
+                    let a = grid[selectedAtoms[i].c][selectedAtoms[i].r];
+                    ctx.lineTo(a.x, a.y);
+                }
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.lineWidth = 10;
+                ctx.strokeStyle = "rgba(0, 255, 170, 0.6)";
+                ctx.stroke();
+                ctx.lineWidth = 4;
+                ctx.strokeStyle = "#fff";
+                ctx.stroke();
+            }
+
+            for (let c = 0; c < cols; c++) {
+                for (let r = 0; r < rows; r++) {
+                    let atom = grid[c][r];
+                    if (atom.removed) continue;
+                    
+                    let props = ATOM_TYPES[atom.type];
+                    let rVisual = props.radius * atom.scale;
+                    let isSel = selectedAtoms.find(a => a.c === c && a.r === r);
+                    
+                    ctx.beginPath();
+                    ctx.arc(atom.x, atom.y + 5, rVisual, 0, Math.PI*2);
+                    ctx.fillStyle = isSel ? "#fff" : props.shadow;
+                    ctx.globalAlpha = 0.5;
+                    ctx.fill();
+                    ctx.globalAlpha = 1.0;
+                    
+                    ctx.beginPath();
+                    ctx.arc(atom.x, atom.y, rVisual, 0, Math.PI*2);
+                    let grad = ctx.createRadialGradient(atom.x - 10, atom.y - 10, 5, atom.x, atom.y, rVisual);
+                    grad.addColorStop(0, "#fff");
+                    grad.addColorStop(0.3, props.color);
+                    grad.addColorStop(1, props.shadow);
+                    ctx.fillStyle = grad;
+                    ctx.fill();
+                    
+                    if (isSel) {
+                        ctx.strokeStyle = "#fff";
+                        ctx.lineWidth = 4;
+                        ctx.stroke();
+                    }
+                    
+                    ctx.fillStyle = props.textColor; 
+                    ctx.font = `bold ${24 * atom.scale}px 'Roboto Mono'`;
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    ctx.fillText(atom.type, atom.x, atom.y + 2);
+                }
+            }
+            
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.5; 
+                p.life -= 0.05;
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+        }
+
+        function loop() {
+            if (!isPlaying) return;
+            updatePhysics();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+    </script>
+</body>
+</html>

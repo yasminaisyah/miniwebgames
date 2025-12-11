@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase Shift: Matter Master</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@400;700&display=swap');
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #050510;
+            font-family: 'Roboto', sans-serif;
+            user-select: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, #1a1a2e 0%, #000000 100%);
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* UI Elements */
+        .hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #00ffcc;
+            font-family: 'Orbitron', sans-serif;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .score-box {
+            font-size: 24px;
+            text-shadow: 0 0 10px #00ffcc;
+        }
+
+        .question-panel {
+            position: absolute;
+            top: 15%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            max-width: 600px;
+            background: rgba(0, 20, 40, 0.85);
+            border: 2px solid #00ffcc;
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            color: white;
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.3);
+            display: none; /* Hidden initially */
+            z-index: 10;
+        }
+
+        .question-text {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .controls-hint {
+            position: absolute;
+            bottom: 30px;
+            width: 100%;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.5);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 14px;
+            pointer-events: none;
+        }
+
+        /* Buttons for Mobile/Click */
+        .state-controls {
+            position: absolute;
+            bottom: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+            z-index: 20;
+        }
+
+        .control-btn {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 3px solid white;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.1s;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-size: 12px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        }
+
+        .btn-solid { background: linear-gradient(135deg, #555, #222); border-color: #a0a0a0; }
+        .btn-liquid { background: linear-gradient(135deg, #00c6ff, #0072ff); border-color: #00c6ff; }
+        .btn-gas { background: linear-gradient(135deg, #ffffff, #dcdcdc); border-color: #fff; color: #333; }
+
+        .control-btn:active, .control-btn.active {
+            transform: scale(0.9);
+            box-shadow: 0 0 20px white;
+        }
+
+        .control-btn span {
+            font-size: 18px;
+            display: block;
+        }
+
+        /* Screens */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 30;
+            color: white;
+        }
+
+        .hidden { display: none !important; }
+
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 50px;
+            background: linear-gradient(to right, #00c6ff, #0072ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .start-btn {
+            padding: 15px 50px;
+            font-size: 24px;
+            font-family: 'Orbitron', sans-serif;
+            background: #00ffcc;
+            color: #000;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            box-shadow: 0 0 15px #00ffcc;
+            transition: 0.2s;
+        }
+
+        .start-btn:hover {
+            background: white;
+            box-shadow: 0 0 25px white;
+        }
+
+        .tutorial {
+            max-width: 500px;
+            text-align: center;
+            line-height: 1.6;
+            margin-bottom: 30px;
+            color: #ccc;
+        }
+
+        /* Feedback Popups */
+        .feedback {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 40px;
+            font-weight: bold;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 15;
+            pointer-events: none;
+        }
+        .feedback.correct { color: #00ff00; text-shadow: 0 0 10px #00ff00; }
+        .feedback.wrong { color: #ff0000; text-shadow: 0 0 10px #ff0000; }
+
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+
+        <div class="hud">
+            <div class="score-box">Score: <span id="score-val">0</span></div>
+            <div style="font-size: 14px; color: #888; margin-top:5px;">Level <span id="level-val">1</span></div>
+        </div>
+
+        <div class="question-panel" id="question-panel">
+            <div style="font-size: 14px; text-transform: uppercase; color: #00ffcc; letter-spacing: 2px;">Identity this State</div>
+            <div class="question-text" id="q-text">Loading...</div>
+        </div>
+
+        <div id="feedback-display" class="feedback">CORRECT!</div>
+
+        <div class="state-controls" id="controls">
+            <div class="control-btn btn-solid" onclick="setPlayerState('solid')" id="btn-solid">
+                <span>🧊</span>SOLID
+            </div>
+            <div class="control-btn btn-liquid" onclick="setPlayerState('liquid')" id="btn-liquid">
+                <span>💧</span>LIQUID
+            </div>
+            <div class="control-btn btn-gas" onclick="setPlayerState('gas')" id="btn-gas">
+                <span>💨</span>GAS
+            </div>
+        </div>
+
+        <div class="controls-hint">Press 1 for Solid, 2 for Liquid, 3 for Gas</div>
+
+        <div id="start-screen" class="screen">
+            <h1>PHASE SHIFT</h1>
+            <div class="tutorial">
+                Master the States of Matter!<br><br>
+                Your character is running through a particle accelerator.<br>
+                Read the clue at the top and <strong>Shift your Phase</strong> to match the answer.<br><br>
+                🧊 <strong>Solid:</strong> Fixed shape, rigid.<br>
+                💧 <strong>Liquid:</strong> Flows, takes container shape.<br>
+                💨 <strong>Gas:</strong> Expands, fills all space.<br>
+            </div>
+            <button class="start-btn" onclick="startGame()">INITIATE</button>
+        </div>
+
+        <div id="game-over-screen" class="screen hidden">
+            <h1 style="color: #ff4444; background: none; -webkit-text-fill-color: #ff4444;">SYSTEM FAILURE</h1>
+            <p style="font-size: 20px;">Final Score: <span id="final-score">0</span></p>
+            <button class="start-btn" onclick="startGame()">REBOOT</button>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA: QUESTIONS ---
+        // Categorized by answer type
+        const questionBank = {
+            solid: [
+                "I have a fixed shape and volume.",
+                "My particles vibrate in a fixed position.",
+                "I am hard to compress.",
+                "Ice is an example of me.",
+                "A rock is an example of me.",
+                "My particles are packed tightly together.",
+                "I do not flow.",
+                "Wood is an example of me.",
+                "Gold is an example of me.",
+                "I keep my shape when moved to a new container."
+            ],
+            liquid: [
+                "I have a fixed volume but no fixed shape.",
+                "I take the shape of the bottom of my container.",
+                "My particles can slide past each other.",
+                "Water is an example of me.",
+                "Milk is an example of me.",
+                "I can flow and be poured.",
+                "My particles are close but not rigid.",
+                "Mercury is a metal that is in this state.",
+                "Rain falls in this state.",
+                "I am wet."
+            ],
+            gas: [
+                "I have no fixed shape and no fixed volume.",
+                "I expand to fill my entire container.",
+                "My particles move freely at high speeds.",
+                "I am easily compressible.",
+                "Steam is an example of me.",
+                "Oxygen is an example of me.",
+                "Helium in a balloon is me.",
+                "My particles are far apart.",
+                "I can be invisible.",
+                "The air you breathe."
+            ]
+        };
+
+        // --- ENGINE ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+
+        // Audio Context
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+
+        // Game State
+        let isPlaying = false;
+        let score = 0;
+        let speed = 5;
+        let distance = 0;
+        let lastTime = 0;
+        let level = 1;
+
+        // Player
+        const player = {
+            x: 100,
+            y: 0, // set in resize
+            radius: 30,
+            state: 'solid', // solid, liquid, gas
+            visualY: 0,
+            animTimer: 0
+        };
+
+        // Current Challenge
+        let currentQuestion = null;
+        let nextGateDistance = 0;
+        let gateSpawnRate = 600; // pixels
+        let usedQuestions = [];
+        let particles = [];
+        let gates = [];
+
+        // Colors
+        const colors = {
+            solid: '#a0a0a0', // Grey/Silver
+            solidGlow: '#ffffff',
+            liquid: '#00c6ff', // Cyan
+            liquidGlow: '#0072ff',
+            gas: '#f0f0f0', // White smoke
+            gasGlow: '#aaaaaa'
+        };
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            player.y = height / 2 + 50;
+            player.visualY = player.y;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // --- AUDIO SYSTEM ---
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            const now = audioCtx.currentTime;
+            
+            if (type === 'switch') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.linearRampToValueAtTime(600, now + 0.1);
+                gainNode.gain.setValueAtTime(0.1, now);
+                gainNode.gain.linearRampToValueAtTime(0, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'correct') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(500, now);
+                osc.frequency.exponentialRampToValueAtTime(1000, now + 0.1);
+                gainNode.gain.setValueAtTime(0.2, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            } else if (type === 'wrong') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.linearRampToValueAtTime(100, now + 0.2);
+                gainNode.gain.setValueAtTime(0.2, now);
+                gainNode.gain.linearRampToValueAtTime(0.01, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            }
+        }
+
+        // --- INPUT ---
+        function setPlayerState(state) {
+            if (!isPlaying) return;
+            player.state = state;
+            playSound('switch');
+            
+            // Visual Update Buttons
+            document.querySelectorAll('.control-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`btn-${state}`).classList.add('active');
+
+            // Particle burst
+            createParticles(player.x, player.visualY, colors[state], 10);
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === '1') setPlayerState('solid');
+            if (e.key === '2') setPlayerState('liquid');
+            if (e.key === '3') setPlayerState('gas');
+        });
+
+        // --- LOGIC ---
+        function generateQuestion() {
+            const types = ['solid', 'liquid', 'gas'];
+            const type = types[Math.floor(Math.random() * types.length)];
+            let pool = questionBank[type];
+            
+            // Filter out recently used
+            let available = pool.filter(q => !usedQuestions.includes(q));
+            if (available.length === 0) {
+                // Reset pool if exhausted
+                usedQuestions = usedQuestions.filter(q => !pool.includes(q));
+                available = pool;
+            }
+
+            const text = available[Math.floor(Math.random() * available.length)];
+            usedQuestions.push(text);
+            
+            // Limit memory
+            if(usedQuestions.length > 15) usedQuestions.shift();
+
+            return { type: type, text: text };
+        }
+
+        function startGame() {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-over-screen').classList.add('hidden');
+            
+            score = 0;
+            speed = 5;
+            level = 1;
+            gates = [];
+            particles = [];
+            nextGateDistance = 300; // Initial delay
+            
+            // Initial Question
+            currentQuestion = generateQuestion();
+            updateQuestionUI();
+            
+            isPlaying = true;
+            lastTime = performance.now();
+            setPlayerState('solid');
+            requestAnimationFrame(gameLoop);
+        }
+
+        function updateQuestionUI() {
+            const panel = document.getElementById('question-panel');
+            const txt = document.getElementById('q-text');
+            
+            if (currentQuestion) {
+                panel.style.display = 'block';
+                txt.innerText = currentQuestion.text;
+                // Animate entrance
+                panel.style.transform = "translateX(-50%) scale(0.8)";
+                panel.style.opacity = "0";
+                setTimeout(() => {
+                    panel.style.transition = "all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
+                    panel.style.transform = "translateX(-50%) scale(1)";
+                    panel.style.opacity = "1";
+                }, 50);
+            } else {
+                panel.style.display = 'none';
+            }
+        }
+
+        function spawnGate() {
+            gates.push({
+                x: width + 100,
+                width: 60,
+                passed: false
+            });
+        }
+
+        function createParticles(x, y, color, count) {
+            for(let i=0; i<count; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 10,
+                    vy: (Math.random() - 0.5) * 10,
+                    life: 1.0,
+                    color: color
+                });
+            }
+        }
+
+        function showFeedback(isCorrect) {
+            const fb = document.getElementById('feedback-display');
+            fb.innerText = isCorrect ? "CORRECT!" : "WRONG!";
+            fb.className = `feedback ${isCorrect ? 'correct' : 'wrong'}`;
+            fb.style.opacity = 1;
+            fb.style.top = "40%";
+            
+            setTimeout(() => {
+                fb.style.opacity = 0;
+                fb.style.top = "35%"; // Float up
+            }, 800);
+        }
+
+        function gameOver() {
+            isPlaying = false;
+            document.getElementById('final-score').innerText = score;
+            document.getElementById('game-over-screen').classList.remove('hidden');
+        }
+
+        function gameLoop(timestamp) {
+            if (!isPlaying) return;
+            const dt = (timestamp - lastTime) / 16; // Normalizing to ~60fps
+            lastTime = timestamp;
+
+            player.animTimer += 0.05 * dt;
+
+            // Update visual player position
+            if (player.state === 'gas') {
+                // Float up slightly
+                player.visualY = player.y - 40 + Math.sin(player.animTimer) * 10;
+            } else if (player.state === 'liquid') {
+                // Flatten slightly
+                player.visualY = player.y + 20;
+            } else {
+                player.visualY = player.y + Math.sin(player.animTimer * 2) * 2;
+            }
+
+            // Gate Spawning Logic
+            nextGateDistance -= speed * dt;
+            if (nextGateDistance <= 0) {
+                spawnGate();
+                // Reset distance for next gate
+                nextGateDistance = gateSpawnRate + (Math.random() * 200); 
+            }
+
+            // Logic Gates
+            for (let i = gates.length - 1; i >= 0; i--) {
+                let g = gates[i];
+                g.x -= speed * dt;
+
+                // Collision/Pass check
+                if (!g.passed && g.x < player.x + player.radius && g.x + g.width > player.x - player.radius) {
+                    // We are inside the gate
+                    // Check Logic
+                    const correctState = currentQuestion.type;
+                    if (player.state === correctState) {
+                        // Success
+                        score += 100;
+                        createParticles(player.x, player.visualY, '#00ff00', 20);
+                        playSound('correct');
+                        showFeedback(true);
+                        speed += 0.2; // Increase speed
+                        if (speed > 15) speed = 15; // Cap speed
+                        
+                        // Level up logic
+                        if (score % 500 === 0) level++;
+                        document.getElementById('level-val').innerText = level;
+
+                    } else {
+                        // Fail
+                        createParticles(player.x, player.visualY, '#ff0000', 20);
+                        playSound('wrong');
+                        showFeedback(false);
+                        gameOver();
+                    }
+                    g.passed = true;
+                    
+                    // Prepare next question immediately after passing
+                    setTimeout(() => {
+                        if(isPlaying) {
+                            currentQuestion = generateQuestion();
+                            updateQuestionUI();
+                        }
+                    }, 500);
+                }
+
+                if (g.x < -100) {
+                    gates.splice(i, 1);
+                }
+            }
+
+            // Update UI
+            document.getElementById('score-val').innerText = score;
+
+            // --- DRAWING ---
+            ctx.clearRect(0, 0, width, height);
+
+            // Draw Background track (Floor/Ceiling)
+            ctx.fillStyle = "#111";
+            ctx.fillRect(0, player.y + 60, width, 10); // Floor
+            ctx.fillRect(0, player.y - 100, width, 10); // Ceiling
+
+            // Moving Grid Effect
+            ctx.strokeStyle = "rgba(0, 255, 204, 0.1)";
+            ctx.beginPath();
+            let offset = (Date.now() / 2 * (speed/5)) % 50;
+            for(let x = -offset; x < width; x+=50) {
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, height);
+            }
+            ctx.stroke();
+
+            // Draw Gates
+            gates.forEach(g => {
+                ctx.save();
+                ctx.translate(g.x, player.y - 100);
+                
+                // Gate structure
+                ctx.fillStyle = "rgba(0, 255, 204, 0.2)";
+                ctx.fillRect(0, 0, g.width, 160);
+                
+                // Energy Field
+                ctx.strokeStyle = "#00ffcc";
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(0, 0); ctx.lineTo(0, 160);
+                ctx.moveTo(g.width, 0); ctx.lineTo(g.width, 160);
+                ctx.stroke();
+
+                // Scanner line
+                let scanY = (Date.now() / 5) % 160;
+                ctx.fillStyle = "#fff";
+                ctx.fillRect(0, scanY, g.width, 2);
+
+                ctx.restore();
+            });
+
+            // Draw Player
+            ctx.save();
+            ctx.translate(player.x, player.visualY);
+
+            if (player.state === 'solid') {
+                // Cube
+                ctx.fillStyle = colors.solid;
+                ctx.shadowColor = colors.solidGlow;
+                ctx.shadowBlur = 15;
+                ctx.fillRect(-25, -25, 50, 50);
+                // Detail
+                ctx.strokeStyle = "#fff";
+                ctx.strokeRect(-25, -25, 50, 50);
+            } 
+            else if (player.state === 'liquid') {
+                // Blob/Drop
+                ctx.fillStyle = colors.liquid;
+                ctx.shadowColor = colors.liquidGlow;
+                ctx.shadowBlur = 15;
+                ctx.beginPath();
+                // Morphing shape
+                let morph = Math.sin(player.animTimer * 5) * 5;
+                ctx.ellipse(0, 0, 30 + morph, 30 - morph, 0, 0, Math.PI*2);
+                ctx.fill();
+            } 
+            else if (player.state === 'gas') {
+                // Cloud
+                ctx.fillStyle = colors.gas;
+                ctx.shadowColor = colors.gasGlow;
+                ctx.shadowBlur = 20;
+                ctx.globalAlpha = 0.8;
+                for(let i=0; i<5; i++) {
+                    let cx = Math.cos(i + player.animTimer) * 20;
+                    let cy = Math.sin(i + player.animTimer) * 10;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, 15, 0, Math.PI*2);
+                    ctx.fill();
+                }
+            }
+            ctx.restore();
+
+            // Draw Particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= 0.05;
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+    </script>
+</body>
+</html>

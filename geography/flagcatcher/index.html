@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flag Catcher</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: linear-gradient(#87CEEB, #E0F7FA);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            touch-action: none; /* Prevent scrolling on mobile */
+        }
+
+        #game-canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* --- UI OVERLAY --- */
+        #ui-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; /* Let clicks pass through to canvas */
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .hud {
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #333;
+            text-shadow: 2px 2px 0 #fff;
+        }
+
+        .mission-banner {
+            align-self: center;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px 40px;
+            border-radius: 50px;
+            border: 4px solid #333;
+            font-size: 2rem;
+            font-weight: 900;
+            color: #d35400;
+            margin-top: 10px;
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+
+        /* --- SCREENS --- */
+        #start-screen, #game-over-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            pointer-events: auto;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 100;
+        }
+
+        .btn {
+            background: #ffcc00;
+            color: #333;
+            border: none;
+            padding: 20px 60px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            margin-top: 20px;
+            box-shadow: 0 5px 0 #c49a00;
+            transition: transform 0.1s;
+        }
+        .btn:active { transform: translateY(4px); box-shadow: none; }
+
+        .hidden { display: none !important; }
+
+        @keyframes popIn { 0% { transform: scale(0); } 100% { transform: scale(1); } }
+        
+        /* Loading spinner */
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #ffcc00;
+            border-radius: 50%;
+            width: 40px; height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    </style>
+</head>
+<body>
+
+    <div id="ui-layer">
+        <div class="hud">
+            <div>SCORE: <span id="score">0</span></div>
+            <div>LIVES: <span id="lives">❤️❤️❤️</span></div>
+        </div>
+        <div id="mission-display" class="mission-banner hidden">CATCH: EUROPE</div>
+        <div style="flex:1"></div> </div>
+
+    <canvas id="game-canvas"></canvas>
+
+    <div id="start-screen">
+        <h1 style="font-size: 3rem; margin-bottom: 10px;">🚩 FLAG CATCHER</h1>
+        <p>Move your basket to catch the right flags!</p>
+        <div id="loader" class="loader"></div>
+        <button id="start-btn" class="btn hidden" onclick="startGame()">PLAY</button>
+    </div>
+
+    <div id="game-over-screen" class="hidden">
+        <h1 style="color: #ff5555">GAME OVER</h1>
+        <h2>Score: <span id="final-score">0</span></h2>
+        <button class="btn" onclick="startGame()">TRY AGAIN</button>
+    </div>
+
+    <script>
+        // --- CONFIG ---
+        const CANVAS = document.getElementById('game-canvas');
+        const CTX = CANVAS.getContext('2d');
+        
+        // Game State
+        let allCountries = [];
+        let gameActive = false;
+        let score = 0;
+        let lives = 3;
+        let frameCount = 0;
+        let difficulty = 1;
+        
+        // The Mission
+        let currentRegion = "Europe"; // The target region to catch
+        const regions = ["Europe", "Africa", "Asia", "Americas"];
+        let missionTimer = 0;
+
+        // Entities
+        let player = { x: 0, y: 0, w: 100, h: 60, color: '#333' };
+        let fallingFlags = []; // Array of flag objects
+        let particles = []; // Explosion effects
+
+        // Audio
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+
+            if (type === 'catch') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.linearRampToValueAtTime(800, now + 0.1);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'hit') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.linearRampToValueAtTime(50, now + 0.2);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            } else if (type === 'switch') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(600, now);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.5);
+                osc.start(now);
+                osc.stop(now + 0.5);
+            }
+        }
+
+        // --- INIT ---
+        window.onload = async () => {
+            resize();
+            window.addEventListener('resize', resize);
+            
+            // Mouse/Touch Controls
+            window.addEventListener('mousemove', (e) => {
+                player.x = e.clientX - player.w / 2;
+            });
+            window.addEventListener('touchmove', (e) => {
+                player.x = e.touches[0].clientX - player.w / 2;
+                e.preventDefault(); // Stop scrolling
+            }, {passive: false});
+
+            try {
+                const res = await fetch('https://restcountries.com/v3.1/all?fields=name,region,flags,cca2');
+                const data = await res.json();
+                // Preload images logic is hard in single file, so we will use Image objects created on fly
+                // Filter data
+                allCountries = data.filter(c => c.region && c.flags.png);
+                
+                document.getElementById('loader').classList.add('hidden');
+                document.getElementById('start-btn').classList.remove('hidden');
+            } catch (e) {
+                alert("Needs internet to load flags!");
+            }
+        };
+
+        function resize() {
+            CANVAS.width = window.innerWidth;
+            CANVAS.height = window.innerHeight;
+            player.y = CANVAS.height - 80;
+        }
+
+        function startGame() {
+            gameActive = true;
+            score = 0;
+            lives = 3;
+            difficulty = 1;
+            fallingFlags = [];
+            particles = [];
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-over-screen').classList.add('hidden');
+            document.getElementById('mission-display').classList.remove('hidden');
+            updateUI();
+            changeMission();
+            gameLoop();
+        }
+
+        function changeMission() {
+            if (!gameActive) return;
+            const prev = currentRegion;
+            // Pick new region different from current
+            do {
+                currentRegion = regions[Math.floor(Math.random() * regions.length)];
+            } while(currentRegion === prev);
+
+            const banner = document.getElementById('mission-display');
+            banner.innerText = "CATCH: " + currentRegion.toUpperCase() + "!";
+            banner.style.color = getColorForRegion(currentRegion);
+            
+            // Visual Pop
+            banner.style.animation = 'none';
+            banner.offsetHeight; /* trigger reflow */
+            banner.style.animation = 'popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+            
+            playSound('switch');
+            
+            // Set timer for next switch (15 seconds)
+            missionTimer = 60 * 15; 
+        }
+
+        function getColorForRegion(reg) {
+            if(reg === 'Europe') return '#2980b9';
+            if(reg === 'Africa') return '#d35400';
+            if(reg === 'Asia') return '#8e44ad';
+            if(reg === 'Americas') return '#27ae60';
+            return '#333';
+        }
+
+        // --- GAME LOOP ---
+        function gameLoop() {
+            if (!gameActive) return;
+
+            CTX.clearRect(0, 0, CANVAS.width, CANVAS.height);
+            frameCount++;
+            missionTimer--;
+
+            // Switch mission periodically
+            if (missionTimer <= 0) changeMission();
+
+            // Spawn Flags
+            if (frameCount % (60 - Math.min(40, score)) === 0) {
+                spawnFlag();
+            }
+
+            // Draw Player Basket
+            drawPlayer();
+
+            // Update & Draw Flags
+            updateFlags();
+
+            // Update & Draw Particles
+            updateParticles();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function spawnFlag() {
+            const country = allCountries[Math.floor(Math.random() * allCountries.length)];
+            const size = 50;
+            const flag = {
+                x: Math.random() * (CANVAS.width - size),
+                y: -60,
+                w: 60,
+                h: 40,
+                dy: 3 + (score * 0.1), // Speed increases with score
+                country: country,
+                img: new Image()
+            };
+            flag.img.src = country.flags.png;
+            fallingFlags.push(flag);
+        }
+
+        function drawPlayer() {
+            // Draw Bucket
+            CTX.fillStyle = '#444';
+            CTX.beginPath();
+            CTX.roundRect(player.x, player.y, player.w, player.h, [0, 0, 20, 20]);
+            CTX.fill();
+            
+            // Decoration
+            CTX.fillStyle = getColorForRegion(currentRegion);
+            CTX.fillRect(player.x, player.y + 10, player.w, 10);
+            
+            CTX.fillStyle = "#fff";
+            CTX.font = "20px Arial";
+            CTX.fillText("BASKET", player.x + 15, player.y + 40);
+        }
+
+        function updateFlags() {
+            for (let i = fallingFlags.length - 1; i >= 0; i--) {
+                let f = fallingFlags[i];
+                f.y += f.dy;
+
+                // Draw Flag
+                try {
+                    if(f.img.complete) CTX.drawImage(f.img, f.x, f.y, f.w, f.h);
+                    else {
+                        CTX.fillStyle = "#fff";
+                        CTX.fillRect(f.x, f.y, f.w, f.h);
+                    }
+                } catch(e){}
+
+                // Collision Detection (Box)
+                if (
+                    f.x < player.x + player.w &&
+                    f.x + f.w > player.x &&
+                    f.y < player.y + player.h &&
+                    f.y + f.h > player.y
+                ) {
+                    // CAUGHT!
+                    handleCatch(f);
+                    fallingFlags.splice(i, 1);
+                    continue;
+                }
+
+                // Missed (Fell off screen)
+                if (f.y > CANVAS.height) {
+                    fallingFlags.splice(i, 1);
+                }
+            }
+        }
+
+        function handleCatch(flag) {
+            // Logic: Is this flag from the current Target Region?
+            let flagRegion = flag.country.region;
+            // Normalize Americas
+            if (flagRegion === "South America" || flagRegion === "North America") flagRegion = "Americas";
+
+            if (flagRegion === currentRegion) {
+                // GOOD CATCH
+                score++;
+                playSound('catch');
+                createExplosion(player.x + player.w/2, player.y, '#fff');
+            } else {
+                // BAD CATCH (Wrong region)
+                lives--;
+                playSound('hit');
+                createExplosion(player.x + player.w/2, player.y, '#ff0000');
+                if (lives <= 0) gameOver();
+            }
+            updateUI();
+        }
+
+        function updateParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= 0.05;
+                
+                CTX.globalAlpha = p.life;
+                CTX.fillStyle = p.color;
+                CTX.beginPath();
+                CTX.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                CTX.fill();
+                CTX.globalAlpha = 1.0;
+
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+        }
+
+        function createExplosion(x, y, color) {
+            for (let i = 0; i < 10; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 10,
+                    vy: (Math.random() - 1) * 10,
+                    life: 1.0,
+                    color: color,
+                    size: Math.random() * 5 + 2
+                });
+            }
+        }
+
+        function updateUI() {
+            document.getElementById('score').innerText = score;
+            let hearts = "";
+            for(let i=0; i<lives; i++) hearts += "❤️";
+            document.getElementById('lives').innerHTML = hearts;
+        }
+
+        function gameOver() {
+            gameActive = false;
+            document.getElementById('game-over-screen').classList.remove('hidden');
+            document.getElementById('final-score').innerText = score;
+        }
+
+    </script>
+</body>
+</html>

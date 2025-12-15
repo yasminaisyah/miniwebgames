@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Geo-Snake: Map Muncher</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #202020;
+            font-family: 'Press Start 2P', cursive; /* Retro Pixel Font */
+            touch-action: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        /* THE GAMEBOY CASE */
+        #console-case {
+            background-color: #c0c0c0;
+            padding: 20px;
+            border-radius: 10px 10px 40px 10px;
+            box-shadow: -5px 5px 10px rgba(0,0,0,0.5), inset 2px 2px 5px rgba(255,255,255,0.5);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 90vw;
+            max-width: 500px;
+        }
+
+        /* THE SCREEN BEZEL */
+        #screen-bezel {
+            background-color: #555;
+            padding: 20px 20px 5px 20px;
+            border-radius: 10px 10px 30px 10px;
+            width: 100%;
+            box-sizing: border-box;
+            margin-bottom: 20px;
+        }
+
+        #screen-glass {
+            background-color: #8b9c0f; /* Classic Green Screen */
+            border: 2px solid #0f380f;
+            width: 100%;
+            position: relative;
+            /* Aspect ratio maintenance roughly */
+            height: 400px; 
+            overflow: hidden;
+            box-shadow: inset 2px 2px 5px rgba(0,0,0,0.2);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            image-rendering: pixelated;
+        }
+
+        /* HUD overlay on the canvas HTML side */
+        #target-display {
+            position: absolute;
+            top: 10px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            color: #0f380f;
+            font-size: 16px;
+            z-index: 10;
+            text-shadow: 1px 1px 0 #9bbc0f;
+        }
+
+        #target-word {
+            font-size: 24px;
+            display: block;
+            margin-top: 5px;
+            text-decoration: underline;
+        }
+
+        /* CONTROLS AREA */
+        #controls-area {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 10px;
+        }
+
+        .d-pad {
+            position: relative;
+            width: 120px;
+            height: 120px;
+        }
+
+        .d-btn {
+            position: absolute;
+            background: #333;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            box-shadow: 0 4px 0 #111;
+            border-radius: 5px;
+        }
+        .d-btn:active { transform: translateY(4px); box-shadow: none; }
+
+        .up { top: 0; left: 40px; }
+        .down { bottom: 0; left: 40px; }
+        .left { top: 40px; left: 0; }
+        .right { top: 40px; right: 0; }
+        .center-d { top: 40px; left: 40px; background: #222; pointer-events: none; border-radius: 0;}
+
+        /* ACTION BUTTONS */
+        .action-grp {
+            display: flex;
+            gap: 15px;
+            transform: rotate(-15deg) translateY(10px);
+        }
+        .a-btn {
+            width: 50px;
+            height: 50px;
+            background: #8b1d1d;
+            border-radius: 50%;
+            color: #fff;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+            cursor: pointer;
+        }
+        .a-btn:active { transform: scale(0.9); }
+
+        /* SCANLINES */
+        .scanlines {
+            position: absolute; top:0; left:0; width:100%; height:100%;
+            background: linear-gradient(rgba(15, 56, 15, 0.1) 50%, transparent 50%);
+            background-size: 100% 4px;
+            pointer-events: none;
+        }
+
+        #start-overlay {
+            position: absolute; top:0; left:0; width:100%; height:100%;
+            background: rgba(139, 156, 15, 0.9);
+            color: #0f380f;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 20;
+            text-align: center;
+        }
+
+        .hidden { display: none !important; }
+
+    </style>
+</head>
+<body>
+
+<div id="console-case">
+    <div id="screen-bezel">
+        <div id="screen-glass">
+            <canvas id="gameCanvas" width="400" height="400"></canvas>
+            <div class="scanlines"></div>
+            
+            <div id="target-display">
+                FIND: <span id="target-word">READY?</span>
+            </div>
+
+            <div id="start-overlay">
+                <h1 style="margin-bottom: 10px;">GEO-SNAKE</h1>
+                <p style="font-size: 12px; line-height: 1.5; margin-bottom: 20px;">
+                    Eat the country<br>shown at the top.<br>Avoid the others!
+                </p>
+                <p style="font-size: 10px;">PRESS 'A' TO START</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="controls-area">
+        <div class="d-pad">
+            <div class="d-btn up" onpointerdown="setDir(0, -1)"></div>
+            <div class="d-btn left" onpointerdown="setDir(-1, 0)"></div>
+            <div class="d-btn center-d"></div>
+            <div class="d-btn right" onpointerdown="setDir(1, 0)"></div>
+            <div class="d-btn down" onpointerdown="setDir(0, 1)"></div>
+        </div>
+        <div class="action-grp">
+            <div class="a-btn" onclick="startGame()">B</div>
+            <div class="a-btn" onclick="startGame()">A</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    /* --- DATASETS --- */
+    const countryNames = [
+        "USA", "Canada", "Mexico", "Brazil", "Peru", "Chile",
+        "France", "UK", "Spain", "Italy", "Germany", "Poland",
+        "China", "Japan", "India", "Iran", "Iraq", "Egypt",
+        "Kenya", "Sudan", "Mali", "Cuba"
+    ];
+
+    /* --- AUDIO (8-Bit Style) --- */
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    function playBeep(type) {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        const t = audioCtx.currentTime;
+
+        if (type === 'move') {
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(100, t);
+            gain.gain.setValueAtTime(0.05, t);
+            gain.gain.linearRampToValueAtTime(0, t + 0.05);
+            osc.start(t); osc.stop(t + 0.05);
+        } else if (type === 'eat') {
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(400, t);
+            osc.frequency.setValueAtTime(600, t + 0.1);
+            gain.gain.setValueAtTime(0.1, t);
+            gain.gain.linearRampToValueAtTime(0, t + 0.2);
+            osc.start(t); osc.stop(t + 0.2);
+        } else if (type === 'crash') {
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(100, t);
+            osc.frequency.exponentialRampToValueAtTime(10, t + 0.5);
+            gain.gain.setValueAtTime(0.2, t);
+            gain.gain.linearRampToValueAtTime(0, t + 0.5);
+            osc.start(t); osc.stop(t + 0.5);
+        }
+    }
+
+    /* --- GAME ENGINE --- */
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const targetEl = document.getElementById('target-word');
+    const overlay = document.getElementById('start-overlay');
+
+    // Grid Settings
+    const gridSize = 20; // 20x20 pixels per cell
+    const tileCount = 20; // 20 tiles wide/high (Total 400x400)
+    
+    let score = 0;
+    let gameInterval;
+    let isRunning = false;
+
+    // Snake
+    let snake = [];
+    let velocity = { x: 0, y: 0 };
+    let nextVelocity = { x: 0, y: 0 }; // Buffer to prevent self-collision on quick turns
+    
+    // Items
+    let items = []; // Array of {x, y, text, isTarget}
+    let currentTargetName = "";
+
+    function initGame() {
+        score = 0;
+        // Start snake in middle
+        snake = [ {x: 10, y: 10}, {x: 10, y: 11}, {x: 10, y: 12} ];
+        velocity = { x: 0, y: -1 }; // Moving up
+        nextVelocity = { x: 0, y: -1 };
+        
+        pickNewMission();
+    }
+
+    function pickNewMission() {
+        // Pick a target
+        currentTargetName = countryNames[Math.floor(Math.random() * countryNames.length)];
+        targetEl.innerText = currentTargetName;
+
+        // Generate 3 items (1 correct, 2 wrong)
+        items = [];
+        
+        // Helper to get random empty spot
+        function getEmptySpot() {
+            let spot;
+            let valid = false;
+            while(!valid) {
+                spot = { x: Math.floor(Math.random() * tileCount), y: Math.floor(Math.random() * tileCount) };
+                // Check collision with snake
+                let hitsSnake = snake.some(s => s.x === spot.x && s.y === spot.y);
+                // Check collision with other items
+                let hitsItem = items.some(i => i.x === spot.x && i.y === spot.y);
+                // Check edges (give some padding for text readability)
+                let edge = (spot.x < 1 || spot.x > tileCount - 4 || spot.y < 1 || spot.y > tileCount - 2);
+                
+                if (!hitsSnake && !hitsItem && !edge) valid = true;
+            }
+            return spot;
+        }
+
+        // Add Target
+        let pos = getEmptySpot();
+        items.push({ x: pos.x, y: pos.y, text: currentTargetName, isTarget: true });
+
+        // Add Decoys
+        for(let i=0; i<2; i++) {
+            let pos = getEmptySpot();
+            let wrongName;
+            do {
+                wrongName = countryNames[Math.floor(Math.random() * countryNames.length)];
+            } while (wrongName === currentTargetName || items.some(it => it.text === wrongName));
+            
+            items.push({ x: pos.x, y: pos.y, text: wrongName, isTarget: false });
+        }
+    }
+
+    function gameLoop() {
+        velocity = nextVelocity;
+
+        // Move Snake
+        let head = { x: snake[0].x + velocity.x, y: snake[0].y + velocity.y };
+
+        // Wall Collision
+        if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
+            gameOver();
+            return;
+        }
+
+        // Self Collision
+        for (let i = 0; i < snake.length; i++) {
+            if (head.x === snake[i].x && head.y === snake[i].y) {
+                gameOver();
+                return;
+            }
+        }
+
+        snake.unshift(head); // Add new head
+
+        // Check Item Eating
+        let ateSomething = false;
+        for (let i = 0; i < items.length; i++) {
+            let item = items[i];
+            // Hitbox check (approximate to grid)
+            if (head.x === item.x && head.y === item.y) {
+                if (item.isTarget) {
+                    // YUM
+                    playBeep('eat');
+                    score++;
+                    ateSomething = true;
+                    // Dont pop tail, so snake grows
+                    pickNewMission();
+                } else {
+                    // POISON
+                    gameOver();
+                    return;
+                }
+                break;
+            }
+        }
+
+        if (!ateSomething) {
+            snake.pop(); // Remove tail if we didn't eat
+            playBeep('move'); // Tick sound
+        }
+
+        draw();
+    }
+
+    function draw() {
+        // Clear Screen (Green)
+        ctx.fillStyle = '#8b9c0f'; 
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Draw faint grid (LCD effect)
+        ctx.strokeStyle = '#9bbc0f';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for(let x=0; x<canvas.width; x+=gridSize) { ctx.moveTo(x,0); ctx.lineTo(x, canvas.height); }
+        for(let y=0; y<canvas.height; y+=gridSize) { ctx.moveTo(0,y); ctx.lineTo(canvas.width, y); }
+        ctx.stroke();
+
+        // Draw Items (Text + Box)
+        ctx.font = '10px "Press Start 2P"';
+        
+        items.forEach(item => {
+            // Box
+            ctx.fillStyle = '#0f380f';
+            ctx.fillRect(item.x * gridSize, item.y * gridSize, gridSize, gridSize);
+            
+            // Text Label
+            ctx.fillStyle = '#0f380f';
+            ctx.fillText(item.text, item.x * gridSize, (item.y * gridSize) - 5);
+        });
+
+        // Draw Snake
+        ctx.fillStyle = '#0f380f';
+        snake.forEach((part, index) => {
+            ctx.fillRect(part.x * gridSize, part.y * gridSize, gridSize-2, gridSize-2);
+        });
+        
+        // Score
+        ctx.fillStyle = '#0f380f';
+        ctx.fillText("SCORE: " + score, 10, canvas.height - 10);
+    }
+
+    function setDir(x, y) {
+        if (!isRunning) return;
+        // Prevent 180 degree turns
+        if (x !== 0 && velocity.x !== 0) return;
+        if (y !== 0 && velocity.y !== 0) return;
+        nextVelocity = { x: x, y: y };
+    }
+
+    // Keyboard controls
+    document.addEventListener('keydown', e => {
+        switch(e.key) {
+            case 'ArrowUp': setDir(0, -1); break;
+            case 'ArrowDown': setDir(0, 1); break;
+            case 'ArrowLeft': setDir(-1, 0); break;
+            case 'ArrowRight': setDir(1, 0); break;
+        }
+    });
+
+    function gameOver() {
+        clearInterval(gameInterval);
+        isRunning = false;
+        playBeep('crash');
+        overlay.classList.remove('hidden');
+        overlay.innerHTML = `<h1>GAME OVER</h1><p>SCORE: ${score}</p><p style="margin-top:20px">PRESS 'A' TO RESTART</p>`;
+    }
+
+    function startGame() {
+        if (isRunning) return;
+        isRunning = true;
+        overlay.classList.add('hidden');
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        initGame();
+        // Speed: 150ms per frame (slow enough for kids)
+        gameInterval = setInterval(gameLoop, 150); 
+    }
+
+</script>
+</body>
+</html>

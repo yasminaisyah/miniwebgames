@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geo-Jumble</title>
+    <style>
+        :root {
+            --wood-light: #deb887;
+            --wood-dark: #8b4513;
+            --bg-creme: #fdf5e6;
+            --text-dark: #3e2723;
+            --green-felt: #2e7d32;
+        }
+
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: var(--bg-creme);
+            background-image: radial-gradient(circle, #eaddca 1px, transparent 1px);
+            background-size: 20px 20px;
+            font-family: 'Georgia', serif;
+            color: var(--text-dark);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            user-select: none;
+        }
+
+        /* --- HEADER & SCORE --- */
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        h1 { margin: 0; font-size: 3rem; letter-spacing: 2px; color: var(--wood-dark); text-shadow: 1px 1px 0px var(--wood-light); }
+        
+        .stats-bar {
+            display: flex;
+            gap: 30px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            background: #fff;
+            padding: 10px 30px;
+            border-radius: 50px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            margin-top: 15px;
+            border: 3px solid var(--wood-light);
+        }
+
+        /* --- GAME BOARD --- */
+        .game-board {
+            background: #fff;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(87, 58, 20, 0.2);
+            width: 100%;
+            max-width: 700px;
+            text-align: center;
+            border: 8px solid var(--wood-dark);
+            position: relative;
+        }
+
+        .answer-slots {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 30px;
+            min-height: 70px;
+            flex-wrap: wrap;
+        }
+
+        .slot {
+            width: 50px; height: 50px;
+            background: #eee;
+            border: 3px dashed #ccc;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: var(--text-dark);
+        }
+
+        .tile-pool {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: var(--green-felt);
+            border-radius: 10px;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.3);
+            min-height: 100px;
+        }
+
+        .tile {
+            width: 50px; height: 50px;
+            background: linear-gradient(to bottom right, var(--wood-light), #cd853f);
+            border: 3px solid var(--wood-dark);
+            border-bottom-width: 6px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: var(--text-dark);
+            cursor: pointer;
+            box-shadow: 0 5px 10px rgba(0,0,0,0.2);
+            transition: transform 0.1s;
+        }
+
+        .tile:active { transform: translateY(4px); border-bottom-width: 3px; }
+        .tile.used { opacity: 0.3; pointer-events: none; transform: scale(0.9); }
+
+        /* --- HINTS --- */
+        .hint-area {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .hint-btn {
+            background: var(--wood-dark);
+            color: var(--wood-light);
+            border: none;
+            padding: 12px 20px;
+            border-radius: 30px;
+            font-weight: bold;
+            cursor: pointer;
+            font-family: inherit;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1rem;
+        }
+        .hint-btn:hover { background: #5d2e0c; }
+        .hint-cost { background: rgba(0,0,0,0.3); padding: 2px 8px; border-radius: 10px; font-size: 0.8rem; }
+
+        .clue-display {
+            margin-top: 10px;
+            font-style: italic;
+            color: #666;
+            min-height: 25px;
+            font-weight: bold;
+        }
+
+        .flag-hint { width: 100px; border: 4px solid var(--wood-dark); display: none; margin: 10px auto; box-shadow: 0 5px 10px rgba(0,0,0,0.2); }
+
+        /* --- CONTROLS --- */
+        .action-btn {
+            background: var(--green-felt);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            font-family: inherit;
+            box-shadow: 0 5px 0 #1b5e20;
+            transition: transform 0.1s;
+            margin: 0 10px;
+        }
+        .action-btn:active { transform: translateY(4px); box-shadow: none; }
+        .btn-clear { background: #d32f2f; box-shadow: 0 5px 0 #b71c1c; }
+
+        /* --- OVERLAYS --- */
+        #game-over-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(253, 245, 230, 0.98);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 100; text-align: center;
+        }
+        .hidden { display: none !important; }
+
+        @keyframes shake { 0% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } 100% { transform: translateX(0); } }
+        .shake { animation: shake 0.4s; }
+
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>GEO-JUMBLE</h1>
+        <div class="stats-bar">
+            <div>Score: <span id="score">0</span></div>
+            <div>Time: <span id="timer">90</span>s</div>
+        </div>
+    </div>
+
+    <div class="game-board" id="game-board">
+        <div class="answer-slots" id="slots-container"></div>
+
+        <img id="flag-clue" class="flag-hint" src="" alt="Flag Hint">
+        <div class="clue-display" id="text-clue"></div>
+
+        <div class="tile-pool" id="pool-container"></div>
+
+        <div style="margin-bottom: 20px;">
+            <button class="action-btn btn-clear" onclick="clearSlots()">Clear</button>
+            <button class="action-btn" onclick="checkAnswer()">Submit!</button>
+        </div>
+
+        <div class="hint-area">
+            <button class="hint-btn" onclick="buyHint('region')">
+                <span>🧭 Region</span> <span class="hint-cost">-10 pts</span>
+            </button>
+            <button class="hint-btn" onclick="buyHint('flag')">
+                <span>🏳️ Flag</span> <span class="hint-cost">-20 pts</span>
+            </button>
+        </div>
+    </div>
+
+    <div id="game-over-screen" class="hidden">
+        <h1>TIME'S UP!</h1>
+        <h2>Final Score: <span id="final-score">0</span></h2>
+        <button class="action-btn" onclick="startGame()">Play Again</button>
+    </div>
+
+    <script>
+        // --- EMBEDDED DATA (No Internet Needed) ---
+        const hardcodedCountries = [
+            { name: "France", region: "Europe", code: "fr" },
+            { name: "Japan", region: "Asia", code: "jp" },
+            { name: "Brazil", region: "Americas", code: "br" },
+            { name: "Canada", region: "Americas", code: "ca" },
+            { name: "Egypt", region: "Africa", code: "eg" },
+            { name: "Italy", region: "Europe", code: "it" },
+            { name: "India", region: "Asia", code: "in" },
+            { name: "Spain", region: "Europe", code: "es" },
+            { name: "China", region: "Asia", code: "cn" },
+            { name: "Kenya", region: "Africa", code: "ke" },
+            { name: "Mexico", region: "Americas", code: "mx" },
+            { name: "Peru", region: "Americas", code: "pe" },
+            { name: "Chile", region: "Americas", code: "cl" },
+            { name: "Norway", region: "Europe", code: "no" },
+            { name: "Sweden", region: "Europe", code: "se" },
+            { name: "Poland", region: "Europe", code: "pl" },
+            { name: "Turkey", region: "Asia", code: "tr" },
+            { name: "Greece", region: "Europe", code: "gr" },
+            { name: "Cuba", region: "Americas", code: "cu" },
+            { name: "Ghana", region: "Africa", code: "gh" },
+            { name: "Iran", region: "Asia", code: "ir" },
+            { name: "Iraq", region: "Asia", code: "iq" },
+            { name: "Yemen", region: "Asia", code: "ye" },
+            { name: "Oman", region: "Asia", code: "om" },
+            { name: "Fiji", region: "Oceania", code: "fj" },
+            { name: "Chad", region: "Africa", code: "td" },
+            { name: "Mali", region: "Africa", code: "ml" },
+            { name: "Laos", region: "Asia", code: "la" }
+        ];
+
+        // --- GAME STATE ---
+        let currentCountry = null;
+        let currentTargetWord = "";
+        let placedLetters = [];
+        let poolLetters = []; 
+        let score = 0;
+        let timeLeft = 90;
+        let timerInterval;
+        let gameActive = false;
+
+        // --- AUDIO ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+
+            if (type === 'click') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(300, now);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'correct') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(600, now);
+                osc.frequency.setValueAtTime(800, now + 0.1);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            } else if (type === 'wrong') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(150, now);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            }
+        }
+
+        // --- LOGIC ---
+        window.onload = startGame;
+
+        function startGame() {
+            score = 0;
+            timeLeft = 90; 
+            updateScore();
+            document.getElementById('game-over-screen').classList.add('hidden');
+            gameActive = true;
+            
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                document.getElementById('timer').innerText = timeLeft;
+                if (timeLeft <= 0) gameOver();
+            }, 1000);
+
+            nextWord();
+        }
+
+        function nextWord() {
+            // Pick Random
+            currentCountry = hardcodedCountries[Math.floor(Math.random() * hardcodedCountries.length)];
+            
+            currentTargetWord = currentCountry.name.toUpperCase();
+            placedLetters = [];
+            
+            // Reset UI
+            document.getElementById('text-clue').innerText = "";
+            document.getElementById('flag-clue').style.display = "none";
+            document.getElementById('slots-container').innerHTML = "";
+            
+            // Slots
+            for(let i=0; i<currentTargetWord.length; i++) {
+                const slot = document.createElement('div');
+                slot.className = 'slot';
+                document.getElementById('slots-container').appendChild(slot);
+            }
+
+            // Shuffle
+            let letters = currentTargetWord.split('');
+            for (let i = letters.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [letters[i], letters[j]] = [letters[j], letters[i]];
+            }
+
+            const poolContainer = document.getElementById('pool-container');
+            poolContainer.innerHTML = '';
+            poolLetters = letters.map((letter, index) => {
+                const tile = document.createElement('div');
+                tile.className = 'tile';
+                tile.innerText = letter;
+                tile.id = 'tile-' + index;
+                tile.onclick = () => handleTileClick(letter, tile.id);
+                poolContainer.appendChild(tile);
+                return { letter, id: tile.id, used: false };
+            });
+        }
+
+        function handleTileClick(letter, tileId) {
+            if (placedLetters.length >= currentTargetWord.length) return;
+            playSound('click');
+            
+            const tileObj = poolLetters.find(t => t.id === tileId);
+            if(tileObj.used) return;
+            tileObj.used = true;
+            document.getElementById(tileId).classList.add('used');
+
+            placedLetters.push({ letter, tileId });
+            updateSlots();
+        }
+
+        function updateSlots() {
+            const slots = document.querySelectorAll('.slot');
+            slots.forEach(s => s.innerText = '');
+            placedLetters.forEach((item, index) => {
+                if (slots[index]) slots[index].innerText = item.letter;
+            });
+        }
+
+        function clearSlots() {
+            if(placedLetters.length === 0) return;
+            playSound('click');
+            placedLetters = [];
+            poolLetters.forEach(t => {
+                t.used = false;
+                document.getElementById(t.id).classList.remove('used');
+            });
+            updateSlots();
+        }
+
+        function checkAnswer() {
+            const currentGuess = placedLetters.map(p => p.letter).join('');
+            
+            if (currentGuess === currentTargetWord) {
+                playSound('correct');
+                score += currentTargetWord.length * 10;
+                updateScore();
+                timeLeft += 10; // Bonus time
+                document.getElementById('timer').innerText = timeLeft;
+                nextWord();
+            } else {
+                playSound('wrong');
+                document.getElementById('game-board').classList.add('shake');
+                setTimeout(() => document.getElementById('game-board').classList.remove('shake'), 400);
+            }
+        }
+
+        function buyHint(type) {
+            if (type === 'region') {
+                if (score < 10) { alert("Need 10 points!"); return; }
+                score -= 10;
+                document.getElementById('text-clue').innerText = `Located in ${currentCountry.region}`;
+            } else if (type === 'flag') {
+                if (score < 20) { alert("Need 20 points!"); return; }
+                score -= 20;
+                const img = document.getElementById('flag-clue');
+                // Using reliable FlagCDN
+                img.src = `https://flagcdn.com/w160/${currentCountry.code}.png`;
+                img.style.display = "block";
+            }
+            updateScore();
+            playSound('click');
+        }
+
+        function updateScore() {
+            document.getElementById('score').innerText = score;
+        }
+
+        function gameOver() {
+            gameActive = false;
+            clearInterval(timerInterval);
+            document.getElementById('final-score').innerText = score;
+            document.getElementById('game-over-screen').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>

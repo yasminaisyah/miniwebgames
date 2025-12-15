@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Pursuit: Agent Zero</title>
+    <style>
+        :root {
+            --paper: #f4f1ea;
+            --ink: #2b2b2b;
+            --red: #d32f2f;
+            --highlight: #ffeb3b;
+            --folder-bg: #c9c0b1;
+        }
+
+        body {
+            margin: 0;
+            padding: 40px 20px; /* Added padding for scrolling space */
+            background-color: #222;
+            background-image: radial-gradient(#333 1px, transparent 1px);
+            background-size: 20px 20px;
+            font-family: 'Courier New', Courier, monospace;
+            min-height: 100vh;
+            color: var(--ink);
+            /* ENABLED SCROLLING HERE: */
+            overflow-y: auto; 
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /* Aligns to top so you can scroll down */
+        }
+
+        /* The Main Dossier Folder */
+        #game-wrapper {
+            width: 100%;
+            max-width: 900px;
+            /* REMOVED FIXED HEIGHT */
+            min-height: 80vh; 
+            background: var(--folder-bg);
+            border-radius: 5px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            margin-top: 20px;
+        }
+
+        /* Top Tab */
+        .folder-tab {
+            position: absolute;
+            top: -30px;
+            left: 20px;
+            width: 200px;
+            height: 40px;
+            background: var(--folder-bg);
+            border-radius: 10px 10px 0 0;
+            text-align: center;
+            padding-top: 5px;
+            font-weight: bold;
+            color: var(--red);
+            box-shadow: 0 -5px 10px rgba(0,0,0,0.2);
+            z-index: 0;
+        }
+
+        /* Paper Sheet inside Folder */
+        .paper-sheet {
+            background: var(--paper);
+            flex: 1; /* Grows to fill folder */
+            margin: 15px;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.1);
+            padding: 30px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            z-index: 10;
+        }
+
+        /* Header UI */
+        header {
+            border-bottom: 2px solid var(--ink);
+            padding-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 20px;
+            flex-wrap: wrap; /* Allows wrapping on mobile */
+            gap: 10px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .stamp {
+            border: 3px solid var(--red);
+            color: var(--red);
+            padding: 5px 10px;
+            font-weight: bold;
+            transform: rotate(-5deg);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+
+        /* Stats Row */
+        .stats-row {
+            display: flex;
+            gap: 20px;
+            font-weight: bold;
+            font-size: 1.1rem;
+            background: rgba(0,0,0,0.05);
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+
+        /* Main Content Grid */
+        .content-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr; /* Side by side on desktop */
+            gap: 25px;
+            margin-bottom: 20px;
+        }
+
+        /* Current Location Box */
+        .location-box {
+            border: 1px solid #aaa;
+            padding: 15px;
+            background: #fff;
+            box-shadow: 5px 5px 0 rgba(0,0,0,0.1);
+        }
+        
+        .location-title {
+            background: var(--ink);
+            color: #fff;
+            padding: 5px;
+            margin: -15px -15px 15px -15px;
+            text-align: center;
+        }
+
+        .flag-large {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            border: 1px solid #000;
+            margin-bottom: 10px;
+        }
+
+        /* Intel / Clues Box */
+        .intel-box {
+            border: 1px solid #aaa;
+            padding: 15px;
+            background: #fff;
+            position: relative;
+            box-shadow: 5px 5px 0 rgba(0,0,0,0.1);
+            min-height: 200px;
+        }
+
+        .typewriter-text {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 8px;
+            height: 15px;
+            background: var(--ink);
+            animation: blink 1s infinite;
+        }
+
+        /* Travel Options */
+        .options-area {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .travel-btn {
+            background: #fff;
+            border: 2px solid var(--ink);
+            padding: 15px;
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-family: inherit;
+            font-size: 1.1rem;
+            box-shadow: 3px 3px 0 rgba(0,0,0,0.1);
+        }
+
+        .travel-btn:hover {
+            background: var(--ink);
+            color: #fff;
+            transform: translate(-2px, -2px);
+            box-shadow: 5px 5px 0 rgba(0,0,0,0.2);
+        }
+
+        .travel-btn img {
+            width: 50px;
+            height: 30px;
+            border: 1px solid #ccc;
+            object-fit: cover;
+        }
+
+        /* Full Screen Overlays */
+        #start-overlay, #game-over-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(34, 34, 34, 0.98);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            text-align: center;
+            padding: 20px;
+            border-radius: 5px; /* Match folder */
+        }
+
+        .big-btn {
+            margin-top: 30px;
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            background: var(--red);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-family: 'Courier New', Courier, monospace;
+            text-transform: uppercase;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        }
+        
+        .big-btn:hover { background: #b71c1c; }
+
+        .hidden { display: none !important; }
+
+        @keyframes blink { 50% { opacity: 0; } }
+
+        /* Fuel Gauge */
+        .fuel-bar {
+            height: 15px;
+            background: #ddd;
+            width: 100%;
+            border: 1px solid #999;
+        }
+        .fuel-fill {
+            height: 100%;
+            background: var(--red);
+            width: 100%;
+            transition: width 0.3s;
+        }
+
+        /* --- MOBILE RESPONSIVENESS --- */
+        @media (max-width: 700px) {
+            .content-grid {
+                grid-template-columns: 1fr; /* Stack vertically on phone */
+            }
+            .options-area {
+                grid-template-columns: 1fr; /* Stack buttons vertically */
+            }
+            body {
+                padding: 10px; /* Less padding on mobile */
+            }
+            h1 {
+                font-size: 1.2rem;
+            }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="game-wrapper">
+        <div class="folder-tab">TOP SECRET</div>
+        
+        <div class="paper-sheet">
+            <header>
+                <div>
+                    <h1>Mission: Global Pursuit</h1>
+                    <small>Agent ID: <span id="agent-id">007</span></small>
+                </div>
+                <div class="stamp">CLASSIFIED</div>
+            </header>
+
+            <div class="stats-row">
+                <div>Suspects Caught: <span id="score">0</span></div>
+                <div style="flex:1; text-align: right; margin-right: 10px;">Fuel:</div>
+                <div style="width: 100px; max-width: 200px;">
+                    <div class="fuel-bar"><div id="fuel-fill" class="fuel-fill"></div></div>
+                </div>
+            </div>
+
+            <div class="content-grid">
+                <div class="location-box">
+                    <div class="location-title">CURRENT LOCATION</div>
+                    <img id="current-flag" src="" class="flag-large" alt="Current Flag">
+                    <h2 id="current-name" style="margin:0; text-align:center;">---</h2>
+                    <p style="text-align:center; font-style:italic; margin-top: 10px;">Secure Uplink Established.</p>
+                </div>
+
+                <div class="intel-box">
+                    <div class="location-title">INTERCEPTED INTEL</div>
+                    <div id="intel-text" class="typewriter-text"></div>
+                    <span class="cursor"></span>
+                </div>
+            </div>
+
+            <h3 style="margin-bottom: 10px; border-bottom: 1px dashed #aaa; padding-bottom: 5px;">SELECT DESTINATION:</h3>
+            <div class="options-area" id="options-container">
+                </div>
+        </div>
+
+        <div id="start-overlay">
+            <h1 style="color: var(--red); font-size: 3rem; margin-bottom: 10px;">GLOBAL PURSUIT</h1>
+            <p style="max-width: 500px; line-height: 1.5; font-size: 1.2rem;">
+                Target is moving between countries.
+                <br>Read the INTEL to deduce the correct destination.
+                <br>Do not run out of Fuel.
+            </p>
+            <button class="big-btn" onclick="startGame()">Accept Mission</button>
+        </div>
+
+        <div id="game-over-overlay" class="hidden">
+            <h1 style="color: var(--red);">MISSION FAILED</h1>
+            <p style="font-size: 1.2rem;">You ran out of fuel.</p>
+            <h2>Suspects Caught: <span id="final-score">0</span></h2>
+            <button class="big-btn" onclick="startGame()">Retry</button>
+        </div>
+    </div>
+
+    <script>
+        // --- GAME VARIABLES ---
+        let allCountries = [];
+        let currentLocation = null;
+        let targetLocation = null;
+        let score = 0;
+        let fuel = 100;
+        let isTyping = false;
+        
+        // --- AUDIO ENGINE ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'type') {
+                // Clicking sound for text
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(800, now);
+                gain.gain.setValueAtTime(0.02, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+                osc.start(now);
+                osc.stop(now + 0.05);
+            } else if (type === 'travel') {
+                // Whoosh
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(200, now);
+                osc.frequency.exponentialRampToValueAtTime(800, now + 0.3);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            } else if (type === 'error') {
+                // Low buzzer
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(100, now);
+                osc.frequency.linearRampToValueAtTime(80, now + 0.4);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.4);
+                osc.start(now);
+                osc.stop(now + 0.4);
+            } else if (type === 'success') {
+                // Chime
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(500, now);
+                osc.frequency.setValueAtTime(800, now + 0.1);
+                gain.gain.setValueAtTime(0.05, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.4);
+                osc.start(now);
+                osc.stop(now + 0.4);
+            }
+        }
+
+        // --- INIT ---
+        window.onload = async () => {
+            const btn = document.querySelector('.big-btn');
+            btn.innerText = "LOADING DATABASE...";
+            try {
+                const res = await fetch('https://restcountries.com/v3.1/all?fields=name,cca3,region,subregion,languages,currencies,borders,flags,population');
+                allCountries = await res.json();
+                btn.innerText = "ACCEPT MISSION";
+            } catch (e) {
+                btn.innerText = "CONNECTION FAILED";
+                console.error(e);
+            }
+        };
+
+        function startGame() {
+            score = 0;
+            fuel = 100;
+            updateFuel();
+            document.getElementById('score').innerText = score;
+            document.getElementById('start-overlay').classList.add('hidden');
+            document.getElementById('game-over-overlay').classList.add('hidden');
+            
+            // Pick random start
+            currentLocation = allCountries[Math.floor(Math.random() * allCountries.length)];
+            generateNextTurn();
+        }
+
+        // --- GAME LOGIC ---
+        function generateNextTurn() {
+            renderCurrentLocation();
+
+            // 1. Determine Target (Neighbor preferred, otherwise random in region)
+            let potentialTargets = [];
+            
+            // Try to find borders first
+            if (currentLocation.borders && currentLocation.borders.length > 0) {
+                potentialTargets = allCountries.filter(c => currentLocation.borders.includes(c.cca3));
+            }
+
+            // If no borders (island) or data missing, pick same region
+            if (potentialTargets.length === 0) {
+                potentialTargets = allCountries.filter(c => c.region === currentLocation.region && c.name.common !== currentLocation.name.common);
+            }
+
+            // Fallback: Anywhere
+            if (potentialTargets.length === 0) potentialTargets = allCountries;
+
+            targetLocation = potentialTargets[Math.floor(Math.random() * potentialTargets.length)];
+
+            // 2. Generate Clues
+            const clues = [];
+            
+            // Clue: Direction/Border (if applicable)
+            if (currentLocation.borders && currentLocation.borders.includes(targetLocation.cca3)) {
+                clues.push(`Target crossed the land border.`);
+            } else {
+                clues.push(`Target took a flight within ${targetLocation.region}.`);
+            }
+
+            // Clue: Currency
+            if (targetLocation.currencies) {
+                const currKey = Object.keys(targetLocation.currencies)[0];
+                const currName = targetLocation.currencies[currKey].name;
+                clues.push(`Suspect exchanged money for ${currName}.`);
+            }
+
+            // Clue: Language
+            if (targetLocation.languages) {
+                const langs = Object.values(targetLocation.languages);
+                clues.push(`Locals here speak ${langs[0]}.`);
+            }
+
+            // Clue: Subregion/Fact
+            clues.push(`The destination is in ${targetLocation.subregion || targetLocation.region}.`);
+            
+            // Randomize and Pick 3 clues
+            const selectedClues = clues.sort(() => 0.5 - Math.random()).slice(0, 3);
+            typeWriterEffect(selectedClues);
+
+            // 3. Generate Options (1 Correct + 3 Wrong)
+            let options = [targetLocation];
+            while (options.length < 4) {
+                const wrong = allCountries[Math.floor(Math.random() * allCountries.length)];
+                if (!options.includes(wrong) && wrong.name.common !== currentLocation.name.common) {
+                    options.push(wrong);
+                }
+            }
+            
+            renderOptions(options.sort(() => 0.5 - Math.random()));
+        }
+
+        function renderCurrentLocation() {
+            document.getElementById('current-flag').src = currentLocation.flags.svg;
+            document.getElementById('current-name').innerText = currentLocation.name.common;
+        }
+
+        function typeWriterEffect(lines) {
+            const el = document.getElementById('intel-text');
+            el.innerHTML = '';
+            let fullText = lines.join('\n\n> ');
+            fullText = '> ' + fullText; // Add initial prompt
+            
+            let i = 0;
+            isTyping = true;
+            
+            const interval = setInterval(() => {
+                if (i < fullText.length) {
+                    el.textContent += fullText.charAt(i);
+                    if(fullText.charAt(i) !== ' ') playSound('type');
+                    i++;
+                } else {
+                    clearInterval(interval);
+                    isTyping = false;
+                }
+            }, 30); // Typing speed
+        }
+
+        function renderOptions(countries) {
+            const container = document.getElementById('options-container');
+            container.innerHTML = '';
+            
+            countries.forEach(c => {
+                const btn = document.createElement('button');
+                btn.className = 'travel-btn';
+                btn.innerHTML = `<img src="${c.flags.svg}"> ${c.name.common}`;
+                btn.onclick = () => handleGuess(c);
+                container.appendChild(btn);
+            });
+        }
+
+        function handleGuess(selectedCountry) {
+            if (isTyping) return; // Wait for intel
+
+            if (selectedCountry.name.common === targetLocation.name.common) {
+                // Correct
+                playSound('success');
+                score++;
+                fuel = Math.min(100, fuel + 15); // Refuel
+                document.getElementById('score').innerText = score;
+                updateFuel();
+                
+                // Move player
+                currentLocation = targetLocation;
+                playSound('travel');
+                generateNextTurn();
+            } else {
+                // Wrong
+                playSound('error');
+                fuel -= 25; // Heavy penalty
+                updateFuel();
+                
+                // Flash red
+                document.getElementById('game-wrapper').style.boxShadow = "0 0 50px red";
+                setTimeout(() => document.getElementById('game-wrapper').style.boxShadow = "0 20px 50px rgba(0,0,0,0.5)", 500);
+
+                if (fuel <= 0) {
+                    gameOver();
+                }
+            }
+        }
+
+        function updateFuel() {
+            const fill = document.getElementById('fuel-fill');
+            fill.style.width = fuel + '%';
+            if (fuel < 30) fill.style.background = '#d32f2f';
+            else fill.style.background = '#2e7d32'; // Green
+        }
+
+        function gameOver() {
+            document.getElementById('final-score').innerText = score;
+            document.getElementById('game-over-overlay').classList.remove('hidden');
+        }
+
+    </script>
+</body>
+</html>

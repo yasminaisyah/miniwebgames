@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Geo-Defenders: Trainee Edition</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;700&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #050505;
+            color: #0f0;
+            font-family: 'Chakra Petch', sans-serif;
+            user-select: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: radial-gradient(circle at center, #1a1a2e 0%, #000 100%);
+            overflow: hidden;
+        }
+
+        /* HUD Elements */
+        .hud-panel {
+            position: absolute;
+            padding: 15px 30px;
+            border-radius: 10px;
+            border: 3px solid #00d2ff;
+            background: rgba(0, 20, 40, 0.8);
+            box-shadow: 0 0 15px #00d2ff;
+            color: #fff;
+            text-transform: uppercase;
+            z-index: 5;
+            font-weight: bold;
+        }
+
+        #score-board { top: 20px; left: 20px; font-size: 28px; }
+        #lives-board { top: 20px; right: 20px; font-size: 28px; border-color: #ff0055; box-shadow: 0 0 15px #ff0055; }
+        
+        #emp-status {
+            position: absolute;
+            bottom: 120px;
+            width: 100%;
+            text-align: center;
+            font-size: 20px;
+            color: #ffcc00;
+            text-shadow: 0 0 5px #ffcc00;
+            z-index: 5;
+            opacity: 0.8;
+        }
+
+        #input-zone {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 500px;
+            text-align: center;
+            z-index: 5;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 20px;
+            font-family: 'Chakra Petch', sans-serif;
+            font-size: 32px;
+            font-weight: bold;
+            background: rgba(0, 0, 0, 0.8);
+            border: 3px solid #00ff00;
+            border-radius: 50px;
+            color: #00ff00;
+            outline: none;
+            text-align: center;
+            text-transform: uppercase;
+            box-shadow: 0 0 20px #00ff00;
+            letter-spacing: 2px;
+        }
+
+        input.error {
+            border-color: #f00;
+            background: rgba(50, 0, 0, 0.8);
+            animation: shake 0.3s;
+        }
+
+        @keyframes shake {
+            0% { transform: translateX(-50%) translateX(0); }
+            25% { transform: translateX(-50%) translateX(-10px); }
+            75% { transform: translateX(-50%) translateX(10px); }
+            100% { transform: translateX(-50%) translateX(0); }
+        }
+
+        #overlay-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+        }
+
+        h1 {
+            font-size: 70px;
+            color: #00d2ff;
+            text-shadow: 0 0 30px #00d2ff;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        p { font-size: 24px; color: #fff; margin-bottom: 40px; text-align: center; max-width: 700px; line-height: 1.6; }
+
+        .key-hint {
+            color: #ffcc00;
+            font-weight: bold;
+            border: 1px solid #ffcc00;
+            padding: 2px 8px;
+            border-radius: 5px;
+        }
+
+        button {
+            padding: 20px 60px;
+            font-family: 'Chakra Petch', sans-serif;
+            font-size: 30px;
+            font-weight: bold;
+            background: #00d2ff;
+            color: #000;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 0 30px #00d2ff;
+            transition: 0.2s;
+        }
+
+        button:hover { transform: scale(1.1); background: #fff; }
+        .hidden { display: none !important; }
+
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="score-board" class="hud-panel">Score: <span id="score-val">0</span></div>
+    <div id="lives-board" class="hud-panel">Shield: <span id="lives-val">100%</span></div>
+    <div id="emp-status">PRESS <span class="key-hint">SPACE</span> FOR EMERGENCY BLAST (-20% SHIELD)</div>
+
+    <div id="input-zone">
+        <input type="text" id="answer-input" placeholder="TYPE THE GREEN WORD" autocomplete="off" spellcheck="false">
+    </div>
+
+    <div id="overlay-screen">
+        <h1 id="title-text">GEO-DEFENDERS</h1>
+        <p>
+            Meteors are falling! <br>
+            Type the <b>GREEN WORD</b> (the Capital City) shown on the meteor to destroy it.<br><br>
+            Example: If you see "FRANCE [PARIS]", type <b>PARIS</b>.
+        </p>
+        <button id="start-btn">START MISSION</button>
+    </div>
+</div>
+
+<script>
+    /* --- DATA: SIMPLIFIED FOR KIDS (Major Countries) --- */
+    const geoData = [
+        {country: "USA", capital: "Washington"},
+        {country: "UK", capital: "London"},
+        {country: "France", capital: "Paris"},
+        {country: "Germany", capital: "Berlin"},
+        {country: "Japan", capital: "Tokyo"},
+        {country: "China", capital: "Beijing"},
+        {country: "Russia", capital: "Moscow"},
+        {country: "Italy", capital: "Rome"},
+        {country: "Spain", capital: "Madrid"},
+        {country: "Canada", capital: "Ottawa"},
+        {country: "Australia", capital: "Canberra"},
+        {country: "Brazil", capital: "Brasilia"},
+        {country: "India", capital: "Delhi"}, // Simplified
+        {country: "Egypt", capital: "Cairo"},
+        {country: "Mexico", capital: "Mexico City"},
+        {country: "Turkey", capital: "Ankara"},
+        {country: "Greece", capital: "Athens"},
+        {country: "Norway", capital: "Oslo"},
+        {country: "Sweden", capital: "Stockholm"},
+        {country: "Peru", capital: "Lima"},
+        {country: "Chile", capital: "Santiago"},
+        {country: "Iran", capital: "Tehran"},
+        {country: "Iraq", capital: "Baghdad"},
+        {country: "Vietnam", capital: "Hanoi"},
+        {country: "Thailand", capital: "Bangkok"},
+        {country: "Kenya", capital: "Nairobi"},
+        {country: "Poland", capital: "Warsaw"},
+        {country: "Portugal", capital: "Lisbon"},
+        {country: "Austria", capital: "Vienna"},
+        {country: "Ireland", capital: "Dublin"},
+        {country: "Cuba", capital: "Havana"}
+    ];
+
+    /* --- AUDIO SYSTEM --- */
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    function playSound(type) {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        const now = audioCtx.currentTime;
+
+        if (type === 'laser') {
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(600, now);
+            osc.frequency.exponentialRampToValueAtTime(1200, now + 0.1);
+            gainNode.gain.setValueAtTime(0.2, now);
+            gainNode.gain.linearRampToValueAtTime(0, now + 0.1);
+            osc.start(now);
+            osc.stop(now + 0.1);
+        } else if (type === 'explosion') {
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(100, now);
+            osc.frequency.exponentialRampToValueAtTime(10, now + 0.3);
+            gainNode.gain.setValueAtTime(0.2, now);
+            gainNode.gain.linearRampToValueAtTime(0, now + 0.3);
+            osc.start(now);
+            osc.stop(now + 0.3);
+        } else if (type === 'emp') {
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(50, now);
+            osc.frequency.linearRampToValueAtTime(800, now + 0.5);
+            gainNode.gain.setValueAtTime(0.3, now);
+            gainNode.gain.linearRampToValueAtTime(0, now + 0.5);
+            osc.start(now);
+            osc.stop(now + 0.5);
+        } else if (type === 'gameover') {
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(300, now);
+            osc.frequency.linearRampToValueAtTime(50, now + 2);
+            gainNode.gain.setValueAtTime(0.3, now);
+            gainNode.gain.linearRampToValueAtTime(0, now + 2);
+            osc.start(now);
+            osc.stop(now + 2);
+        }
+    }
+
+    /* --- GAME LOGIC --- */
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const input = document.getElementById('answer-input');
+    const scoreVal = document.getElementById('score-val');
+    const livesVal = document.getElementById('lives-val');
+    const overlay = document.getElementById('overlay-screen');
+    const startBtn = document.getElementById('start-btn');
+    const titleText = document.getElementById('title-text');
+
+    let animationId;
+    let score = 0;
+    let lives = 100;
+    let gameActive = false;
+    let spawnRate = 3500; // Slower spawn rate for kids
+    let lastSpawn = 0;
+    
+    let meteors = [];
+    let particles = [];
+    let availableCountries = [];
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    function shuffleDeck() {
+        availableCountries = [...geoData];
+        availableCountries.sort(() => Math.random() - 0.5);
+    }
+
+    class Meteor {
+        constructor() {
+            if (availableCountries.length === 0) shuffleDeck();
+            const data = availableCountries.pop();
+            this.country = data.country;
+            this.capital = data.capital;
+            
+            this.x = Math.random() * (canvas.width - 200) + 100;
+            this.y = -60;
+            // Slower speed for kids (0.3 to 0.8)
+            this.speed = Math.random() * 0.5 + 0.3; 
+            this.radius = 40;
+            this.color = '#fff';
+            this.destroyed = false;
+        }
+
+        update() {
+            this.y += this.speed;
+        }
+
+        draw() {
+            // Glow
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = '#00d2ff';
+
+            // Meteor Body
+            ctx.fillStyle = '#111';
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#00d2ff';
+            ctx.stroke();
+
+            // Text
+            ctx.textAlign = 'center';
+            ctx.shadowBlur = 0;
+            
+            // Draw Country (Top, Smaller)
+            ctx.font = 'bold 16px "Chakra Petch"';
+            ctx.fillStyle = '#aaa';
+            ctx.fillText(this.country.toUpperCase(), this.x, this.y - 10);
+
+            // Draw Capital (Bottom, Bright, Target)
+            ctx.font = 'bold 24px "Chakra Petch"';
+            ctx.fillStyle = '#0f0';
+            ctx.fillText(this.capital.toUpperCase(), this.x, this.y + 18);
+        }
+    }
+
+    class Particle {
+        constructor(x, y) {
+            this.x = x;
+            this.y = y;
+            this.vx = (Math.random() - 0.5) * 15;
+            this.vy = (Math.random() - 0.5) * 15;
+            this.life = 1.0;
+            this.color = `hsl(${Math.random()*60 + 160}, 100%, 50%)`; // Blue/Cyan colors
+        }
+        update() {
+            this.x += this.vx;
+            this.y += this.vy;
+            this.life -= 0.03;
+        }
+        draw() {
+            ctx.globalAlpha = this.life;
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, 5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+        }
+    }
+
+    function spawnMeteor(timestamp) {
+        if (timestamp - lastSpawn > spawnRate) {
+            meteors.push(new Meteor());
+            lastSpawn = timestamp;
+            // Cap speed increase so it doesn't get impossible
+            if (spawnRate > 1500) spawnRate -= 20; 
+        }
+    }
+
+    function createExplosion(x, y) {
+        for(let i=0; i<20; i++) particles.push(new Particle(x, y));
+    }
+
+    function checkInput() {
+        const val = input.value.trim().toLowerCase();
+        let hit = false;
+        
+        meteors.forEach(m => {
+            if (m.capital.toLowerCase() === val) {
+                m.destroyed = true;
+                hit = true;
+                score += 50;
+                scoreVal.innerText = score;
+                createExplosion(m.x, m.y);
+                playSound('laser');
+                playSound('explosion');
+                
+                // Laser beam visual
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.strokeStyle = '#00ff00';
+                ctx.lineWidth = 8;
+                ctx.beginPath();
+                ctx.moveTo(canvas.width/2, canvas.height);
+                ctx.lineTo(m.x, m.y);
+                ctx.stroke();
+                ctx.globalCompositeOperation = 'source-over';
+            }
+        });
+
+        if (hit) {
+            input.value = '';
+            input.classList.remove('error');
+        }
+    }
+
+    // Emergency EMP (Spacebar)
+    document.addEventListener('keydown', (e) => {
+        if (e.code === 'Space' && gameActive) {
+            e.preventDefault(); 
+            if (lives > 20) {
+                lives -= 20;
+                livesVal.innerText = lives + "%";
+                score -= 50; // Penalty
+                scoreVal.innerText = score;
+                playSound('emp');
+                
+                // Destroy all on screen
+                meteors.forEach(m => {
+                    m.destroyed = true;
+                    createExplosion(m.x, m.y);
+                });
+                
+                // Flash screen white
+                ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                ctx.fillRect(0,0,canvas.width, canvas.height);
+            }
+        }
+    });
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            const val = input.value.trim().toLowerCase();
+            let found = false;
+            meteors.forEach(m => { if (m.capital.toLowerCase() === val) found = true; });
+            
+            if(!found && val !== "") {
+                input.classList.add('error');
+                setTimeout(() => input.classList.remove('error'), 300);
+            }
+        }
+    });
+
+    input.addEventListener('input', checkInput);
+
+    function loop(timestamp) {
+        if (!gameActive) return;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw Player Turret
+        ctx.fillStyle = '#002244';
+        ctx.beginPath();
+        ctx.arc(canvas.width/2, canvas.height + 100, 150, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#00d2ff';
+        ctx.lineWidth = 4;
+        ctx.stroke();
+
+        spawnMeteor(timestamp);
+
+        meteors.forEach((m) => {
+            m.update();
+            m.draw();
+
+            if (m.y > canvas.height - 50 && !m.destroyed) {
+                lives -= 10;
+                livesVal.innerText = lives + "%";
+                createExplosion(m.x, m.y);
+                playSound('explosion');
+                m.destroyed = true;
+
+                if (lives <= 0) endGame();
+            }
+        });
+
+        meteors = meteors.filter(m => !m.destroyed);
+
+        particles.forEach((p, index) => {
+            p.update();
+            p.draw();
+            if (p.life <= 0) particles.splice(index, 1);
+        });
+
+        animationId = requestAnimationFrame(loop);
+    }
+
+    function startGame() {
+        score = 0;
+        lives = 100;
+        spawnRate = 3500;
+        meteors = [];
+        particles = [];
+        shuffleDeck();
+        
+        scoreVal.innerText = "0";
+        livesVal.innerText = "100%";
+        input.value = "";
+        
+        gameActive = true;
+        overlay.classList.add('hidden');
+        input.focus();
+        
+        if(audioCtx.state === 'suspended') audioCtx.resume();
+        lastSpawn = performance.now();
+        loop(performance.now());
+    }
+
+    function endGame() {
+        gameActive = false;
+        cancelAnimationFrame(animationId);
+        playSound('gameover');
+        titleText.innerText = "GAME OVER";
+        document.querySelector('#overlay-screen p').innerHTML = `Great effort!<br>Final Score: ${score}`;
+        startBtn.innerText = "TRY AGAIN";
+        overlay.classList.remove('hidden');
+    }
+
+    startBtn.addEventListener('click', startGame);
+
+</script>
+</body>
+</html>

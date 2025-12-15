@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Aero-Drop: Global Delivery</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --sky-1: #4facfe;
+            --sky-2: #00f2fe;
+            --ground: #4CAF50;
+            --wood: #8D6E63;
+            --wood-dark: #6D4C41;
+            --ui-bg: #ffffff;
+            --correct: #00E676;
+            --wrong: #FF5252;
+            --accent: #FFC107;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Fredoka One', cursive;
+            background: linear-gradient(to bottom, var(--sky-1), var(--sky-2));
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- BACKGROUND ANIMATION --- */
+        .scenery-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .cloud {
+            position: absolute;
+            background: rgba(255,255,255,0.8);
+            border-radius: 50px;
+            animation: moveCloud linear infinite;
+        }
+
+        @keyframes moveCloud {
+            from { left: 110%; }
+            to { left: -50%; }
+        }
+
+        /* --- HEADER UI --- */
+        #hud {
+            position: absolute;
+            top: 10px;
+            left: 0;
+            width: 100%;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            z-index: 100;
+        }
+
+        .stat-capsule {
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(5px);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 30px;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border: 2px solid rgba(255,255,255,0.3);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        /* --- QUESTION BANNER (FIXED) --- */
+        #question-panel {
+            position: absolute;
+            top: 70px; /* Fixed below HUD */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 500px;
+            z-index: 90;
+            display: flex;
+            justify-content: center;
+        }
+
+        .bubble {
+            background: white;
+            padding: 15px 25px;
+            border-radius: 20px;
+            color: #333;
+            font-size: 1.2rem;
+            text-align: center;
+            box-shadow: 0 8px 0 rgba(0,0,0,0.1);
+            position: relative;
+            line-height: 1.4;
+            border: 3px solid #fff;
+        }
+        
+        /* Little triangle pointing down */
+        .bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 10px 10px 0;
+            border-style: solid;
+            border-color: white transparent transparent transparent;
+        }
+
+        /* --- GAME AREA --- */
+        #game-stage {
+            flex-grow: 1;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+
+        /* The Plane SVG Container - Lowered */
+        #plane-container {
+            position: absolute;
+            top: 40%; /* Lowered from 15% so it's visible */
+            width: 200px;
+            height: 100px;
+            z-index: 20;
+            animation: flyHover 3s ease-in-out infinite;
+        }
+
+        @keyframes flyHover {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-15px) rotate(1deg); }
+        }
+
+        /* The Cargo Crate */
+        #crate-wrapper {
+            position: absolute;
+            top: 60px; /* Below plane */
+            left: 60px;
+            width: 80px;
+            height: 80px;
+            z-index: 19;
+            transition: transform 0.5s ease-in;
+        }
+
+        .crate {
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(45deg, var(--wood), var(--wood) 10px, var(--wood-dark) 10px, var(--wood-dark) 20px);
+            border: 4px solid var(--wood-dark);
+            border-radius: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+            position: relative;
+        }
+
+        .crate::after {
+            content: 'FRAGILE';
+            position: absolute;
+            font-size: 10px;
+            color: rgba(0,0,0,0.5);
+            transform: rotate(-15deg);
+            border: 2px solid rgba(0,0,0,0.5);
+            padding: 2px 5px;
+            border-radius: 4px;
+        }
+
+        .crate-icon {
+            font-size: 2.5rem;
+            filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3));
+        }
+
+        /* Parachute */
+        .parachute {
+            position: absolute;
+            top: -60px;
+            left: 50%;
+            transform: translateX(-50%) scale(0);
+            width: 80px;
+            height: 60px;
+            background: #fff;
+            border-radius: 50% 50% 0 0;
+            border: 3px solid #eee;
+            z-index: 18;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            opacity: 0;
+        }
+        .parachute::before, .parachute::after {
+            content: '';
+            position: absolute;
+            bottom: -20px;
+            width: 2px;
+            height: 25px;
+            background: #fff;
+        }
+        .parachute::before { left: 10px; transform: rotate(20deg); }
+        .parachute::after { right: 10px; transform: rotate(-20deg); }
+
+        .parachute.open {
+            transform: translateX(-50%) scale(1);
+            opacity: 1;
+        }
+
+        /* Drop Animation Classes */
+        .dropping-left { transform: translate(-150px, 200px) rotate(-10deg); }
+        .dropping-center { transform: translate(0px, 200px); }
+        .dropping-right { transform: translate(150px, 200px) rotate(10deg); }
+
+        /* --- BOTTOM CONTROLS --- */
+        #ground-layer {
+            height: 20px;
+            background: #81C784;
+            width: 100%;
+            position: relative;
+            z-index: 20;
+        }
+        
+        #timer-strip {
+            height: 15px;
+            background: #37474F;
+            width: 100%;
+            position: relative;
+        }
+        #timer-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #FFC107, #FF9800);
+            width: 100%;
+            transition: width 0.1s linear;
+        }
+
+        #controls {
+            background: #263238;
+            padding: 10px;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            height: 160px; /* Fixed height for controls */
+            z-index: 30;
+            padding-bottom: 30px;
+        }
+
+        .landing-pad {
+            background: #fff;
+            border-radius: 15px;
+            position: relative;
+            cursor: pointer;
+            transition: transform 0.1s, background 0.2s;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border-bottom: 6px solid #CFD8DC;
+            overflow: hidden;
+            height: 100%;
+        }
+
+        .landing-pad:active {
+            transform: translateY(4px);
+            border-bottom-width: 4px;
+        }
+
+        .landing-pad-target {
+            width: 30px;
+            height: 30px;
+            border: 3px solid #ccc;
+            border-radius: 50%;
+            margin-bottom: 5px;
+            position: relative;
+        }
+        .landing-pad-target::after {
+            content: 'H';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ccc;
+            font-size: 0.9rem;
+        }
+
+        .landing-text {
+            color: #333;
+            font-size: 1rem;
+            text-align: center;
+            padding: 0 5px;
+            line-height: 1.2;
+        }
+
+        /* Feedback States */
+        .landing-pad.correct { background: #C8E6C9; border-bottom-color: #81C784; }
+        .landing-pad.wrong { background: #FFCDD2; border-bottom-color: #E57373; animation: shake 0.5s; }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        /* SCREENS */
+        .modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            z-index: 200;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            text-align: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        .modal.active { opacity: 1; pointer-events: auto; }
+
+        .btn-main {
+            background: #FFC107;
+            color: #3E2723;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            font-family: inherit;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 6px 0 #FF6F00;
+            margin-top: 20px;
+            transition: transform 0.1s;
+        }
+        .btn-main:active { transform: translateY(6px); box-shadow: none; }
+
+        h1 { font-size: 3rem; margin: 0; text-shadow: 0 4px 0 rgba(0,0,0,0.5); color: #FFC107; }
+        .sub-text { font-size: 1.5rem; margin-bottom: 30px; color: #ddd; }
+
+    </style>
+</head>
+<body>
+
+    <div class="scenery-container" id="clouds"></div>
+
+    <div id="hud">
+        <div class="stat-capsule">
+            <span>📦</span> <span id="score">0</span>
+        </div>
+        <div class="stat-capsule" style="background: rgba(255, 193, 7, 0.3);">
+            <span>⚡</span> <span id="level">1</span>
+        </div>
+    </div>
+
+    <div id="question-panel">
+        <div class="bubble" id="question-bubble">
+            Question Text Here
+        </div>
+    </div>
+
+    <div id="game-stage">
+        
+        <div id="plane-container">
+            <svg viewBox="0 0 200 100" width="200" height="100">
+                <g transform="scale(-1, 1) translate(-200, 0)"> <path fill="#ddd" d="M10,40 L10,60 L0,50 Z">
+                        <animateTransform attributeName="transform" type="rotate" from="0 5 50" to="360 5 50" dur="0.1s" repeatCount="indefinite"/>
+                    </path>
+                    <path fill="#F44336" d="M20,35 L120,35 L160,10 L160,50 L120,65 L20,65 Q0,65 0,50 Q0,35 20,35 Z" />
+                    <path fill="#D32F2F" d="M60,40 L140,40 L130,60 L70,60 Z" />
+                    <path fill="#D32F2F" d="M150,10 L180,10 L160,35 L140,35 Z" />
+                    <path fill="#81D4FA" d="M30,40 L50,40 L50,55 L30,50 Z" />
+                </g>
+            </svg>
+
+            <div id="crate-wrapper">
+                <div class="parachute" id="parachute"></div>
+                <div class="crate">
+                    <span class="crate-icon" id="cargo-icon">🍎</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div id="timer-strip">
+        <div id="timer-fill"></div>
+    </div>
+    <div id="ground-layer"></div>
+    <div id="controls">
+        <div class="landing-pad" id="pad-0" onclick="attemptDrop(0)">
+            <div class="landing-pad-target"></div>
+            <div class="landing-text" id="opt-0">...</div>
+        </div>
+        <div class="landing-pad" id="pad-1" onclick="attemptDrop(1)">
+            <div class="landing-pad-target"></div>
+            <div class="landing-text" id="opt-1">...</div>
+        </div>
+        <div class="landing-pad" id="pad-2" onclick="attemptDrop(2)">
+            <div class="landing-pad-target"></div>
+            <div class="landing-text" id="opt-2">...</div>
+        </div>
+    </div>
+
+    <div id="start-screen" class="modal active">
+        <h1>AERO-DROP</h1>
+        <p class="sub-text">Global Delivery Service</p>
+        <p>Drop the cargo on the correct answer!</p>
+        <button class="btn-main" onclick="initGame()">TAKE OFF</button>
+    </div>
+
+    <div id="game-over-screen" class="modal">
+        <h1 style="color: #FF5252">CRASH!</h1>
+        <p class="sub-text">Final Score: <span id="final-score">0</span></p>
+        <button class="btn-main" onclick="initGame()">RETRY</button>
+    </div>
+
+    <script>
+        // --- DATA ---
+        const db = [
+            { t: 'Landmark', q: 'Where is the Eiffel Tower?', i: '🗼', a: 'France' },
+            { t: 'Landmark', q: 'Pyramids of Giza', i: '🔺', a: 'Egypt' },
+            { t: 'Landmark', q: 'Statue of Liberty', i: '🗽', a: 'USA' },
+            { t: 'Animal', q: 'Where do Kangaroos live?', i: '🦘', a: 'Australia' },
+            { t: 'Food', q: 'Origin of Sushi', i: '🍣', a: 'Japan' },
+            { t: 'Flag', q: 'Red Maple Leaf Flag', i: '🇨🇦', a: 'Canada' },
+            { t: 'Capital', q: 'Capital city is London', i: '🏰', a: 'UK' },
+            { t: 'Nature', q: 'Amazon Rainforest', i: '🌳', a: 'Brazil' },
+            { t: 'Food', q: 'Pizza & Pasta', i: '🍕', a: 'Italy' },
+            { t: 'Landmark', q: 'The Taj Mahal', i: '🕌', a: 'India' },
+            { t: 'Animal', q: 'Home of the Giant Panda', i: '🐼', a: 'China' },
+            { t: 'Nature', q: 'Mount Everest', i: '🏔️', a: 'Nepal' },
+            { t: 'Flag', q: 'Green Circle Flag', i: '🇧🇩', a: 'Bangladesh' },
+            { t: 'Capital', q: 'Capital city is Berlin', i: '🐻', a: 'Germany' },
+            { t: 'Food', q: 'Tacos & Burritos', i: '🌮', a: 'Mexico' },
+            { t: 'Landmark', q: 'Sydney Opera House', i: '🎭', a: 'Australia' },
+            { t: 'Nature', q: 'Sahara Desert', i: '🌵', a: 'Algeria' },
+            { t: 'Animal', q: 'Penguins live here', i: '🐧', a: 'Antarctica' },
+            { t: 'Capital', q: 'Capital city is Moscow', i: '❄️', a: 'Russia' },
+            { t: 'Landmark', q: 'Machu Picchu', i: '⛰️', a: 'Peru' },
+            { t: 'Food', q: 'Croissants', i: '🥐', a: 'France' },
+            { t: 'Flag', q: 'Yellow Star on Red', i: '🇻🇳', a: 'Vietnam' },
+            { t: 'Capital', q: 'Capital city is Madrid', i: '💃', a: 'Spain' },
+            { t: 'Animal', q: 'Lemurs', i: '🐒', a: 'Madagascar' },
+            { t: 'Nature', q: 'Niagara Falls', i: '🌊', a: 'Canada' },
+            { t: 'Capital', q: 'Capital city is Tokyo', i: '🗾', a: 'Japan' },
+            { t: 'Landmark', q: 'The Colosseum', i: '⚔️', a: 'Italy' },
+            { t: 'Food', q: 'Kimchi', i: '🥬', a: 'South Korea' }
+        ];
+
+        const allAnswers = [...new Set(db.map(x => x.a))];
+
+        // --- AUDIO ENGINE ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playTone(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+            
+            if(type === 'win') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(523.25, now); // C
+                osc.frequency.setValueAtTime(659.25, now + 0.1); // E
+                osc.frequency.setValueAtTime(783.99, now + 0.2); // G
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.5);
+                osc.start(now);
+                osc.stop(now + 0.5);
+            } else if (type === 'lose') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.linearRampToValueAtTime(50, now + 0.3);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            } else if (type === 'drop') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.exponentialRampToValueAtTime(100, now + 0.2);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            }
+        }
+
+        // --- GAME VARIABLES ---
+        let score = 0;
+        let level = 1;
+        let currentQ = null;
+        let options = [];
+        let timer = 100;
+        let timerInterval = null;
+        let gameActive = false;
+        let speed = 0.2; // fuel drain speed
+        
+        // --- LOGIC ---
+        function initGame() {
+            score = 0;
+            level = 1;
+            speed = 0.2;
+            document.getElementById('score').innerText = 0;
+            document.getElementById('level').innerText = 1;
+            document.getElementById('start-screen').classList.remove('active');
+            document.getElementById('game-over-screen').classList.remove('active');
+            gameActive = true;
+            nextRound();
+            startLoop();
+        }
+
+        function nextRound() {
+            // Reset visual
+            const crate = document.getElementById('crate-wrapper');
+            crate.className = ''; // remove drop classes
+            crate.style.transform = ''; // reset transform
+            document.getElementById('parachute').classList.remove('open');
+
+            // Difficulty Scaling
+            if(score > 0 && score % 50 === 0) {
+                level++;
+                speed += 0.05;
+                document.getElementById('level').innerText = level;
+            }
+
+            // Pick Question
+            currentQ = db[Math.floor(Math.random() * db.length)];
+            document.getElementById('question-bubble').innerText = currentQ.q;
+            document.getElementById('cargo-icon').innerText = currentQ.i;
+
+            // Generate Options
+            let wrongs = allAnswers.filter(a => a !== currentQ.a);
+            // Shuffle wrongs and take 2
+            wrongs.sort(() => Math.random() - 0.5);
+            options = [currentQ.a, wrongs[0], wrongs[1]];
+            options.sort(() => Math.random() - 0.5);
+
+            // Set UI
+            for(let i=0; i<3; i++) {
+                const pad = document.getElementById('pad-'+i);
+                pad.className = 'landing-pad'; // reset
+                pad.style.pointerEvents = 'auto';
+                document.getElementById('opt-'+i).innerText = options[i];
+                pad.style.opacity = '1';
+            }
+
+            // Reset Timer
+            timer = 100;
+        }
+
+        function startLoop() {
+            if(timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if(!gameActive) return;
+                timer -= speed;
+                document.getElementById('timer-fill').style.width = timer + '%';
+                
+                if(timer < 30) document.getElementById('timer-fill').style.background = '#FF5252';
+                else document.getElementById('timer-fill').style.background = 'linear-gradient(90deg, #FFC107, #FF9800)';
+
+                if(timer <= 0) gameOver();
+            }, 30);
+        }
+
+        function attemptDrop(index) {
+            if(!gameActive) return;
+            
+            // Disable clicks
+            document.querySelectorAll('.landing-pad').forEach(p => p.style.pointerEvents = 'none');
+
+            const choice = options[index];
+            const isCorrect = (choice === currentQ.a);
+            const pad = document.getElementById('pad-'+index);
+            const crate = document.getElementById('crate-wrapper');
+
+            playTone('drop');
+
+            // 1. VISUAL DROP ANIMATION
+            // Determine direction
+            if(index === 0) crate.classList.add('dropping-left');
+            else if(index === 1) crate.classList.add('dropping-center');
+            else crate.classList.add('dropping-right');
+
+            // Open Parachute mid-air
+            setTimeout(() => {
+                document.getElementById('parachute').classList.add('open');
+            }, 100);
+
+            // 2. LANDING LOGIC
+            setTimeout(() => {
+                if(isCorrect) {
+                    pad.classList.add('correct');
+                    playTone('win');
+                    score += 10;
+                    document.getElementById('score').innerText = score;
+                    setTimeout(nextRound, 1000);
+                } else {
+                    pad.classList.add('wrong');
+                    playTone('lose');
+                    // Shake screen
+                    document.body.style.transform = "translateX(5px)";
+                    setTimeout(() => document.body.style.transform = "translateX(0)", 100);
+                    
+                    // Game Over on wrong answer? Or Penalty?
+                    // Let's do Penalty for better flow
+                    timer -= 30; // Huge fuel penalty
+                    pad.style.opacity = '0.5';
+                    
+                    // Allow retry if alive
+                    if(timer > 0) {
+                        // Reset crate slightly
+                        crate.className = '';
+                        document.getElementById('parachute').classList.remove('open');
+                        // Re-enable other pads
+                         document.querySelectorAll('.landing-pad').forEach((p, idx) => {
+                             if(idx !== index) p.style.pointerEvents = 'auto';
+                         });
+                    }
+                }
+            }, 600); // Wait for drop animation
+        }
+
+        function gameOver() {
+            gameActive = false;
+            clearInterval(timerInterval);
+            document.getElementById('final-score').innerText = score;
+            document.getElementById('game-over-screen').classList.add('active');
+        }
+
+        // Generate Clouds
+        const cloudContainer = document.getElementById('clouds');
+        for(let i=0; i<8; i++) {
+            let c = document.createElement('div');
+            c.className = 'cloud';
+            c.style.width = (Math.random()*100 + 50) + 'px';
+            c.style.height = (Math.random()*40 + 20) + 'px';
+            c.style.top = (Math.random()*50) + '%';
+            c.style.animationDuration = (Math.random()*10 + 10) + 's';
+            c.style.animationDelay = (Math.random()*-20) + 's';
+            cloudContainer.appendChild(c);
+        }
+
+    </script>
+</body>
+</html>

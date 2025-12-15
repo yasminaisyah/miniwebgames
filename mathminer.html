@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Math Miner: Deep Dig</title>
+    <link href="https://fonts.googleapis.com/css2?family=Changa+One&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-deep: #2c1e19;
+            --rock-color: #5d4037;
+            --rock-light: #795548;
+            --ui-panel: #263238;
+            --accent: #ffb300;
+            --gem: #00bcd4;
+            --wrong: #d32f2f;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-deep);
+            color: white;
+            font-family: 'Changa One', sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* --- BACKGROUND ANIMATION --- */
+        #shaft-bg {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-image: 
+                linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.8)),
+                url('data:image/svg+xml;utf8,<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><g fill="%233e2723" fill-opacity="0.4"><circle cx="10" cy="10" r="5"/><circle cx="50" cy="60" r="8"/><circle cx="80" cy="30" r="4"/><circle cx="20" cy="80" r="6"/></g></svg>');
+            background-repeat: repeat;
+            z-index: 0;
+            transition: background-position 0.2s;
+        }
+
+        /* --- UI HEADER --- */
+        #hud {
+            position: relative;
+            z-index: 20;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+        }
+
+        .stat-box {
+            font-size: 1.5rem;
+            text-shadow: 2px 2px 0 #000;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* --- GAME STAGE --- */
+        #game-area {
+            flex-grow: 1;
+            position: relative;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: visible;
+        }
+
+        /* The Drill Machine */
+        #drill-container {
+            width: 120px;
+            height: 140px;
+            position: absolute;
+            top: 20px; /* Fixed position */
+            z-index: 30;
+            filter: drop-shadow(0 10px 10px rgba(0,0,0,0.5));
+            transition: transform 0.1s;
+        }
+
+        .drill-body {
+            fill: #ffb300;
+            stroke: #3e2723;
+            stroke-width: 3;
+        }
+        
+        .drill-head {
+            fill: #cfd8dc;
+            stroke: #455a64;
+            stroke-width: 2;
+            transform-origin: 60px 100px;
+        }
+
+        .spinning { animation: spinDrill 0.1s linear infinite; }
+        
+        @keyframes spinDrill {
+            from { transform: translateX(-2px); }
+            to { transform: translateX(2px); }
+        }
+
+        /* The Rock (Question) */
+        #rock-container {
+            position: absolute;
+            top: 140px; /* Below drill */
+            width: 260px;
+            height: 200px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 25;
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .rock-visual {
+            width: 100%;
+            height: 100%;
+            background: var(--rock-color);
+            border-radius: 20px 20px 40px 40px;
+            box-shadow: inset 10px 10px 0 var(--rock-light), 0 10px 20px rgba(0,0,0,0.5);
+            border: 5px solid #3e2723;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cracked {
+            background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0,0,0,0.2) 10px, rgba(0,0,0,0.2) 12px);
+        }
+
+        #math-display {
+            font-size: 3.5rem;
+            color: white;
+            text-shadow: 3px 3px 0 #000;
+            z-index: 2;
+            text-align: center;
+        }
+
+        /* Particles */
+        .particle {
+            position: absolute;
+            background: var(--rock-light);
+            border: 2px solid var(--rock-color);
+            width: 20px; 
+            height: 20px;
+            z-index: 40;
+            pointer-events: none;
+        }
+
+        /* --- CONTROLS --- */
+        #control-deck {
+            position: relative;
+            z-index: 20;
+            background: var(--ui-panel);
+            padding: 20px;
+            border-top: 5px solid #455a64;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+            height: 160px;
+        }
+
+        .drill-btn {
+            background: linear-gradient(to bottom, #cfd8dc, #b0bec5);
+            border: none;
+            border-radius: 10px;
+            border-bottom: 8px solid #78909c;
+            color: #263238;
+            font-family: inherit;
+            font-size: 2rem;
+            cursor: pointer;
+            transition: transform 0.1s, border 0.1s;
+            position: relative;
+        }
+
+        .drill-btn:active {
+            transform: translateY(5px);
+            border-bottom-width: 3px;
+        }
+
+        .drill-btn::before {
+            content: '';
+            position: absolute;
+            top: -10px; left: 50%; transform: translateX(-50%);
+            width: 0; height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-bottom: 10px solid #cfd8dc;
+        }
+
+        /* Fuel Bar */
+        #fuel-gauge {
+            position: absolute;
+            bottom: 160px; /* Above controls */
+            left: 20px; right: 20px;
+            height: 20px;
+            background: rgba(0,0,0,0.5);
+            border-radius: 10px;
+            overflow: hidden;
+            border: 2px solid #546e7a;
+            z-index: 20;
+        }
+        #fuel-fill {
+            height: 100%;
+            background: #ffb300;
+            width: 100%;
+            transition: width 0.2s linear;
+        }
+
+        /* --- ANIMATIONS --- */
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+
+        .screen-shake {
+            animation: shake 0.5s;
+        }
+
+        /* SCREENS */
+        .modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            text-align: center;
+        }
+        .hidden { display: none; }
+
+        h1 { color: #ffb300; font-size: 3rem; margin: 0 0 20px 0; text-transform: uppercase; letter-spacing: 2px; }
+        .btn-start {
+            background: #ffb300;
+            color: #3e2723;
+            border: none;
+            padding: 20px 50px;
+            font-size: 1.5rem;
+            font-family: inherit;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 5px 0 #ff6f00;
+        }
+        .btn-start:active { transform: translateY(5px); box-shadow: none; }
+
+    </style>
+</head>
+<body>
+
+    <div id="shaft-bg"></div>
+
+    <div id="hud">
+        <div class="stat-box">DEPTH: <span id="score">0</span>m</div>
+        <div class="stat-box">⚡ <span id="level">1</span></div>
+    </div>
+
+    <div id="game-area">
+        
+        <div id="drill-container">
+            <svg viewBox="0 0 120 140">
+                <rect x="20" y="0" width="80" height="80" rx="10" class="drill-body" />
+                <circle cx="60" cy="40" r="15" fill="#3e2723" opacity="0.5"/>
+                <path d="M40,80 L80,80 L60,130 Z" class="drill-head" />
+                <path d="M45,85 L75,85 L60,120 Z" fill="none" stroke="#546e7a" stroke-width="2" opacity="0.5" />
+            </svg>
+        </div>
+
+        <div id="rock-container">
+            <div class="rock-visual" id="rock-vis">
+                <span id="math-display">2 + 2</span>
+            </div>
+        </div>
+
+    </div>
+
+    <div id="fuel-gauge"><div id="fuel-fill"></div></div>
+
+    <div id="control-deck">
+        <button class="drill-btn" id="btn-0" onclick="handleInput(0)">?</button>
+        <button class="drill-btn" id="btn-1" onclick="handleInput(1)">?</button>
+        <button class="drill-btn" id="btn-2" onclick="handleInput(2)">?</button>
+    </div>
+
+    <div id="start-screen" class="modal">
+        <h1>MATH MINER</h1>
+        <p style="font-size: 1.2rem; margin-bottom: 30px; color: #ccc;">Solve to Dig Deeper!</p>
+        <button class="btn-start" onclick="startGame()">START DIGGING</button>
+    </div>
+
+    <div id="game-over-screen" class="modal hidden">
+        <h1 style="color: #ef5350;">OUT OF FUEL</h1>
+        <p style="font-size: 1.5rem;">Depth Reached: <span id="final-score">0</span>m</p>
+        <button class="btn-start" onclick="startGame()">TRY AGAIN</button>
+    </div>
+
+    <script>
+        // --- AUDIO SYSTEM ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+
+            if (type === 'drill') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(100, now);
+                osc.frequency.linearRampToValueAtTime(50, now + 0.2);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            } else if (type === 'crash') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(50, now);
+                osc.frequency.exponentialRampToValueAtTime(10, now + 0.3);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            } else if (type === 'clank') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(150, now);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            }
+        }
+
+        // --- GAME VARIABLES ---
+        let score = 0;
+        let level = 1;
+        let fuel = 100;
+        let maxFuel = 100;
+        let fuelRate = 0.1;
+        let gameLoopId;
+        let currentProblem = {};
+        let options = [];
+        let isGameRunning = false;
+
+        // --- MATH GENERATION ---
+        function generateProblem(lvl) {
+            let type = Math.random();
+            let a, b, sign, ans;
+
+            // Difficulty ramping
+            let range = 10 + (lvl * 5); 
+
+            if (type < 0.4 || lvl === 1) { // Addition
+                a = Math.floor(Math.random() * range);
+                b = Math.floor(Math.random() * range);
+                sign = '+';
+                ans = a + b;
+            } else if (type < 0.7) { // Subtraction
+                a = Math.floor(Math.random() * range) + 5;
+                b = Math.floor(Math.random() * a); // Ensure positive result
+                sign = '-';
+                ans = a - b;
+            } else { // Multiplication (Unlocked at lvl 3 approx)
+                if (lvl < 3) return generateProblem(1); // Fallback
+                a = Math.floor(Math.random() * (lvl + 2)) + 2;
+                b = Math.floor(Math.random() * 10);
+                sign = '×';
+                ans = a * b;
+            }
+
+            return { txt: `${a} ${sign} ${b}`, ans: ans };
+        }
+
+        function generateOptions(correct) {
+            let opts = [correct];
+            while (opts.length < 3) {
+                let offset = Math.floor(Math.random() * 10) - 5;
+                let val = correct + offset;
+                if (val >= 0 && !opts.includes(val)) {
+                    opts.push(val);
+                }
+            }
+            return opts.sort(() => Math.random() - 0.5);
+        }
+
+        // --- GAME LOGIC ---
+        function startGame() {
+            score = 0;
+            level = 1;
+            fuel = 100;
+            fuelRate = 0.15;
+            isGameRunning = true;
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-over-screen').classList.add('hidden');
+            document.getElementById('score').innerText = 0;
+            
+            nextLevel();
+            loop();
+        }
+
+        function nextLevel() {
+            if (!isGameRunning) return;
+
+            // Scale Difficulty
+            if (score > 0 && score % 50 === 0) {
+                level++;
+                fuelRate += 0.05;
+                document.getElementById('level').innerText = level;
+            }
+
+            // Create Problem
+            currentProblem = generateProblem(level);
+            options = generateOptions(currentProblem.ans);
+
+            // Update UI
+            document.getElementById('math-display').innerText = currentProblem.txt;
+            document.getElementById('rock-vis').classList.remove('cracked');
+            document.getElementById('rock-container').style.transform = "translateY(0) scale(1)";
+            document.getElementById('rock-container').style.opacity = "1";
+            
+            for(let i=0; i<3; i++) {
+                document.getElementById('btn-'+i).innerText = options[i];
+                document.getElementById('btn-'+i).style.background = "linear-gradient(to bottom, #cfd8dc, #b0bec5)";
+            }
+        }
+
+        function handleInput(idx) {
+            if (!isGameRunning) return;
+            
+            let selected = options[idx];
+            if (selected === currentProblem.ans) {
+                success();
+            } else {
+                fail();
+            }
+        }
+
+        function success() {
+            playSound('drill');
+            playSound('crash');
+            
+            // Visuals
+            const rock = document.getElementById('rock-container');
+            const drill = document.querySelector('.drill-head');
+            
+            // Animate Rock breaking
+            rock.style.transform = "scale(1.1)";
+            document.getElementById('rock-vis').classList.add('cracked');
+            createParticles();
+            
+            // Animate Drill
+            drill.parentElement.classList.add('spinning');
+            setTimeout(() => drill.parentElement.classList.remove('spinning'), 300);
+
+            // Move Rock Down (Digging effect)
+            setTimeout(() => {
+                rock.style.transform = "translateY(100px) scale(0)";
+                rock.style.opacity = "0";
+            }, 100);
+
+            // Logic
+            score += 10;
+            fuel = Math.min(maxFuel, fuel + 15); // Refill fuel
+            document.getElementById('score').innerText = score;
+
+            // Background Scroll Effect
+            let currentBgPos = parseFloat(getComputedStyle(document.getElementById('shaft-bg')).backgroundPositionY) || 0;
+            document.getElementById('shaft-bg').style.backgroundPositionY = (currentBgPos - 50) + "px";
+
+            setTimeout(nextLevel, 400);
+        }
+
+        function fail() {
+            playSound('clank');
+            fuel -= 15; // Penalty
+            
+            // Screen Shake
+            document.body.classList.add('screen-shake');
+            setTimeout(() => document.body.classList.remove('screen-shake'), 500);
+
+            // Visual feedback on buttons
+            // (Optional: highlight wrong button in red)
+        }
+
+        function createParticles() {
+            const rock = document.getElementById('rock-container');
+            const rect = rock.getBoundingClientRect();
+            
+            for(let i=0; i<8; i++) {
+                let p = document.createElement('div');
+                p.className = 'particle';
+                p.style.left = (rect.left + rect.width/2) + 'px';
+                p.style.top = (rect.top + rect.height/2) + 'px';
+                document.body.appendChild(p);
+
+                // Random explode direction
+                let x = (Math.random() - 0.5) * 200;
+                let y = (Math.random() - 0.5) * 200;
+                
+                p.animate([
+                    { transform: 'translate(0,0) rotate(0deg)', opacity: 1 },
+                    { transform: `translate(${x}px, ${y}px) rotate(${Math.random()*360}deg)`, opacity: 0 }
+                ], {
+                    duration: 500,
+                    easing: 'ease-out'
+                }).onfinish = () => p.remove();
+            }
+        }
+
+        function loop() {
+            if (!isGameRunning) return;
+
+            fuel -= fuelRate;
+            let pct = Math.max(0, fuel);
+            document.getElementById('fuel-fill').style.width = pct + "%";
+
+            // Low Fuel Warning
+            if(pct < 25) document.getElementById('fuel-fill').style.background = "#d32f2f";
+            else document.getElementById('fuel-fill').style.background = "#ffb300";
+
+            if (fuel <= 0) {
+                gameOver();
+            } else {
+                requestAnimationFrame(loop);
+            }
+        }
+
+        function gameOver() {
+            isGameRunning = false;
+            document.getElementById('final-score').innerText = score;
+            document.getElementById('game-over-screen').classList.remove('hidden');
+        }
+
+    </script>
+</body>
+</html>

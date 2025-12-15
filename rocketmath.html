@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Rocket Math: Sudden Death</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #1a1a2e;
+            font-family: 'Fredoka', sans-serif;
+            touch-action: none;
+            user-select: none;
+        }
+
+        canvas { display: block; }
+
+        /* UI OVERLAY */
+        #hud {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #top-bar {
+            width: 100%;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            box-sizing: border-box;
+            max-width: 600px;
+        }
+
+        .stat-badge {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(5px);
+            border: 2px solid rgba(255,255,255,0.2);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 30px;
+            font-size: 1.2rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+
+        #question-card {
+            margin-top: 10px;
+            background: #fff;
+            color: #333;
+            padding: 15px 40px;
+            border-radius: 20px;
+            font-size: 2.5rem;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+            border-bottom: 6px solid #e0e0e0;
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes popIn {
+            from { transform: scale(0); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        /* SCREENS */
+        .modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(26, 26, 46, 0.95);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 100;
+            transition: opacity 0.3s;
+            pointer-events: auto;
+            color: white;
+            text-align: center;
+        }
+        .hidden { opacity: 0; pointer-events: none; }
+
+        h1 {
+            font-size: 3.5rem;
+            color: #ff4081;
+            text-shadow: 0 5px 0 #c51162;
+            margin-bottom: 10px;
+        }
+
+        .btn-launch {
+            margin-top: 30px;
+            padding: 20px 60px;
+            font-size: 1.5rem;
+            font-family: 'Fredoka', sans-serif;
+            background: #ff4081;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 6px 0 #c51162;
+            transition: transform 0.1s;
+        }
+        .btn-launch:active { transform: translateY(6px); box-shadow: none; }
+
+        .tutorial {
+            color: #aaa;
+            font-size: 1.2rem;
+            margin-top: 10px;
+            max-width: 80%;
+            line-height: 1.5;
+        }
+
+        .shake { animation: shake 0.5s; }
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="hud">
+        <div id="top-bar">
+            <div class="stat-badge">⭐ <span id="score">0</span></div>
+            <div class="stat-badge">🚀 <span id="height-display">0m</span></div>
+        </div>
+        <div id="question-card">Ready?</div>
+    </div>
+
+    <div id="start-screen" class="modal">
+        <h1>ROCKET MATH</h1>
+        <p class="tutorial">Land on the <b>Correct Answer</b> to fly higher.<br>Warning: Wrong answers cause immediate explosion!</p>
+        <button class="btn-launch" onclick="startGame()">LAUNCH</button>
+    </div>
+
+    <div id="game-over-screen" class="modal hidden">
+        <h1 style="color: #ff5252;">CRASHED!</h1>
+        <p style="font-size: 1.5rem;">Score: <span id="final-score">0</span></p>
+        <button class="btn-launch" onclick="startGame()">RELAUNCH</button>
+    </div>
+
+    <script>
+        // --- AUDIO ENGINE ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = "lowpass";
+            filter.frequency.value = 800;
+
+            osc.connect(filter);
+            filter.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            if (type === 'jump') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(200, now);
+                osc.frequency.linearRampToValueAtTime(400, now + 0.1);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            } else if (type === 'explode') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(100, now);
+                osc.frequency.exponentialRampToValueAtTime(10, now + 0.4);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.4);
+                osc.start(now);
+                osc.stop(now + 0.4);
+            } else if (type === 'levelup') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.setValueAtTime(600, now + 0.1);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            }
+        }
+
+        // --- SETUP ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // --- GAME VARIABLES ---
+        let gameActive = false;
+        let score = 0;
+        let maxHeight = 0;
+        let level = 1;
+        let cameraY = 0;
+        
+        let player = { 
+            x: 0, 
+            y: 0, 
+            vx: 0, 
+            vy: 0, 
+            width: 40, 
+            height: 60,
+            frame: 0,
+            dead: false
+        };
+        
+        let platforms = [];
+        let particles = [];
+        let stars = [];
+        
+        let currentQ = { txt: "", ans: 0 };
+        let nextPlatformY = 0; 
+
+        // --- CLASSES ---
+
+        class Platform {
+            constructor(y) {
+                this.w = 140; 
+                this.h = 25;
+                this.x = Math.random() * (width - this.w);
+                this.y = y;
+                this.val = 0;
+                this.isCorrect = false;
+                this.broken = false;
+                this.color = '#fff';
+            }
+
+            draw(camY) {
+                if (this.broken) return; 
+                let drawY = height - (this.y - camY);
+                
+                ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                ctx.fillRect(this.x + 5, drawY + 5, this.w, this.h);
+
+                ctx.fillStyle = this.isCorrect ? '#fff' : '#fff'; // Keep them looking same to force math
+                ctx.fillRect(this.x, drawY, this.w, this.h);
+                
+                ctx.fillStyle = 'rgba(0,0,0,0.1)';
+                ctx.fillRect(this.x, drawY + 15, this.w, 5);
+
+                ctx.fillStyle = '#333';
+                ctx.font = "bold 20px Arial";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(this.val, this.x + this.w/2, drawY + this.h/2 - 2);
+            }
+        }
+
+        // --- LOGIC ---
+
+        function initStars() {
+            stars = [];
+            for(let i=0; i<50; i++) {
+                stars.push({
+                    x: Math.random() * width,
+                    y: Math.random() * height,
+                    size: Math.random() * 2 + 1,
+                    speed: Math.random() * 0.5 + 0.1
+                });
+            }
+        }
+
+        function generateQuestion() {
+            let range = 5 + (level * 2); 
+            let a = Math.floor(Math.random() * range);
+            let b = Math.floor(Math.random() * range);
+            let ans = a + b;
+            
+            if (level > 10 && Math.random() > 0.6) {
+                a = Math.floor(Math.random() * 9) + 2;
+                b = Math.floor(Math.random() * 9) + 2;
+                ans = a * b;
+                currentQ = { txt: `${a} × ${b}`, ans: ans };
+            } else {
+                currentQ = { txt: `${a} + ${b}`, ans: ans };
+            }
+            
+            const card = document.getElementById('question-card');
+            card.innerText = currentQ.txt;
+            card.style.animation = 'none';
+            card.offsetHeight; 
+            card.style.animation = 'popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+        }
+
+        function generatePlatformBatch(startY) {
+            let y = startY;
+            let answers = [currentQ.ans];
+            let count = 2; 
+
+            while(answers.length < count) {
+                let w = currentQ.ans + Math.floor(Math.random() * 10) - 5;
+                if(w !== currentQ.ans && w >= 0 && !answers.includes(w)) answers.push(w);
+                if(answers.length < count && w < 0) answers.push(currentQ.ans + 1);
+            }
+            answers.sort(() => Math.random() - 0.5);
+            
+            let laneWidth = width / count;
+            
+            for(let i=0; i<count; i++) {
+                let p = new Platform(y);
+                p.x = (i * laneWidth) + (laneWidth/2) - (p.w/2);
+                p.x += (Math.random() * 40 - 20);
+                p.val = answers[i];
+                p.isCorrect = (p.val === currentQ.ans);
+                p.color = '#fff';
+                platforms.push(p);
+            }
+            
+            let gap = 140; 
+            nextPlatformY += gap; 
+        }
+
+        function resetGame() {
+            score = 0;
+            maxHeight = 0;
+            level = 1;
+            cameraY = 0;
+            
+            player.x = width / 2;
+            player.y = 100;
+            player.vx = 0;
+            player.vy = 0;
+            player.dead = false;
+            
+            platforms = [];
+            particles = [];
+            
+            let base = new Platform(50);
+            base.x = width/2 - 70;
+            base.w = 140;
+            base.val = "Start";
+            base.isCorrect = true;
+            platforms.push(base);
+
+            nextPlatformY = 220;
+            generateQuestion();
+            generatePlatformBatch(nextPlatformY);
+            generatePlatformBatch(nextPlatformY);
+            generatePlatformBatch(nextPlatformY);
+        }
+
+        function startGame() {
+            gameActive = true;
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-over-screen').classList.add('hidden');
+            resetGame();
+            initStars();
+            loop();
+        }
+
+        function loop() {
+            if (!gameActive) return;
+            requestAnimationFrame(loop);
+            
+            ctx.clearRect(0, 0, width, height);
+
+            ctx.fillStyle = '#fff';
+            stars.forEach(s => {
+                let drawY = (height - (s.y - cameraY * 0.5)) % height; 
+                if(drawY < 0) drawY += height;
+                ctx.globalAlpha = 0.5;
+                ctx.beginPath();
+                ctx.arc(s.x, drawY, s.size, 0, Math.PI*2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+
+            if (!player.dead) {
+                // Physics
+                player.vy -= 0.3; // Low gravity
+                let targetX = mousePos.x;
+                player.x += (targetX - player.x) * 0.15; 
+                
+                if (player.x < -20) player.x = width + 20;
+                if (player.x > width + 20) player.x = -20;
+                
+                player.y += player.vy;
+
+                // Cam
+                let targetCamY = player.y - height * 0.4;
+                if (targetCamY > cameraY) {
+                    cameraY = targetCamY;
+                    maxHeight = Math.floor(cameraY / 10);
+                    document.getElementById('height-display').innerText = maxHeight + "m";
+                }
+
+                // Cleanup
+                if(platforms.length > 0 && platforms[0].y < cameraY - 100) {
+                    platforms.shift();
+                }
+                // Spawn
+                if(nextPlatformY < cameraY + height + 200) {
+                    generatePlatformBatch(nextPlatformY);
+                }
+
+                // Collisions
+                if (player.vy < 0) {
+                    platforms.forEach(p => {
+                        if (p.broken) return;
+
+                        if (
+                            player.x + 10 < p.x + p.w &&
+                            player.x - 10 > p.x && 
+                            player.y > p.y &&
+                            player.y + player.vy <= p.y + 15 
+                        ) {
+                            if (p.val === "Start" || p.isCorrect) {
+                                // CORRECT
+                                player.vy = 16; 
+                                player.y = p.y;
+                                playSound('jump');
+                                createParticles(player.x, player.y, '#fff');
+                                
+                                if(p.val !== "Start") {
+                                    score += 10;
+                                    document.getElementById('score').innerText = score;
+                                    level = 1 + Math.floor(score / 50);
+                                    generateQuestion(); 
+                                    playSound('levelup');
+                                }
+                            } else {
+                                // WRONG -> EXPLODE
+                                player.dead = true;
+                                playSound('explode');
+                                createExplosion(player.x, player.y);
+                                document.getElementById('hud').classList.add('shake');
+                                setTimeout(() => {
+                                    gameOver();
+                                    document.getElementById('hud').classList.remove('shake');
+                                }, 1000);
+                            }
+                        }
+                    });
+                }
+            } else {
+                // Dead animation logic (keep camera still)
+            }
+
+            if (player.y < cameraY - 50 && !player.dead) {
+                gameOver();
+            }
+
+            platforms.forEach(p => p.draw(cameraY));
+            
+            if(!player.dead) {
+                drawRocket(player.x, height - (player.y - cameraY));
+            }
+            
+            drawParticles();
+        }
+
+        function drawRocket(x, y) {
+            ctx.save();
+            ctx.translate(x, y);
+            
+            let tilt = (mousePos.x - player.x) * 0.5;
+            tilt = Math.max(-20, Math.min(20, tilt));
+            ctx.rotate(tilt * Math.PI / 180);
+
+            player.frame++;
+            if(player.vy > 0) {
+                let fSize = (Math.sin(player.frame * 0.5) * 5) + 20;
+                ctx.fillStyle = '#ff9100';
+                ctx.beginPath();
+                ctx.moveTo(-10, 0); ctx.lineTo(10, 0); ctx.lineTo(0, fSize);
+                ctx.fill();
+            }
+
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.ellipse(0, -25, 20, 35, 0, 0, Math.PI*2);
+            ctx.fill();
+
+            ctx.fillStyle = '#ff4081';
+            ctx.beginPath();
+            ctx.moveTo(-20, -10); ctx.lineTo(-30, 10); ctx.lineTo(-15, 10); ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(20, -10); ctx.lineTo(30, 10); ctx.lineTo(15, 10); ctx.fill();
+
+            ctx.fillStyle = '#00bcd4';
+            ctx.beginPath();
+            ctx.arc(0, -30, 10, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(3, -33, 3, 0, Math.PI*2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function createParticles(x, y, color) {
+            for(let i=0; i<10; i++) {
+                particles.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 10,
+                    vy: (Math.random() - 0.5) * 10,
+                    life: 1.0,
+                    color: color
+                });
+            }
+        }
+
+        function createExplosion(x, y) {
+            // Big explosion for death
+            for(let i=0; i<30; i++) {
+                particles.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 20,
+                    vy: (Math.random() - 0.5) * 20,
+                    life: 1.5,
+                    color: '#ff4081'
+                });
+            }
+        }
+
+        function drawParticles() {
+            for(let i=particles.length-1; i>=0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.5;
+                p.life -= 0.05;
+
+                let drawY = height - (p.y - cameraY);
+                
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x, drawY, 8, 8);
+                ctx.globalAlpha = 1;
+
+                if(p.life <= 0) particles.splice(i, 1);
+            }
+        }
+
+        function gameOver() {
+            gameActive = false;
+            document.getElementById('final-score').innerText = maxHeight;
+            document.getElementById('game-over-screen').classList.remove('hidden');
+        }
+
+        let mousePos = { x: width/2, y: 0 };
+        window.addEventListener('mousemove', e => mousePos.x = e.clientX);
+        window.addEventListener('touchmove', e => { e.preventDefault(); mousePos.x = e.touches[0].clientX; }, {passive: false});
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Math Racer: Neon Velocity</title>
+    <link href="https://fonts.googleapis.com/css2?family=Russo+One&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #050510;
+            font-family: 'Russo One', sans-serif;
+            touch-action: none;
+            user-select: none;
+        }
+
+        canvas { display: block; }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .stat-box {
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00f3ff;
+            color: #00f3ff;
+            padding: 10px 20px;
+            font-size: 1.2rem;
+            transform: skew(-10deg);
+            box-shadow: 0 0 10px #00f3ff;
+        }
+
+        #question-panel {
+            position: absolute;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            border: 3px solid #ff00de;
+            color: #fff;
+            padding: 20px 50px;
+            font-size: 3rem;
+            text-shadow: 3px 3px 0 #ff00de;
+            border-radius: 10px;
+            z-index: 10;
+            white-space: nowrap;
+        }
+
+        /* SCREENS */
+        .modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(5, 5, 16, 0.95);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 100;
+            transition: opacity 0.3s;
+            pointer-events: auto;
+        }
+        .hidden { opacity: 0; pointer-events: none; }
+
+        h1 {
+            font-size: 3.5rem;
+            color: #fff;
+            text-shadow: 0 0 10px #00f3ff, 0 0 20px #00f3ff;
+            margin-bottom: 10px;
+            font-style: italic;
+        }
+
+        .btn-start {
+            margin-top: 30px;
+            padding: 20px 60px;
+            font-size: 1.5rem;
+            font-family: 'Russo One', sans-serif;
+            background: #ff00de;
+            color: white;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 0 20px #ff00de;
+            transform: skew(-10deg);
+            transition: transform 0.1s;
+        }
+        .btn-start:active { transform: skew(-10deg) scale(0.95); }
+
+        #speed-lines {
+            position: absolute; top:0; left:0; width:100%; height:100%;
+            background: repeating-linear-gradient(0deg, transparent, transparent 49px, rgba(0, 243, 255, 0.05) 50px);
+            pointer-events: none;
+            z-index: 5;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="speed-lines"></div>
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="hud">
+        <div class="top-bar">
+            <div class="stat-box">SCORE: <span id="score">0</span></div>
+            <div class="stat-box">SPEED: <span id="speed-display">1</span>x</div>
+        </div>
+        <div id="question-panel">READY</div>
+    </div>
+
+    <div id="start-screen" class="modal">
+        <h1>NEON RACER</h1>
+        <p style="color: #aaa; font-size: 1.2rem;">Start Slow. Survive the Speed.</p>
+        <p style="color: #00f3ff;">Steer with Mouse / Touch</p>
+        <button class="btn-start" onclick="startGame()">IGNITE ENGINE</button>
+    </div>
+
+    <div id="game-over-screen" class="modal hidden">
+        <h1 style="color: #ff0055">CRASHED!</h1>
+        <p style="color: #fff; font-size: 1.5rem;">Final Score: <span id="final-score">0</span></p>
+        <button class="btn-start" onclick="startGame()">RETRY</button>
+    </div>
+
+    <script>
+        // --- AUDIO ENGINE (Soft Remaster) ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playTone(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = "lowpass";
+            filter.frequency.value = 1000; 
+
+            osc.connect(filter);
+            filter.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            if (type === 'engine') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(40, now);
+                gain.gain.setValueAtTime(0.02, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            } else if (type === 'coin') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.exponentialRampToValueAtTime(600, now + 0.2);
+                gain.gain.setValueAtTime(0, now);
+                gain.gain.linearRampToValueAtTime(0.05, now + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+                osc.start(now);
+                osc.stop(now + 0.4);
+            } else if (type === 'crash') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(80, now);
+                osc.frequency.exponentialRampToValueAtTime(20, now + 0.2);
+                gain.gain.setValueAtTime(0.08, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            }
+        }
+
+        // --- SETUP ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // --- GAME VARIABLES ---
+        let gameActive = false;
+        let score = 0;
+        let hp = 100;
+        let speed = 3; // STARTS SLOW
+        let level = 1;
+        
+        let player = { x: 0, y: 0, w: 50, h: 80 };
+        let road = { x: 0, w: 0, stripeY: 0 };
+        let gates = [];
+        let particles = [];
+        
+        let currentQ = { txt: "START", ans: 0 };
+        let roadColor = 0;
+
+        // --- MATH LOGIC ---
+        function generateQuestion() {
+            const hard = (level > 10 && Math.random() > 0.6);
+            let a, b, ans, sign;
+
+            if(hard) {
+                a = Math.floor(Math.random() * 9) + 2;
+                b = Math.floor(Math.random() * 9) + 2;
+                ans = a * b;
+                sign = '×';
+            } else {
+                let range = 5 + (level * 2);
+                a = Math.floor(Math.random() * range);
+                b = Math.floor(Math.random() * range);
+                ans = a + b;
+                sign = '+';
+            }
+            
+            currentQ = { txt: `${a} ${sign} ${b}`, ans: ans };
+            document.getElementById('question-panel').innerText = currentQ.txt;
+            
+            spawnGates(ans);
+        }
+
+        function spawnGates(correctAnswer) {
+            const laneWidth = road.w / 3;
+            const startX = road.x;
+            
+            let correctLane = Math.floor(Math.random() * 3);
+            
+            for(let i=0; i<3; i++) {
+                let val;
+                let isCorrect = (i === correctLane);
+                
+                if(isCorrect) {
+                    val = correctAnswer;
+                } else {
+                    val = correctAnswer + Math.floor(Math.random() * 10) - 5;
+                    if(val === correctAnswer) val += 1;
+                }
+
+                gates.push({
+                    x: startX + (i * laneWidth) + (laneWidth/2) - 40,
+                    y: -500, // Spawn high up
+                    w: 80,
+                    h: 40,
+                    val: val,
+                    isCorrect: isCorrect,
+                    active: true
+                });
+            }
+        }
+
+        // --- MAIN LOOP ---
+        function startGame() {
+            gameActive = true;
+            score = 0;
+            hp = 100;
+            speed = 3; // Initial Slow Speed
+            level = 1;
+            gates = [];
+            particles = [];
+            
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-over-screen').classList.add('hidden');
+            document.getElementById('score').innerText = 0;
+            document.getElementById('speed-display').innerText = "1x";
+
+            road.w = Math.min(600, width * 0.9);
+            road.x = (width - road.w) / 2;
+            player.x = width / 2;
+            player.y = height - 150;
+
+            generateQuestion();
+            requestAnimationFrame(loop);
+        }
+
+        function loop() {
+            if(!gameActive) return;
+            requestAnimationFrame(loop);
+
+            ctx.clearRect(0, 0, width, height);
+
+            // 1. Draw Road
+            roadColor += speed * 0.1;
+            ctx.fillStyle = '#111';
+            ctx.fillRect(road.x, 0, road.w, height);
+            
+            ctx.strokeStyle = `hsl(${roadColor % 360}, 100%, 50%)`;
+            ctx.lineWidth = 5;
+            ctx.beginPath();
+            ctx.moveTo(road.x, 0); ctx.lineTo(road.x, height);
+            ctx.moveTo(road.x + road.w, 0); ctx.lineTo(road.x + road.w, height);
+            ctx.stroke();
+
+            // Lane Markers
+            road.stripeY += speed;
+            if(road.stripeY > 100) road.stripeY = 0;
+            
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.lineWidth = 4;
+            ctx.setLineDash([50, 50]);
+            ctx.lineDashOffset = -road.stripeY;
+            
+            ctx.beginPath();
+            ctx.moveTo(road.x + road.w/3, 0); ctx.lineTo(road.x + road.w/3, height);
+            ctx.moveTo(road.x + (road.w/3)*2, 0); ctx.lineTo(road.x + (road.w/3)*2, height);
+            ctx.stroke();
+            ctx.setLineDash([]); 
+
+            // 2. Update Gates
+            for(let i=gates.length-1; i>=0; i--) {
+                let g = gates[i];
+                g.y += speed;
+
+                if(g.active) {
+                    ctx.fillStyle = g.isCorrect ? 'rgba(0, 255, 0, 0.2)' : 'rgba(255, 0, 0, 0.2)';
+                    ctx.strokeStyle = g.isCorrect ? '#00e676' : '#ff1744';
+                    ctx.lineWidth = 3;
+                    
+                    ctx.fillRect(g.x, g.y, g.w, g.h);
+                    ctx.strokeRect(g.x, g.y, g.w, g.h);
+
+                    ctx.fillStyle = '#fff';
+                    ctx.font = "bold 24px Arial";
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    ctx.fillText(g.val, g.x + g.w/2, g.y + g.h/2);
+
+                    if(rectIntersect(player.x - player.w/2, player.y - player.h/2, player.w, player.h, g.x, g.y, g.w, g.h)) {
+                        handleCollision(g);
+                        gates[i].active = false; 
+                        disableRow(g.y);
+                    }
+                }
+
+                if(g.y > height) gates.splice(i, 1);
+            }
+
+            // --- PROGRESSION LOGIC ---
+            if(gates.length === 0) {
+                generateQuestion();
+                
+                // MAKE IT HARDER
+                speed += 0.2; // Ramp up speed
+                level++;
+                
+                // Update HUD Speedometer
+                let speedScale = (speed - 2).toFixed(1);
+                document.getElementById('speed-display').innerText = speedScale + "x";
+            }
+
+            // 3. Draw Player Car
+            let targetX = mousePos.x;
+            targetX = Math.max(road.x + 30, Math.min(road.x + road.w - 30, targetX));
+            player.x += (targetX - player.x) * 0.15; 
+
+            drawCar(player.x, player.y);
+
+            // 4. Particles
+            for(let i=particles.length-1; i>=0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= 0.05;
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x, p.y, p.size, p.size);
+                ctx.globalAlpha = 1;
+                if(p.life <= 0) particles.splice(i, 1);
+            }
+
+            if(Math.random() > 0.95) playTone('engine');
+            if(hp <= 0) gameOver();
+        }
+
+        function drawCar(x, y) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = '#00f3ff';
+            
+            ctx.fillStyle = '#222';
+            ctx.beginPath();
+            ctx.moveTo(0, -40); ctx.lineTo(20, 10); ctx.lineTo(20, 40); ctx.lineTo(-20, 40); ctx.lineTo(-20, 10);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = '#00f3ff';
+            ctx.beginPath();
+            ctx.moveTo(-15, 0); ctx.lineTo(15, 0); ctx.lineTo(10, -20); ctx.lineTo(-10, -20);
+            ctx.fill();
+
+            ctx.shadowColor = '#ff00de';
+            ctx.fillStyle = '#ff00de';
+            ctx.fillRect(-18, 38, 10, 5);
+            ctx.fillRect(8, 38, 10, 5);
+            ctx.restore();
+        }
+
+        function handleCollision(g) {
+            createExplosion(g.x + g.w/2, g.y + g.h/2, g.isCorrect ? '#00e676' : '#ff1744');
+            
+            if(g.isCorrect) {
+                playTone('coin');
+                score += 100;
+                document.getElementById('score').innerText = score;
+            } else {
+                playTone('crash');
+                hp -= 34; // 3 Strikes and out
+                ctx.translate(Math.random()*20-10, Math.random()*20-10);
+                setTimeout(() => ctx.setTransform(1,0,0,1,0,0), 50);
+            }
+        }
+
+        function disableRow(yPos) {
+            gates.forEach(g => {
+                if(Math.abs(g.y - yPos) < 50) g.active = false;
+            });
+        }
+
+        function createExplosion(x, y, color) {
+            for(let i=0; i<15; i++) {
+                particles.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 10,
+                    vy: (Math.random() - 0.5) * 10,
+                    life: 1.0,
+                    size: Math.random() * 5 + 2,
+                    color: color
+                });
+            }
+        }
+
+        function rectIntersect(x1, y1, w1, h1, x2, y2, w2, h2) {
+            return x2 < x1 + w1 && x2 + w2 > x1 && y2 < y1 + h1 && y2 + h2 > y1;
+        }
+
+        function gameOver() {
+            gameActive = false;
+            document.getElementById('final-score').innerText = score;
+            document.getElementById('game-over-screen').classList.remove('hidden');
+        }
+
+        let mousePos = { x: 0, y: 0 };
+        window.addEventListener('mousemove', e => mousePos.x = e.clientX);
+        window.addEventListener('touchmove', e => { e.preventDefault(); mousePos.x = e.touches[0].clientX; }, {passive: false});
+
+    </script>
+</body>
+</html>

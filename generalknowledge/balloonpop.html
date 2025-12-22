@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Balloon Pop Party</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Comic+Neue:wght@700&display=swap');
+
+        body {
+            margin: 0;
+            background: linear-gradient(#4facfe, #00f2fe); /* Sky Blue */
+            font-family: 'Comic Neue', cursive;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+            cursor: crosshair;
+        }
+
+        /* Clouds Background */
+        .cloud {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            z-index: 0;
+            animation: moveCloud 20s linear infinite;
+        }
+        .cloud::after, .cloud::before {
+            content: '';
+            position: absolute;
+            background: inherit;
+            border-radius: 50%;
+        }
+        
+        @keyframes moveCloud { from { left: -200px; } to { left: 110%; } }
+
+        /* HUD */
+        .hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-family: 'Fredoka One', cursive;
+            font-size: 2rem;
+            color: white;
+            text-shadow: 2px 2px 0 #333;
+            z-index: 20;
+            pointer-events: none;
+        }
+
+        /* The Question Box (Bottom) */
+        .question-box {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 600px;
+            background: white;
+            border: 5px solid #ff9ff3;
+            border-radius: 25px;
+            padding: 20px;
+            text-align: center;
+            font-size: 1.8rem;
+            color: #333;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            z-index: 20;
+            animation: bounceIn 0.5s;
+        }
+
+        @keyframes bounceIn {
+            0% { transform: translateX(-50%) scale(0); }
+            80% { transform: translateX(-50%) scale(1.1); }
+            100% { transform: translateX(-50%) scale(1); }
+        }
+
+        /* Balloons */
+        .balloon-container {
+            position: absolute;
+            bottom: -200px; /* Start below screen */
+            width: 120px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            z-index: 10;
+            transition: transform 0.1s;
+        }
+        
+        .balloon-container:active { transform: scale(0.95); }
+
+        .balloon {
+            width: 100px;
+            height: 120px;
+            background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.8), rgba(255,255,255,0) 20%), var(--color);
+            border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%;
+            box-shadow: inset -5px -5px 10px rgba(0,0,0,0.1);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            text-align: center;
+            color: white;
+            font-weight: bold;
+            font-size: 1.2rem;
+            text-shadow: 1px 1px 0 rgba(0,0,0,0.3);
+            line-height: 1.1;
+        }
+
+        /* Balloon String */
+        .string {
+            width: 2px;
+            height: 60px;
+            background: rgba(255,255,255,0.7);
+            margin-top: -5px;
+        }
+
+        /* Pop Effect */
+        .pop-particle {
+            position: absolute;
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            background: var(--color);
+            pointer-events: none;
+            z-index: 15;
+            animation: popAnim 0.5s forwards;
+        }
+        @keyframes popAnim {
+            to { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+        }
+
+        /* Start Screen */
+        #start-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.9);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .play-btn {
+            background: #ff9ff3;
+            border: none;
+            padding: 20px 60px;
+            border-radius: 50px;
+            font-family: 'Fredoka One', cursive;
+            font-size: 2.5rem;
+            color: white;
+            cursor: pointer;
+            box-shadow: 0 8px 0 #f368e0;
+            transition: transform 0.1s;
+        }
+        .play-btn:active {
+            transform: translateY(8px);
+            box-shadow: none;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="cloud" style="width: 200px; height: 60px; top: 10%; left: 10%; animation-duration: 25s;"></div>
+    <div class="cloud" style="width: 300px; height: 100px; top: 20%; left: 60%; animation-duration: 35s;"></div>
+    <div class="cloud" style="width: 150px; height: 50px; top: 5%; left: 80%; animation-duration: 20s;"></div>
+
+    <div class="hud">
+        Score: <span id="score">0</span>
+    </div>
+
+    <div id="start-screen">
+        <h1 style="font-family: 'Fredoka One'; font-size: 3.5rem; color: #4facfe; margin-bottom: 10px;">Balloon Pop!</h1>
+        <p style="font-size: 1.5rem; color: #555;">Simple Questions for Smart Kids</p>
+        <button class="play-btn" onclick="startGame()">PLAY</button>
+    </div>
+
+    <div id="game-area">
+        <div class="question-box" id="q-text">Ready?</div>
+        </div>
+
+<script>
+    // --- EASY KID QUESTIONS (Hardcoded Backup) ---
+    // This ensures the game is definitely easy enough initially
+    const EASY_QUESTIONS = [
+        { q: "What color is a banana?", a: "Yellow", w: ["Blue", "Red"] },
+        { q: "How many legs does a spider have?", a: "8", w: ["2", "4"] },
+        { q: "Which animal says 'Moo'?", a: "Cow", w: ["Dog", "Cat"] },
+        { q: "What is 2 + 2?", a: "4", w: ["3", "5"] },
+        { q: "What color is the sky?", a: "Blue", w: ["Green", "Purple"] },
+        { q: "Which animal has a long trunk?", a: "Elephant", w: ["Lion", "Mouse"] },
+        { q: "What do bees make?", a: "Honey", w: ["Milk", "Juice"] },
+        { q: "Which fruit is red?", a: "Apple", w: ["Lemon", "Lime"] },
+        { q: "How many fingers do you have on one hand?", a: "5", w: ["10", "2"] },
+        { q: "Which animal is the King of the Jungle?", a: "Lion", w: ["Tiger", "Bear"] },
+        { q: "What is 5 + 5?", a: "10", w: ["15", "8"] },
+        { q: "Which shape has 3 sides?", a: "Triangle", w: ["Square", "Circle"] },
+        { q: "What is frozen water called?", a: "Ice", w: ["Steam", "Rain"] },
+        { q: "Which animal hops?", a: "Rabbit", w: ["Snake", "Fish"] },
+        { q: "What color is grass?", a: "Green", w: ["Pink", "Orange"] }
+    ];
+
+    // --- Audio ---
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    function playPop() {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const t = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        
+        // Pop sound (fast frequency drop)
+        osc.frequency.setValueAtTime(400, t);
+        osc.frequency.exponentialRampToValueAtTime(50, t + 0.1);
+        gain.gain.setValueAtTime(0.5, t);
+        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+        
+        osc.start(t);
+        osc.stop(t + 0.1);
+    }
+
+    function playWin() {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const t = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(523, t); // C
+        osc.frequency.setValueAtTime(659, t + 0.1); // E
+        gain.gain.setValueAtTime(0.1, t);
+        gain.gain.linearRampToValueAtTime(0, t + 0.3);
+        
+        osc.start(t);
+        osc.stop(t + 0.3);
+    }
+
+    // --- Game Logic ---
+    let score = 0;
+    let balloons = []; // Store active balloon elements
+    let isPlaying = false;
+    let currentQ = null;
+    
+    // API State
+    let apiQueue = [];
+    let useApi = false; // Start with local questions first
+
+    async function fetchApiQuestions() {
+        // Fetch Animals (27) or Cartoons (32), Difficulty: Easy
+        const cat = Math.random() > 0.5 ? 27 : 32;
+        try {
+            const res = await fetch(`https://opentdb.com/api.php?amount=10&category=${cat}&difficulty=easy&type=multiple`);
+            const data = await res.json();
+            if (data.response_code === 0) {
+                apiQueue.push(...data.results);
+            }
+        } catch(e) { console.log("API Fail"); }
+    }
+
+    function startGame() {
+        document.getElementById('start-screen').style.display = 'none';
+        score = 0;
+        document.getElementById('score').innerText = score;
+        isPlaying = true;
+        
+        // Shuffle local questions
+        EASY_QUESTIONS.sort(() => Math.random() - 0.5);
+        
+        // Pre-fetch API for later
+        fetchApiQuestions();
+        
+        nextRound();
+    }
+
+    function nextRound() {
+        if (!isPlaying) return;
+
+        // Clean up old balloons
+        document.querySelectorAll('.balloon-container').forEach(b => b.remove());
+
+        // Get Question
+        let qData;
+        if (EASY_QUESTIONS.length > 0) {
+            qData = EASY_QUESTIONS.pop();
+        } else if (apiQueue.length > 0) {
+            // Convert API format to our simple format
+            const apiQ = apiQueue.pop();
+            const parser = new DOMParser();
+            const parse = (s) => parser.parseFromString(s, 'text/html').body.textContent;
+            qData = {
+                q: parse(apiQ.question),
+                a: parse(apiQ.correct_answer),
+                w: apiQ.incorrect_answers.map(parse)
+            };
+            if (apiQueue.length < 3) fetchApiQuestions();
+        } else {
+            // Reload local questions if everything runs out
+            qData = { q: "What comes after 1?", a: "2", w: ["3", "4"] }; // Fallback
+        }
+
+        currentQ = qData;
+        document.getElementById('q-text').innerText = currentQ.q;
+
+        // Prepare Answers (1 Correct + 2 Wrong)
+        // Ensure we only have 2 wrongs max to keep screen clean
+        let wrong = currentQ.w.slice(0, 2); 
+        let answers = [...wrong, currentQ.a];
+        answers.sort(() => Math.random() - 0.5);
+
+        // Spawn Balloons
+        answers.forEach((ans, index) => {
+            createBalloon(ans, index, answers.length);
+        });
+    }
+
+    function createBalloon(text, index, total) {
+        const cont = document.createElement('div');
+        cont.className = 'balloon-container';
+        
+        // Random bright colors
+        const colors = ['#ff7675', '#74b9ff', '#55efc4', '#ffeaa7', '#a29bfe'];
+        const color = colors[Math.floor(Math.random() * colors.length)];
+        
+        cont.innerHTML = `
+            <div class="balloon" style="--color: ${color}">${text}</div>
+            <div class="string"></div>
+        `;
+
+        // Positioning
+        // Spread them out across the screen width
+        const section = 100 / total;
+        const left = (section * index) + (section / 2) - 10; // Center in section
+        cont.style.left = left + "%";
+        
+        // Random speed
+        const speed = Math.random() * 2 + 3; // 3 to 5 seconds
+        cont.style.transition = `bottom ${speed}s linear`;
+
+        // Click Event
+        cont.onclick = (e) => handleBalloonClick(text, e.clientX, e.clientY, cont, color);
+
+        document.getElementById('game-area').appendChild(cont);
+
+        // Animate Float Up
+        requestAnimationFrame(() => {
+            cont.style.bottom = "110%"; // Fly off top
+        });
+
+        // Detect if missed (flies off screen)
+        setTimeout(() => {
+            if (cont.parentNode && isPlaying) {
+                // If it's the correct answer and it flew away...
+                if (text === currentQ.a) {
+                    // Just restart round (Kids game, no "Game Over")
+                    nextRound();
+                } else {
+                    cont.remove();
+                }
+            }
+        }, speed * 1000);
+    }
+
+    function handleBalloonClick(text, x, y, el, color) {
+        if (!isPlaying) return;
+
+        if (text === currentQ.a) {
+            // CORRECT!
+            playPop();
+            playWin();
+            score++;
+            document.getElementById('score').innerText = score;
+            createConfetti(x, y, color);
+            el.remove();
+            
+            // Wait slightly then next round
+            setTimeout(nextRound, 500);
+        } else {
+            // WRONG
+            playPop();
+            el.style.opacity = '0'; // Disappear
+            el.remove();
+            // User can try clicking the other balloons still floating!
+        }
+    }
+
+    function createConfetti(x, y, color) {
+        for (let i = 0; i < 10; i++) {
+            const p = document.createElement('div');
+            p.className = 'pop-particle';
+            p.style.left = x + 'px';
+            p.style.top = y + 'px';
+            p.style.setProperty('--color', color);
+            
+            // Random explosion direction
+            const tx = (Math.random() - 0.5) * 100 + 'px';
+            const ty = (Math.random() - 0.5) * 100 + 'px';
+            p.style.setProperty('--tx', tx);
+            p.style.setProperty('--ty', ty);
+
+            document.body.appendChild(p);
+            setTimeout(() => p.remove(), 500);
+        }
+    }
+
+</script>
+</body>
+</html>

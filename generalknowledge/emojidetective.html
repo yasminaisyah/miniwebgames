@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emoji Detective</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Varela+Round&display=swap');
+
+        :root {
+            --bg: #ffefc1;
+            --panel: #ffffff;
+            --primary: #ff6b6b;
+            --accent: #4ecdc4;
+        }
+
+        body {
+            margin: 0;
+            background-color: var(--bg);
+            /* Polka dot pattern */
+            background-image: radial-gradient(#ffeaa7 20%, transparent 20%), radial-gradient(#ffeaa7 20%, transparent 20%);
+            background-position: 0 0, 50px 50px;
+            background-size: 100px 100px;
+            font-family: 'Varela Round', sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            overflow: hidden;
+        }
+
+        /* --- Header / Target Area --- */
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            animation: slideDown 0.5s;
+        }
+
+        h1 {
+            font-family: 'Fredoka One', cursive;
+            color: var(--primary);
+            font-size: 2.5rem;
+            margin: 0;
+            text-shadow: 3px 3px 0 #fff;
+        }
+
+        .instruction-box {
+            background: white;
+            padding: 15px 40px;
+            border-radius: 50px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            display: inline-flex;
+            align-items: center;
+            gap: 15px;
+            margin-top: 15px;
+            border: 4px solid var(--accent);
+            transform: scale(1);
+            transition: transform 0.2s;
+        }
+
+        .target-emoji {
+            font-size: 3rem;
+            animation: bounce 1s infinite;
+        }
+
+        .find-text {
+            font-size: 1.5rem;
+            color: #555;
+            font-weight: bold;
+        }
+
+        /* --- Game Grid --- */
+        .game-board {
+            background: rgba(255,255,255,0.8);
+            padding: 20px;
+            border-radius: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            display: grid;
+            gap: 15px;
+            /* Default 2x2 */
+            grid-template-columns: repeat(2, 1fr); 
+            transition: all 0.3s;
+        }
+
+        .emoji-card {
+            background: white;
+            border-radius: 20px;
+            width: 80px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            cursor: pointer;
+            box-shadow: 0 6px 0 #eee;
+            border: 2px solid #eee;
+            transition: transform 0.1s, background 0.2s;
+        }
+
+        .emoji-card:active {
+            transform: translateY(6px);
+            box-shadow: none;
+        }
+
+        .emoji-card:hover {
+            background: #f9f9f9;
+        }
+
+        /* Animations */
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0); opacity: 0; }
+            60% { transform: scale(1.1); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .pop-in { animation: popIn 0.4s backwards; }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px) rotate(-5deg); }
+            75% { transform: translateX(5px) rotate(5deg); }
+        }
+        .shake { animation: shake 0.3s; background: #ffcccc !important; border-color: #ffaaaa !important; }
+
+        .correct-anim {
+            background: #b8e994 !important;
+            border-color: #78e08f !important;
+            transform: scale(1.1) !important;
+        }
+
+        /* Start Screen */
+        #start-screen {
+            position: fixed; top:0; left:0; width:100%; height:100%;
+            background: rgba(255, 239, 193, 0.95);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .big-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 20px 50px;
+            font-size: 2rem;
+            border-radius: 50px;
+            font-family: 'Fredoka One', cursive;
+            cursor: pointer;
+            box-shadow: 0 10px 0 #d63031;
+            margin-top: 20px;
+            transition: transform 0.1s;
+        }
+        .big-btn:active { transform: translateY(10px); box-shadow: none; }
+
+        /* Level Badge */
+        .level-badge {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            color: var(--accent);
+            box-shadow: 0 5px 10px rgba(0,0,0,0.1);
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="start-screen">
+        <h1 style="font-size: 4rem;">Emoji Detective</h1>
+        <p style="font-size: 1.5rem; color: #666;">Find the right picture!</p>
+        <button class="big-btn" onclick="startGame()">PLAY</button>
+    </div>
+
+    <div class="level-badge">Level: <span id="level-num">1</span></div>
+
+    <div class="header">
+        <h1>Find This:</h1>
+        <div class="instruction-box">
+            <span class="target-emoji" id="target-display">🦁</span>
+            <span class="find-text" id="target-name">Lion</span>
+        </div>
+    </div>
+
+    <div class="game-board" id="grid">
+        </div>
+
+<script>
+    // --- Data Sets (Kid Friendly) ---
+    const DATA = {
+        animals: [
+            {e:"🐶", n:"Dog"}, {e:"🐱", n:"Cat"}, {e:"🐭", n:"Mouse"}, {e:"🐹", n:"Hamster"},
+            {e:"🐰", n:"Bunny"}, {e:"🦊", n:"Fox"}, {e:"🐻", n:"Bear"}, {e:"🐼", n:"Panda"},
+            {e:"🐨", n:"Koala"}, {e:"🐯", n:"Tiger"}, {e:"🦁", n:"Lion"}, {e:"🐮", n:"Cow"},
+            {e:"🐷", n:"Pig"}, {e:"🐸", n:"Frog"}, {e:"🐵", n:"Monkey"}, {e:"🐔", n:"Chicken"},
+            {e:"🐧", n:"Penguin"}, {e:"🐦", n:"Bird"}, {e:"🦆", n:"Duck"}, {e:"🦅", n:"Eagle"},
+            {e:"🦉", n:"Owl"}, {e:"🦇", n:"Bat"}, {e:"🐺", n:"Wolf"}, {e:"🦄", n:"Unicorn"},
+            {e:"🐝", n:"Bee"}, {e:"🐛", n:"Bug"}, {e:"🦋", n:"Butterfly"}, {e:"🐢", n:"Turtle"},
+            {e:"🐙", n:"Octopus"}, {e:"🐠", n:"Fish"}, {e:"🐬", n:"Dolphin"}, {e:"🐳", n:"Whale"}
+        ],
+        food: [
+            {e:"🍏", n:"Apple"}, {e:"🍐", n:"Pear"}, {e:"🍊", n:"Orange"}, {e:"🍋", n:"Lemon"},
+            {e:"🍌", n:"Banana"}, {e:"🍉", n:"Watermelon"}, {e:"🍇", n:"Grapes"}, {e:"🍓", n:"Strawberry"},
+            {e:"🍒", n:"Cherries"}, {e:"🍑", n:"Peach"}, {e:"🍍", n:"Pineapple"}, {e:"🥝", n:"Kiwi"},
+            {e:"🍅", n:"Tomato"}, {e:"🥑", n:"Avocado"}, {e:"🌽", n:"Corn"}, {e:"🥕", n:"Carrot"},
+            {e:"🥦", n:"Broccoli"}, {e:"🍞", n:"Bread"}, {e:"🧀", n:"Cheese"}, {e:"🍖", n:"Meat"},
+            {e:"🍔", n:"Burger"}, {e:"🍟", n:"Fries"}, {e:"🍕", n:"Pizza"}, {e:"🌭", n:"Hotdog"},
+            {e:"🌮", n:"Taco"}, {e:"🍦", n:"Ice Cream"}, {e:"🍩", n:"Donut"}, {e:"🍪", n:"Cookie"},
+            {e:"🎂", n:"Cake"}, {e:"🍫", n:"Chocolate"}, {e:"🍬", n:"Candy"}, {e:"🍭", n:"Lollipop"}
+        ],
+        stuff: [
+            {e:"⚽", n:"Soccer Ball"}, {e:"🏀", n:"Basketball"}, {e:"🏈", n:"Football"}, {e:"⚾", n:"Baseball"},
+            {e:"🚗", n:"Car"}, {e:"🚕", n:"Taxi"}, {e:"🚌", n:"Bus"}, {e:"🚑", n:"Ambulance"},
+            {e:"🚒", n:"Fire Truck"}, {e:"🚓", n:"Police Car"}, {e:"🚜", n:"Tractor"}, {e:"🚲", n:"Bicycle"},
+            {e:"🚀", n:"Rocket"}, {e:"🚁", n:"Helicopter"}, {e:"🚂", n:"Train"}, {e:"⛵", n:"Boat"},
+            {e:"⌚", n:"Watch"}, {e:"📱", n:"Phone"}, {e:"💻", n:"Laptop"}, {e:"📷", n:"Camera"},
+            {e:"🎈", n:"Balloon"}, {e:"🎁", n:"Gift"}, {e:"🏆", n:"Trophy"}, {e:"💎", n:"Diamond"}
+        ]
+    };
+
+    // --- Audio ---
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playSfx(type) {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const t = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        if (type === 'pop') {
+            osc.frequency.setValueAtTime(600, t);
+            osc.frequency.exponentialRampToValueAtTime(100, t + 0.1);
+            gain.gain.setValueAtTime(0.3, t);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+            osc.start(t); osc.stop(t+0.1);
+        } else if (type === 'win') {
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(500, t);
+            osc.frequency.setValueAtTime(700, t+0.1);
+            osc.frequency.setValueAtTime(1000, t+0.2);
+            gain.gain.setValueAtTime(0.2, t);
+            gain.gain.linearRampToValueAtTime(0, t+0.4);
+            osc.start(t); osc.stop(t+0.4);
+        } else if (type === 'err') {
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(150, t);
+            gain.gain.setValueAtTime(0.2, t);
+            gain.gain.linearRampToValueAtTime(0, t+0.2);
+            osc.start(t); osc.stop(t+0.2);
+        }
+    }
+
+    // --- Game Logic ---
+    let level = 1;
+    let currentTarget = null;
+    let isProcessing = false;
+
+    function startGame() {
+        document.getElementById('start-screen').style.display = 'none';
+        level = 1;
+        loadLevel();
+    }
+
+    function loadLevel() {
+        document.getElementById('level-num').innerText = level;
+        isProcessing = false;
+        
+        // Determine grid size based on level
+        let gridSize = 2; // 2x2 = 4 items
+        if (level > 3) gridSize = 3; // 3x3 = 9 items
+        if (level > 8) gridSize = 4; // 4x4 = 16 items
+        
+        const count = gridSize * gridSize;
+
+        // Pick a random category
+        const cats = Object.keys(DATA);
+        const randCat = cats[Math.floor(Math.random() * cats.length)];
+        const pool = [...DATA[randCat]];
+
+        // Shuffle pool
+        pool.sort(() => Math.random() - 0.5);
+
+        // Pick items for this round
+        const roundItems = pool.slice(0, count);
+        
+        // Pick target from roundItems
+        currentTarget = roundItems[Math.floor(Math.random() * roundItems.length)];
+
+        // Update Header
+        document.getElementById('target-display').innerText = currentTarget.e;
+        document.getElementById('target-name').innerText = currentTarget.n;
+
+        // Render Grid
+        const grid = document.getElementById('grid');
+        grid.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
+        grid.innerHTML = '';
+
+        roundItems.forEach((item, index) => {
+            const card = document.createElement('div');
+            card.className = 'emoji-card pop-in';
+            card.style.animationDelay = (index * 0.05) + 's';
+            card.innerText = item.e;
+            
+            card.onclick = () => handleCardClick(card, item);
+            grid.appendChild(card);
+        });
+        
+        playSfx('pop');
+    }
+
+    function handleCardClick(card, item) {
+        if (isProcessing) return;
+
+        if (item.e === currentTarget.e) {
+            // Correct
+            isProcessing = true;
+            playSfx('win');
+            card.classList.add('correct-anim');
+            createConfetti(card);
+            
+            setTimeout(() => {
+                level++;
+                loadLevel();
+            }, 1000);
+        } else {
+            // Wrong
+            playSfx('err');
+            card.classList.add('shake');
+            setTimeout(() => card.classList.remove('shake'), 400);
+        }
+    }
+
+    // --- Confetti Effect ---
+    function createConfetti(element) {
+        const rect = element.getBoundingClientRect();
+        const center = {
+            x: rect.left + rect.width / 2,
+            y: rect.top + rect.height / 2
+        };
+
+        for(let i=0; i<20; i++) {
+            const el = document.createElement('div');
+            el.style.position = 'fixed';
+            el.style.left = center.x + 'px';
+            el.style.top = center.y + 'px';
+            el.style.width = '10px';
+            el.style.height = '10px';
+            el.style.backgroundColor = ['#ff6b6b', '#feca57', '#48dbfb', '#ff9ff3'][Math.floor(Math.random()*4)];
+            el.style.borderRadius = '50%';
+            el.style.pointerEvents = 'none';
+            el.style.zIndex = '999';
+            
+            document.body.appendChild(el);
+
+            const destX = (Math.random() - 0.5) * 200;
+            const destY = (Math.random() - 0.5) * 200;
+
+            el.animate([
+                { transform: 'translate(0,0) scale(1)', opacity: 1 },
+                { transform: `translate(${destX}px, ${destY}px) scale(0)`, opacity: 0 }
+            ], {
+                duration: 800,
+                easing: 'cubic-bezier(0, .9, .57, 1)'
+            }).onfinish = () => el.remove();
+        }
+    }
+
+</script>
+</body>
+</html>

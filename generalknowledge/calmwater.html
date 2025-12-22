@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trivia Fishing: Calm Waters</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@500;700&display=swap');
+
+        :root {
+            --water-top: #a2d9ff;
+            --water-deep: #0077be;
+            --sky: #e0f7fa;
+            --wood: #8d6e63;
+            --fish-gold: #ffca28;
+        }
+
+        body {
+            margin: 0;
+            background: linear-gradient(to bottom, var(--sky) 0%, var(--water-top) 50%, var(--water-deep) 100%);
+            font-family: 'Quicksand', sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* --- SCENERY --- */
+        .sun {
+            position: absolute;
+            top: 30px;
+            right: 30px;
+            width: 60px; height: 60px;
+            background: #fff9c4;
+            border-radius: 50%;
+            box-shadow: 0 0 40px #fff176;
+            animation: pulse 5s infinite;
+        }
+
+        .boat-container {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+            animation: bob 3s infinite ease-in-out;
+        }
+
+        .boat {
+            width: 150px;
+            height: 60px;
+            background: var(--wood);
+            border-radius: 0 0 70px 70px;
+            position: relative;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+        .boat::after {
+            content: '';
+            position: absolute;
+            top: -40px; left: 40px;
+            width: 10px; height: 40px;
+            background: #5d4037;
+        }
+
+        .fisherman {
+            position: absolute;
+            top: -50px; left: 50px;
+            font-size: 3rem;
+        }
+
+        /* Fishing Line */
+        .rod {
+            position: absolute;
+            top: -40px; left: 50px;
+            width: 100px; height: 2px;
+            background: #3e2723;
+            transform-origin: left center;
+            transform: rotate(-30deg);
+            transition: transform 0.3s;
+        }
+
+        .line {
+            position: absolute;
+            right: 0; top: 0;
+            width: 1px; height: 0px; /* Grows when casting */
+            background: rgba(255,255,255,0.6);
+            transition: height 1s;
+        }
+
+        .bobber {
+            position: absolute;
+            bottom: 0; left: -5px;
+            width: 10px; height: 10px;
+            background: #ff5252;
+            border-radius: 50%;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        /* Interaction Zone */
+        .cast-btn {
+            position: absolute;
+            bottom: 150px;
+            background: #26c6da;
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 30px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: transform 0.1s;
+            font-family: 'Quicksand', sans-serif;
+            z-index: 20;
+        }
+        .cast-btn:active { transform: scale(0.95); }
+        .cast-btn:disabled { background: #b2ebf2; cursor: default; }
+
+        /* Bucket (Score) */
+        .bucket {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(255,255,255,0.8);
+            padding: 15px;
+            border-radius: 15px;
+            font-weight: bold;
+            color: #006064;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* QUESTION MODAL (Soft UI) */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.3);
+            backdrop-filter: blur(2px);
+            z-index: 100;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-card {
+            background: white;
+            width: 90%;
+            max-width: 450px;
+            padding: 30px;
+            border-radius: 25px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            animation: floatUp 0.4s ease-out;
+        }
+
+        .q-text {
+            font-size: 1.3rem;
+            color: #37474f;
+            margin-bottom: 25px;
+            line-height: 1.4;
+        }
+
+        .options-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .opt-btn {
+            background: #e0f7fa;
+            border: 1px solid #b2ebf2;
+            padding: 15px;
+            border-radius: 12px;
+            color: #006064;
+            font-size: 1.1rem;
+            font-family: 'Quicksand', sans-serif;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .opt-btn:hover { background: #b2ebf2; }
+        
+        /* Feedback Colors */
+        .opt-btn.correct { background: #c8e6c9; border-color: #81c784; color: #2e7d32; }
+        .opt-btn.wrong { background: #ffcdd2; border-color: #e57373; color: #c62828; }
+
+        /* Animations */
+        @keyframes bob { 0%, 100% { transform: translate(-50%, -50%); } 50% { transform: translate(-50%, -45%); } }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+        @keyframes floatUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes bite { 0% { transform: translateY(0); } 25% { transform: translateY(10px); } 50% { transform: translateY(0); } 75% { transform: translateY(10px); } 100% { transform: translateY(0); } }
+
+        /* States */
+        .bobber.biting { animation: bite 0.5s infinite; background: #d50000; box-shadow: 0 0 10px white; }
+
+        /* Start Screen */
+        #start-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--sky);
+            z-index: 200;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        
+    </style>
+</head>
+<body>
+
+    <div class="sun"></div>
+
+    <div class="boat-container">
+        <div class="rod" id="rod">
+            <div class="line" id="line">
+                <div class="bobber" id="bobber"></div>
+            </div>
+        </div>
+        <div class="fisherman">🎣</div>
+        <div class="boat"></div>
+    </div>
+
+    <button class="cast-btn" id="action-btn" onclick="handleAction()">CAST LINE</button>
+
+    <div class="bucket">
+        🐟 Fish Caught: <span id="score">0</span>
+    </div>
+
+    <div id="start-screen">
+        <h1 style="color: #006064; font-size: 3rem;">Trivia Fishing</h1>
+        <p style="color: #00838f;">Relax, answer questions, catch fish.</p>
+        <button class="cast-btn" style="position:relative; bottom:auto; margin-top:20px;" onclick="startGame()">START FISHING</button>
+    </div>
+
+    <div class="modal-overlay" id="modal">
+        <div class="modal-card">
+            <div class="q-text" id="q-text">Question...</div>
+            <div class="options-list" id="options-list"></div>
+        </div>
+    </div>
+
+<script>
+    // --- 1. Gentle Audio System (Subtractive Synthesis) ---
+    // Creates water sounds and soft chimes instead of beeps
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    function playSound(type) {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const t = audioCtx.currentTime;
+
+        if (type === 'splash') {
+            // Filtered Noise for water splash
+            const bufferSize = audioCtx.sampleRate * 0.5;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(800, t);
+            filter.frequency.exponentialRampToValueAtTime(100, t + 0.3);
+
+            const gain = audioCtx.createGain();
+            gain.gain.setValueAtTime(0.5, t);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
+
+            noise.connect(filter);
+            filter.connect(gain);
+            gain.connect(audioCtx.destination);
+            noise.start(t);
+        } 
+        else if (type === 'cast') {
+            // Whistle sound
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.frequency.setValueAtTime(600, t);
+            osc.frequency.exponentialRampToValueAtTime(1200, t + 0.3);
+            gain.gain.setValueAtTime(0.1, t);
+            gain.gain.linearRampToValueAtTime(0, t + 0.3);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(t); osc.stop(t+0.3);
+        }
+        else if (type === 'success') {
+            // Soft Chime (Sine wave with slow attack/decay)
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(523.25, t); // C5
+            
+            gain.gain.setValueAtTime(0, t);
+            gain.gain.linearRampToValueAtTime(0.3, t + 0.05); // Soft attack
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.8); // Long decay
+
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(t); osc.stop(t+0.8);
+            
+            // Harmony
+            const osc2 = audioCtx.createOscillator();
+            const gain2 = audioCtx.createGain();
+            osc2.type = 'sine';
+            osc2.frequency.setValueAtTime(659.25, t); // E5
+            gain2.gain.setValueAtTime(0, t);
+            gain2.gain.linearRampToValueAtTime(0.2, t + 0.05);
+            gain2.gain.exponentialRampToValueAtTime(0.01, t + 0.8);
+            osc2.connect(gain2); gain2.connect(audioCtx.destination);
+            osc2.start(t); osc2.stop(t+0.8);
+        }
+        else if (type === 'fail') {
+            // Soft low bloop
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(300, t);
+            osc.frequency.linearRampToValueAtTime(150, t + 0.2);
+            gain.gain.setValueAtTime(0.2, t);
+            gain.gain.linearRampToValueAtTime(0, t + 0.2);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(t); osc.stop(t+0.2);
+        }
+    }
+
+    // --- 2. Curated "Goldilocks" Questions ---
+    // Not too easy, not too hard.
+    const FISH_QUESTIONS = [
+        { q: "Which mammal can fly?", a: "Bat", w: ["Flying Squirrel", "Cat"] },
+        { q: "What is the largest ocean in the world?", a: "Pacific Ocean", w: ["Atlantic Ocean", "Indian Ocean"] },
+        { q: "How many colors are in a rainbow?", a: "7", w: ["5", "8"] },
+        { q: "What do pandas mostly eat?", a: "Bamboo", w: ["Fish", "Leaves"] },
+        { q: "Which planet is closest to the Sun?", a: "Mercury", w: ["Venus", "Earth"] },
+        { q: "What is the hardest rock?", a: "Diamond", w: ["Gold", "Iron"] },
+        { q: "How many legs does a spider have?", a: "8", w: ["6", "10"] },
+        { q: "Which country has Pyramids?", a: "Egypt", w: ["Mexico", "China"] },
+        { q: "What turns into a frog?", a: "Tadpole", w: ["Caterpillar", "Egg"] },
+        { q: "What is the fastest animal on land?", a: "Cheetah", w: ["Lion", "Horse"] },
+        { q: "Which fruit has seeds on the outside?", a: "Strawberry", w: ["Apple", "Banana"] },
+        { q: "What is the largest animal on Earth?", a: "Blue Whale", w: ["Elephant", "Shark"] },
+        { q: "Water freezes into what?", a: "Ice", w: ["Steam", "Cloud"] },
+        { q: "How many hours in a day?", a: "24", w: ["12", "48"] },
+        { q: "Which season is usually the hottest?", a: "Summer", w: ["Winter", "Spring"] }
+    ];
+
+    // --- 3. Game State ---
+    const state = {
+        phase: 'idle', // idle, casting, waiting, biting, caught
+        score: 0,
+        currentQ: null,
+        biteTimer: null
+    };
+
+    const els = {
+        btn: document.getElementById('action-btn'),
+        line: document.getElementById('line'),
+        bobber: document.getElementById('bobber'),
+        rod: document.getElementById('rod'),
+        modal: document.getElementById('modal')
+    };
+
+    function startGame() {
+        document.getElementById('start-screen').style.display = 'none';
+        state.phase = 'idle';
+        FISH_QUESTIONS.sort(() => Math.random() - 0.5); // Shuffle local questions
+    }
+
+    function handleAction() {
+        if (state.phase === 'idle') {
+            castLine();
+        } else if (state.phase === 'biting') {
+            reelIn();
+        }
+    }
+
+    function castLine() {
+        state.phase = 'casting';
+        playSound('cast');
+        els.btn.disabled = true;
+        els.btn.innerText = "WAITING...";
+        
+        // Animate Rod & Line
+        els.rod.style.transform = "rotate(0deg)";
+        els.line.style.height = "200px";
+        
+        setTimeout(() => {
+            playSound('splash');
+            els.bobber.style.opacity = '1';
+            state.phase = 'waiting';
+            
+            // Random wait time 2s - 5s
+            const waitTime = Math.random() * 3000 + 2000;
+            state.biteTimer = setTimeout(fishBite, waitTime);
+        }, 600);
+    }
+
+    function fishBite() {
+        state.phase = 'biting';
+        els.bobber.classList.add('biting');
+        playSound('splash');
+        els.btn.innerText = "REEL IT IN!";
+        els.btn.style.backgroundColor = "#ff5252";
+        els.btn.disabled = false;
+
+        // Give them 3 seconds to react or fish leaves
+        state.biteTimer = setTimeout(fishEscaped, 3000);
+    }
+
+    function fishEscaped() {
+        if (state.phase !== 'biting') return;
+        resetFishing("Too slow! Fish got away.");
+    }
+
+    function reelIn() {
+        clearTimeout(state.biteTimer);
+        state.phase = 'caught';
+        els.bobber.classList.remove('biting');
+        els.btn.disabled = true;
+        els.btn.innerText = "CATCHING...";
+        els.btn.style.backgroundColor = "#26c6da";
+
+        // Pull up animation
+        els.rod.style.transform = "rotate(-40deg)";
+        els.line.style.height = "50px";
+
+        setTimeout(() => {
+            showQuestion();
+        }, 500);
+    }
+
+    function resetFishing(msg) {
+        state.phase = 'idle';
+        els.bobber.classList.remove('biting');
+        els.bobber.style.opacity = '0';
+        els.rod.style.transform = "rotate(-30deg)";
+        els.line.style.height = "0px";
+        
+        els.btn.disabled = false;
+        els.btn.innerText = msg || "CAST LINE";
+        els.btn.style.backgroundColor = "#26c6da";
+    }
+
+    function showQuestion() {
+        // Pick Question
+        if (FISH_QUESTIONS.length === 0) {
+            // Reset deck if empty
+             FISH_QUESTIONS.push({ q: "What color is the sun?", a: "Yellow", w: ["Blue"] }); 
+        }
+        
+        const qData = FISH_QUESTIONS.pop();
+        // Recycle it back to bottom of deck
+        FISH_QUESTIONS.unshift(qData); 
+
+        state.currentQ = qData;
+
+        document.getElementById('q-text').innerText = qData.q;
+        const list = document.getElementById('options-list');
+        list.innerHTML = '';
+
+        let answers = [...qData.w, qData.a];
+        answers.sort(() => Math.random() - 0.5);
+
+        answers.forEach(ans => {
+            const btn = document.createElement('button');
+            btn.className = 'opt-btn';
+            btn.innerText = ans;
+            btn.onclick = () => handleAnswer(btn, ans);
+            list.appendChild(btn);
+        });
+
+        els.modal.style.display = 'flex';
+    }
+
+    function handleAnswer(btn, selected) {
+        // Disable all buttons to prevent double clicks
+        const all = document.querySelectorAll('.opt-btn');
+        all.forEach(b => b.disabled = true);
+
+        if (selected === state.currentQ.a) {
+            // Correct
+            btn.classList.add('correct');
+            playSound('success');
+            state.score++;
+            document.getElementById('score').innerText = state.score;
+            
+            setTimeout(() => {
+                els.modal.style.display = 'none';
+                resetFishing("Nice catch! Cast again?");
+            }, 1500); // Slow pause to enjoy the win
+        } else {
+            // Wrong
+            btn.classList.add('wrong');
+            playSound('fail');
+            
+            setTimeout(() => {
+                els.modal.style.display = 'none';
+                resetFishing("It swam away. Try again!");
+            }, 1500);
+        }
+    }
+
+</script>
+</body>
+</html>

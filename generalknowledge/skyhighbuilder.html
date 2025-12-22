@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sky High Builder</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Carter+One&family=Roboto:wght@500&display=swap');
+
+        :root {
+            --sky-bottom: #87CEEB;
+            --sky-top: #00BFFF;
+            --crane-yellow: #f1c40f;
+            --block-color: #e67e22;
+            --block-shadow: #d35400;
+            --ground: #27ae60;
+        }
+
+        body {
+            margin: 0;
+            background: linear-gradient(to top, var(--sky-bottom), var(--sky-top));
+            font-family: 'Roboto', sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            user-select: none;
+        }
+
+        /* Moving Clouds */
+        .bg-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+        .cloud {
+            position: absolute;
+            background: rgba(255,255,255,0.7);
+            border-radius: 50px;
+            animation: floatCloud 20s linear infinite;
+        }
+        @keyframes floatCloud { from { left: -200px; } to { left: 110%; } }
+
+        /* HUD */
+        .hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 20;
+            font-family: 'Carter One', cursive;
+            color: white;
+            text-shadow: 2px 2px 0 #000;
+            font-size: 1.5rem;
+        }
+        .strikes {
+            color: #ff6b6b;
+            font-size: 2rem;
+        }
+
+        /* The Game World */
+        .game-viewport {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            transition: transform 0.5s ease-in-out;
+        }
+
+        .ground {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 50px;
+            background: var(--ground);
+            border-top: 10px solid #2ecc71;
+            z-index: 5;
+        }
+
+        .tower-container {
+            position: relative;
+            bottom: 50px; /* Sit on ground */
+            display: flex;
+            flex-direction: column-reverse; /* Build upwards */
+            align-items: center;
+            transition: transform 0.5s ease-out;
+            z-index: 4;
+        }
+
+        .block {
+            width: 120px;
+            height: 80px;
+            background: var(--block-color);
+            border: 4px solid #fff;
+            border-radius: 8px;
+            box-shadow: inset -10px -10px 0 rgba(0,0,0,0.1), 5px 5px 10px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Carter One', cursive;
+            color: white;
+            font-size: 1.5rem;
+            position: relative;
+            margin-bottom: -4px; /* Stack tight */
+        }
+
+        /* Brick texture */
+        .block::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-image: linear-gradient(rgba(255,255,255,0.2) 2px, transparent 2px),
+            linear-gradient(90deg, rgba(255,255,255,0.2) 2px, transparent 2px);
+            background-size: 40px 40px;
+            opacity: 0.3;
+        }
+
+        /* Crane (Top UI) */
+        .crane-arm {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 50%;
+            height: 20px;
+            background: var(--crane-yellow);
+            z-index: 10;
+            /* Hazard stripes */
+            background-image: repeating-linear-gradient(45deg, #f1c40f, #f1c40f 10px, #000 10px, #000 20px);
+        }
+        
+        .crane-cable {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            width: 4px;
+            height: 100px;
+            background: #333;
+            transform: translateX(-50%);
+            z-index: 9;
+            transition: height 0.5s;
+        }
+
+        .hook {
+            position: absolute;
+            bottom: -30px;
+            left: -15px;
+            width: 30px;
+            height: 30px;
+            border: 4px solid #333;
+            border-top: none;
+            border-radius: 0 0 15px 15px;
+        }
+
+        /* Action Button */
+        .build-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--crane-yellow);
+            color: #333;
+            font-family: 'Carter One', cursive;
+            font-size: 2rem;
+            padding: 15px 40px;
+            border: 4px solid #000;
+            border-radius: 10px;
+            cursor: pointer;
+            z-index: 50;
+            box-shadow: 0 10px 0 #000;
+            transition: transform 0.1s;
+        }
+        .build-btn:active {
+            transform: translateY(10px);
+            box-shadow: none;
+        }
+        .build-btn:disabled {
+            filter: grayscale(1);
+            cursor: not-allowed;
+        }
+
+        /* Question Modal */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(5px);
+            z-index: 100;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-box {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 500px;
+            text-align: center;
+            box-shadow: 0 20px 0 rgba(0,0,0,0.2);
+            border: 5px solid #333;
+            animation: slideDown 0.3s;
+        }
+
+        .q-text {
+            font-size: 1.4rem;
+            color: #333;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .opt-btn {
+            background: #eee;
+            border: 2px solid #ccc;
+            padding: 15px;
+            font-size: 1.1rem;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            color: #555;
+            transition: 0.1s;
+        }
+        .opt-btn:hover { background: #ddd; transform: translateY(-2px); }
+        .opt-btn:active { transform: translateY(2px); }
+
+        .opt-btn.correct { background: #2ecc71; color: white; border-color: #27ae60; }
+        .opt-btn.wrong { background: #e74c3c; color: white; border-color: #c0392b; }
+
+        /* Animation Classes */
+        .drop-anim { animation: dropDown 0.5s forwards cubic-bezier(0.5, 0, 0.75, 0); }
+        @keyframes dropDown { 
+            0% { transform: translateY(-300px); opacity: 0; } 
+            70% { transform: translateY(0); opacity: 1; }
+            85% { transform: translateY(-10px); } 
+            100% { transform: translateY(0); }
+        }
+
+        .crumble-anim { animation: crumble 0.5s forwards; }
+        @keyframes crumble {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1) rotate(10deg); background: #555; }
+            100% { transform: scale(0); opacity: 0; }
+        }
+
+        @keyframes slideDown { from { transform: translateY(-50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        /* Start Screen */
+        #start-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #87CEEB;
+            z-index: 200;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="bg-layer">
+        <div class="cloud" style="width:200px; height:60px; top:50px; left:10px;"></div>
+        <div class="cloud" style="width:150px; height:40px; top:150px; left:60%;"></div>
+    </div>
+
+    <div id="start-screen">
+        <h1 style="font-family: 'Carter One'; font-size: 4rem; color: #f1c40f; -webkit-text-stroke: 2px black; margin-bottom: 0;">Sky High</h1>
+        <h2 style="font-family: 'Carter One'; color: white; text-shadow: 2px 2px #000; margin-top: 0;">Builder</h2>
+        <button class="build-btn" style="position:relative; bottom:auto; right:auto;" onclick="initGame()">START BUILDING</button>
+    </div>
+
+    <div class="hud">
+        Height: <span id="height-disp">0</span>m<br>
+        <span class="strikes" id="strikes-disp"></span>
+    </div>
+
+    <div class="crane-arm"></div>
+    <div class="crane-cable">
+        <div class="hook"></div>
+    </div>
+
+    <div class="game-viewport" id="viewport">
+        <div class="tower-container" id="tower">
+            </div>
+        <div class="ground"></div>
+    </div>
+
+    <button class="build-btn" id="action-btn" onclick="requestBlock()">PLACE BLOCK</button>
+
+    <div class="modal-overlay" id="modal">
+        <div class="modal-box">
+            <div class="q-text" id="q-text">Question?</div>
+            <div class="options-grid" id="opt-grid"></div>
+        </div>
+    </div>
+
+<script>
+    // --- 1. Audio (Construction Sounds) ---
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    function playSound(type) {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const t = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        if (type === 'drop') {
+            // Heavy thud
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(100, t);
+            osc.frequency.exponentialRampToValueAtTime(10, t+0.2);
+            gain.gain.setValueAtTime(0.5, t);
+            gain.gain.linearRampToValueAtTime(0, t+0.2);
+            osc.start(t); osc.stop(t+0.2);
+        } else if (type === 'crumble') {
+            // Noise burst
+            const bufferSize = audioCtx.sampleRate * 0.5;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for(let i=0; i<bufferSize; i++) data[i] = Math.random() * 2 - 1;
+            const src = audioCtx.createBufferSource();
+            src.buffer = buffer;
+            const g = audioCtx.createGain();
+            g.gain.setValueAtTime(0.3, t);
+            g.gain.linearRampToValueAtTime(0, t+0.3);
+            src.connect(g); g.connect(audioCtx.destination);
+            src.start(t);
+        } else if (type === 'crane') {
+            // High motor whine
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(200, t);
+            osc.frequency.linearRampToValueAtTime(400, t+0.3);
+            gain.gain.setValueAtTime(0.1, t);
+            gain.gain.linearRampToValueAtTime(0, t+0.3);
+            osc.start(t); osc.stop(t+0.3);
+        }
+    }
+
+    // --- 2. Questions (Middle Grade) ---
+    const BUILDER_QUESTIONS = [
+        { q: "Which planet is the largest?", a: "Jupiter", w: ["Earth", "Mars", "Saturn"] },
+        { q: "What is 12 x 5?", a: "60", w: ["50", "55", "72"] },
+        { q: "What is the capital of Japan?", a: "Tokyo", w: ["Kyoto", "Osaka", "Beijing"] },
+        { q: "Who lives in a pineapple under the sea?", a: "Spongebob", w: ["Patrick", "Nemo", "Ariel"] },
+        { q: "How many legs does a spider have?", a: "8", w: ["6", "10", "4"] },
+        { q: "Water turns to ice at what temperature?", a: "0°C", w: ["100°C", "32°C", "-10°C"] },
+        { q: "Which superhero is Peter Parker?", a: "Spider-Man", w: ["Batman", "Iron Man", "Flash"] },
+        { q: "What do bees collect from flowers?", a: "Nectar", w: ["Honey", "Wax", "Seeds"] },
+        { q: "How many sides does a hexagon have?", a: "6", w: ["5", "8", "4"] },
+        { q: "Who painted the Mona Lisa?", a: "Da Vinci", w: ["Picasso", "Van Gogh", "Warhol"] },
+        { q: "Which country is the shape of a boot?", a: "Italy", w: ["France", "Spain", "Greece"] },
+        { q: "What is the fastest land animal?", a: "Cheetah", w: ["Lion", "Leopard", "Tiger"] },
+        { q: "Which movie features a lion king named Simba?", a: "The Lion King", w: ["Madagascar", "Ice Age", "Rio"] },
+        { q: "What gas do humans need to breathe?", a: "Oxygen", w: ["Helium", "Nitrogen", "Carbon"] },
+        { q: "How many days are in a Leap Year?", a: "366", w: ["365", "364", "360"] },
+        { q: "What is the hardest natural rock?", a: "Diamond", w: ["Gold", "Ruby", "Granite"] },
+        { q: "Which ocean is off the coast of California?", a: "Pacific", w: ["Atlantic", "Indian", "Arctic"] },
+        { q: "What do caterpillars turn into?", a: "Butterflies", w: ["Moths", "Worms", "Beetles"] },
+        { q: "In Minecraft, what do Creepers do?", a: "Explode", w: ["Fly", "Swim", "Trade"] },
+        { q: "What is the largest continent?", a: "Asia", w: ["Africa", "Europe", "America"] }
+    ];
+
+    // --- 3. Game Logic ---
+    let state = {
+        height: 0,
+        strikes: 0,
+        currentQ: null,
+        scrollOffset: 0
+    };
+
+    function initGame() {
+        document.getElementById('start-screen').style.display = 'none';
+        state.height = 0;
+        state.strikes = 0;
+        state.scrollOffset = 0;
+        document.getElementById('tower').innerHTML = '';
+        updateHUD();
+        
+        // Shuffle questions
+        BUILDER_QUESTIONS.sort(() => Math.random() - 0.5);
+    }
+
+    function updateHUD() {
+        document.getElementById('height-disp').innerText = state.height;
+        let x = "";
+        for(let i=0; i<state.strikes; i++) x += "❌ ";
+        document.getElementById('strikes-disp').innerText = x;
+    }
+
+    function requestBlock() {
+        playSound('crane');
+        
+        // Pick question
+        if (BUILDER_QUESTIONS.length === 0) {
+            // Recycle
+            BUILDER_QUESTIONS.push({q:"What is 5+5?", a:"10", w:["8","12","20"]});
+        }
+        state.currentQ = BUILDER_QUESTIONS.pop();
+        // Put back at bottom
+        BUILDER_QUESTIONS.unshift(state.currentQ);
+
+        showModal();
+    }
+
+    function showModal() {
+        document.getElementById('q-text').innerText = state.currentQ.q;
+        const grid = document.getElementById('opt-grid');
+        grid.innerHTML = '';
+
+        let answers = [...state.currentQ.w, state.currentQ.a];
+        answers.sort(() => Math.random() - 0.5);
+
+        answers.forEach(ans => {
+            const btn = document.createElement('button');
+            btn.className = 'opt-btn';
+            btn.innerText = ans;
+            btn.onclick = () => handleAnswer(btn, ans);
+            grid.appendChild(btn);
+        });
+
+        document.getElementById('modal').style.display = 'flex';
+    }
+
+    function handleAnswer(btn, selected) {
+        // Lock buttons
+        const all = document.querySelectorAll('.opt-btn');
+        all.forEach(b => b.disabled = true);
+
+        if (selected === state.currentQ.a) {
+            // Correct
+            btn.classList.add('correct');
+            setTimeout(() => {
+                document.getElementById('modal').style.display = 'none';
+                dropBlock(true);
+            }, 800);
+        } else {
+            // Wrong
+            btn.classList.add('wrong');
+            setTimeout(() => {
+                document.getElementById('modal').style.display = 'none';
+                dropBlock(false);
+            }, 800);
+        }
+    }
+
+    function dropBlock(success) {
+        const tower = document.getElementById('tower');
+        const block = document.createElement('div');
+        block.className = 'block';
+        
+        if (success) {
+            block.innerText = state.height + 10 + "m"; // Label block
+            block.classList.add('drop-anim');
+            tower.appendChild(block);
+            
+            // Wait for landing
+            setTimeout(() => {
+                playSound('drop');
+                state.height += 10;
+                
+                // Camera Scroll Logic
+                // Every 3 blocks (30m), shift view down
+                if (state.height > 30) {
+                    state.scrollOffset += 80; // block height
+                    document.getElementById('tower').style.transform = `translateY(${state.scrollOffset}px)`;
+                }
+                
+                updateHUD();
+            }, 500);
+
+        } else {
+            // Failure Animation
+            block.innerText = "⚠️";
+            block.style.background = "#555";
+            block.classList.add('drop-anim');
+            tower.appendChild(block);
+
+            // Wait for landing then crumble
+            setTimeout(() => {
+                playSound('crumble');
+                block.classList.remove('drop-anim');
+                block.classList.add('crumble-anim');
+                
+                state.strikes++;
+                updateHUD();
+
+                setTimeout(() => {
+                    block.remove(); // Clean up debris
+                    if (state.strikes >= 3) {
+                        alert("CONSTRUCTION HALTED! Too many mistakes.");
+                        location.reload();
+                    }
+                }, 500);
+            }, 500);
+        }
+    }
+
+</script>
+</body>
+</html>

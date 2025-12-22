@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Word Jungle Trivia</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Changa+One&family=Nunito:wght@700&display=swap');
+
+        :root {
+            --leaf-dark: #2d6a4f;
+            --leaf-light: #40916c;
+            --wood: #8B4513;
+            --wood-light: #A0522D;
+            --sky: #d8f3dc;
+            --gold: #FFD700;
+        }
+
+        body {
+            margin: 0;
+            background-color: var(--sky);
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(45, 106, 79, 0.1) 0%, transparent 20%),
+                radial-gradient(circle at 90% 80%, rgba(45, 106, 79, 0.1) 0%, transparent 20%);
+            font-family: 'Nunito', sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* --- UI Components --- */
+        
+        .top-bar {
+            position: absolute;
+            top: 20px;
+            display: flex;
+            gap: 20px;
+            z-index: 10;
+        }
+
+        .stat-badge {
+            background: var(--wood);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 15px;
+            font-family: 'Changa One', cursive;
+            font-size: 1.2rem;
+            border-bottom: 4px solid #5a2d0c;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+
+        .game-board {
+            width: 90%;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+
+        .question-sign {
+            background: var(--leaf-dark);
+            color: white;
+            padding: 25px;
+            border-radius: 20px;
+            text-align: center;
+            font-size: 1.3rem;
+            line-height: 1.4;
+            width: 100%;
+            box-shadow: 0 10px 0 var(--leaf-light);
+            margin-bottom: 40px;
+            position: relative;
+            transform: rotate(-1deg);
+        }
+
+        /* The Nails on the sign */
+        .question-sign::before, .question-sign::after {
+            content: '';
+            position: absolute;
+            top: 10px;
+            width: 12px;
+            height: 12px;
+            background: #aaa;
+            border-radius: 50%;
+            box-shadow: inset 2px 2px 5px rgba(0,0,0,0.5);
+        }
+        .question-sign::before { left: 15px; }
+        .question-sign::after { right: 15px; }
+
+        /* The Answer Slots */
+        .slots-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 40px;
+            min-height: 60px;
+        }
+
+        .slot {
+            width: 50px;
+            height: 50px;
+            background: rgba(255,255,255,0.5);
+            border: 3px dashed var(--leaf-dark);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Changa One', cursive;
+            font-size: 2rem;
+            color: var(--wood);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .slot.filled {
+            background: white;
+            border-style: solid;
+            border-color: var(--wood);
+            box-shadow: 0 4px 0 rgba(0,0,0,0.1);
+        }
+
+        .slot.correct { background: #b7e4c7; border-color: #2d6a4f; color: #2d6a4f; }
+        .slot.wrong { background: #ffccd5; border-color: #e63946; color: #e63946; animation: shake 0.4s; }
+
+        /* The Letter Tiles */
+        .tiles-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .tile {
+            width: 55px;
+            height: 55px;
+            background: var(--wood);
+            color: #fff;
+            border-radius: 12px;
+            font-family: 'Changa One', cursive;
+            font-size: 1.8rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 6px 0 var(--wood-light);
+            transition: transform 0.1s;
+            user-select: none;
+        }
+
+        .tile:active {
+            transform: translateY(6px);
+            box-shadow: none;
+        }
+
+        .tile.used {
+            opacity: 0;
+            pointer-events: none;
+            transform: scale(0);
+        }
+
+        /* Action Buttons */
+        .actions {
+            margin-top: 40px;
+            display: flex;
+            gap: 20px;
+        }
+
+        .action-btn {
+            background: white;
+            border: 2px solid var(--wood);
+            padding: 10px 20px;
+            border-radius: 50px;
+            font-weight: bold;
+            color: var(--wood);
+            cursor: pointer;
+            font-family: 'Changa One', cursive;
+            font-size: 1.2rem;
+            transition: 0.2s;
+            box-shadow: 0 4px 0 rgba(0,0,0,0.1);
+        }
+        .action-btn:hover { background: #fff8e1; transform: translateY(-2px); }
+        .action-btn:active { transform: translateY(2px); box-shadow: none; }
+
+        /* Overlays */
+        #start-screen {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(45, 106, 79, 0.95);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            text-align: center;
+        }
+        
+        .play-btn {
+            background: var(--gold);
+            color: var(--wood);
+            font-size: 2.5rem;
+            padding: 20px 60px;
+            border-radius: 20px;
+            border: none;
+            font-family: 'Changa One', cursive;
+            cursor: pointer;
+            box-shadow: 0 10px 0 #d4af37;
+            margin-top: 20px;
+            transition: transform 0.1s;
+        }
+        .play-btn:active { transform: translateY(10px); box-shadow: none; }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        .hidden { display: none !important; }
+
+    </style>
+</head>
+<body>
+
+    <div id="start-screen">
+        <h1 style="font-size: 4rem; margin: 0; text-shadow: 4px 4px 0 #000;">Word Jungle</h1>
+        <p style="font-size: 1.5rem;">Unscramble the answers!</p>
+        <button class="play-btn" onclick="initGame()">PLAY</button>
+        <p id="loading-txt" style="margin-top: 20px; opacity: 0.7;">Sharpening Machetes...</p>
+    </div>
+
+    <div class="top-bar">
+        <div class="stat-badge">
+            <span style="color: var(--gold);">🪙</span> <span id="coin-display">0</span>
+        </div>
+        <div class="stat-badge">
+            <span>🏆</span> <span id="level-display">1</span>
+        </div>
+    </div>
+
+    <div class="game-board">
+        <div class="question-sign" id="question-text">
+            Loading...
+        </div>
+
+        <div class="slots-container" id="slots-area"></div>
+
+        <div class="tiles-container" id="tiles-area"></div>
+
+        <div class="actions">
+            <button class="action-btn" onclick="useHint()">💡 Hint (20 coins)</button>
+            <button class="action-btn" style="color: #e63946; border-color: #e63946;" onclick="skipLevel()">⏭️ Skip</button>
+        </div>
+    </div>
+
+<script>
+    // --- Audio Synth (Wooden Sounds) ---
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    function playSound(type) {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        const t = audioCtx.currentTime;
+
+        if (type === 'wood') {
+            // Woodblock click
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(800, t);
+            osc.frequency.exponentialRampToValueAtTime(100, t + 0.1);
+            gain.gain.setValueAtTime(0.3, t);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+            osc.start(t); osc.stop(t + 0.1);
+        } else if (type === 'win') {
+            // Success Chime
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(523.25, t);
+            osc.frequency.setValueAtTime(659.25, t+0.1);
+            osc.frequency.setValueAtTime(783.99, t+0.2);
+            gain.gain.setValueAtTime(0.1, t);
+            gain.gain.linearRampToValueAtTime(0, t+0.6);
+            osc.start(t); osc.stop(t+0.6);
+        } else if (type === 'error') {
+            // Error Thud
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(150, t);
+            osc.frequency.linearRampToValueAtTime(50, t+0.2);
+            gain.gain.setValueAtTime(0.1, t);
+            gain.gain.linearRampToValueAtTime(0, t+0.2);
+            osc.start(t); osc.stop(t+0.2);
+        }
+    }
+
+    // --- Game State ---
+    const state = {
+        queue: [],
+        currentQ: null,
+        coins: 50, // Start with some coins
+        level: 1,
+        slots: [], // Array of letters entered
+        answerChars: [], // Correct answer array
+        token: null,
+        isFetching: false
+    };
+
+    // --- Logic ---
+
+    // 1. Fetching Logic (with Filtering for Single Words)
+    async function getToken() {
+        try {
+            let res = await fetch('https://opentdb.com/api_token.php?command=request');
+            let data = await res.json();
+            state.token = data.token;
+        } catch(e) {}
+    }
+
+    async function fetchQuestions() {
+        if (state.isFetching) return;
+        state.isFetching = true;
+        
+        let url = 'https://opentdb.com/api.php?amount=50&type=multiple'; // Request multiple to get distractors if needed, but we mostly need question+answer
+        if(state.token) url += `&token=${state.token}`;
+
+        try {
+            let res = await fetch(url);
+            let data = await res.json();
+            
+            if (data.response_code === 0) {
+                // FILTER: We only want one-word answers (or very simple phrases)
+                // Filter out answers with special chars, spaces, or numbers to make spelling fun/easy
+                const cleanQuestions = data.results.filter(q => {
+                    const ans = q.correct_answer;
+                    return /^[a-zA-Z]+$/.test(ans) && ans.length <= 10;
+                });
+                state.queue.push(...cleanQuestions);
+            } else if (data.response_code === 4) {
+                await getToken();
+                state.isFetching = false;
+                fetchQuestions();
+                return;
+            }
+        } catch(e) { console.log(e); }
+        
+        state.isFetching = false;
+
+        // If very first load
+        if(document.getElementById('start-screen').style.display !== 'none' && state.queue.length > 0) {
+           startLevel();
+        }
+    }
+
+    async function initGame() {
+        document.getElementById('loading-txt').innerText = "Scouting the jungle...";
+        await getToken();
+        await fetchQuestions();
+        if(state.queue.length === 0) {
+             // Retry if filter was too strict on first batch
+             await fetchQuestions();
+        }
+        startLevel();
+    }
+
+    function startLevel() {
+        document.getElementById('start-screen').style.display = 'none';
+        
+        // Need more questions?
+        if (state.queue.length < 5) fetchQuestions();
+        
+        // Get question
+        if (state.queue.length === 0) {
+            setTimeout(startLevel, 1000); return; 
+        }
+
+        const qData = state.queue.pop();
+        state.currentQ = qData;
+        
+        // Clean Question Text
+        const parser = new DOMParser();
+        const cleanQ = parser.parseFromString(`<!doctype html><body>${qData.question}`, 'text/html').body.textContent;
+        document.getElementById('question-text').innerText = cleanQ;
+
+        // Prepare Answer
+        const cleanAns = qData.correct_answer.toUpperCase();
+        state.answerChars = cleanAns.split('');
+        state.slots = new Array(state.answerChars.length).fill(null);
+
+        renderBoard(cleanAns);
+        updateUI();
+    }
+
+    function renderBoard(answerString) {
+        const slotsArea = document.getElementById('slots-area');
+        const tilesArea = document.getElementById('tiles-area');
+        
+        slotsArea.innerHTML = '';
+        tilesArea.innerHTML = '';
+
+        // Create Slots
+        state.answerChars.forEach((char, index) => {
+            let s = document.createElement('div');
+            s.className = 'slot';
+            s.dataset.index = index;
+            s.onclick = () => removeLetter(index);
+            slotsArea.appendChild(s);
+        });
+
+        // Create Tiles (Scramble them)
+        let tileChars = answerString.split('').sort(() => Math.random() - 0.5);
+        
+        // Logic to track which specific tile DOM element corresponds to which character for visuals
+        // To keep it simple: we create buttons. When clicked, they find the first empty slot.
+        tileChars.forEach((char, i) => {
+            let t = document.createElement('div');
+            t.className = 'tile';
+            t.innerText = char;
+            // Store unique ID to handle duplicates letters correctly
+            t.id = `tile-${i}`;
+            t.onclick = () => placeLetter(char, t.id);
+            tilesArea.appendChild(t);
+        });
+    }
+
+    function placeLetter(char, tileId) {
+        // Find first empty slot
+        const emptyIndex = state.slots.findIndex(x => x === null);
+        if (emptyIndex === -1) return; // Full
+
+        // Update State
+        state.slots[emptyIndex] = { char: char, sourceId: tileId };
+        
+        // Update UI
+        const slotEl = document.getElementById('slots-area').children[emptyIndex];
+        slotEl.innerText = char;
+        slotEl.classList.add('filled');
+
+        const tileEl = document.getElementById(tileId);
+        tileEl.classList.add('used');
+
+        playSound('wood');
+
+        // Check Win?
+        if (!state.slots.includes(null)) {
+            checkWin();
+        }
+    }
+
+    function removeLetter(index) {
+        if (state.slots[index] === null) return;
+
+        const data = state.slots[index];
+        
+        // Restore Tile
+        const tileEl = document.getElementById(data.sourceId);
+        tileEl.classList.remove('used');
+
+        // Clear Slot
+        state.slots[index] = null;
+        const slotEl = document.getElementById('slots-area').children[index];
+        slotEl.innerText = '';
+        slotEl.classList.remove('filled', 'wrong');
+        
+        playSound('wood');
+    }
+
+    function checkWin() {
+        const currentWord = state.slots.map(s => s.char).join('');
+        const correctWord = state.answerChars.join('');
+
+        const slots = document.querySelectorAll('.slot');
+
+        if (currentWord === correctWord) {
+            // WIN
+            slots.forEach(s => s.classList.add('correct'));
+            playSound('win');
+            state.coins += 20;
+            state.level++;
+            updateUI();
+            setTimeout(startLevel, 1200);
+        } else {
+            // WRONG
+            slots.forEach(s => s.classList.add('wrong'));
+            playSound('error');
+        }
+    }
+
+    function useHint() {
+        if (state.coins < 20) {
+            alert("Not enough coins!");
+            return;
+        }
+
+        // Find first incorrect or empty slot
+        let targetIndex = -1;
+        for(let i=0; i<state.answerChars.length; i++) {
+            if (state.slots[i] === null || state.slots[i].char !== state.answerChars[i]) {
+                targetIndex = i;
+                break;
+            }
+        }
+
+        if (targetIndex === -1) return; // All correct already
+
+        // Deduct cost
+        state.coins -= 20;
+        updateUI();
+
+        // If there is a wrong letter there, remove it
+        if (state.slots[targetIndex] !== null) {
+            removeLetter(targetIndex);
+        }
+
+        // Find the correct letter tile in the pool that hasn't been used (or is used wrongly elsewhere)
+        // This is tricky logic, simplified:
+        // Just cheat visually: fill the slot, disable a matching tile.
+        
+        const neededChar = state.answerChars[targetIndex];
+        
+        // Find a tile with this char that is NOT used
+        let tiles = Array.from(document.querySelectorAll('.tile:not(.used)'));
+        let targetTile = tiles.find(t => t.innerText === neededChar);
+        
+        if (targetTile) {
+            placeLetter(neededChar, targetTile.id);
+            // Lock this slot visually so they know it's a hint? (Optional, kept simple here)
+            document.getElementById('slots-area').children[targetIndex].style.borderColor = '#FFD700'; 
+        }
+    }
+
+    function skipLevel() {
+        state.level++; // No coins earned
+        startLevel();
+    }
+
+    function updateUI() {
+        document.getElementById('coin-display').innerText = state.coins;
+        document.getElementById('level-display').innerText = state.level;
+    }
+
+</script>
+</body>
+</html>

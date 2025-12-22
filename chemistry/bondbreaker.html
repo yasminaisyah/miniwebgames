@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bond Breaker: Molecule Ninja</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Bangers&family=Roboto:wght@400;700&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #1e272e;
+            font-family: 'Bangers', cursive;
+            touch-action: none;
+            cursor: crosshair;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: radial-gradient(circle, #353b48 0%, #1e272e 100%);
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* UI Overlay */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .hud {
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 40px;
+            color: #f5f6fa;
+            text-shadow: 3px 3px 0 #000;
+        }
+
+        .strikes {
+            color: #ff3f34;
+        }
+
+        #combo-display {
+            position: absolute;
+            top: 20%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            font-size: 80px;
+            color: #f1c40f;
+            text-shadow: 4px 4px 0 #c23616;
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        /* Menu Screens */
+        #menu, #game-over {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+            z-index: 10;
+        }
+
+        h1 {
+            font-size: 80px;
+            margin: 0;
+            color: #0fb9b1;
+            text-shadow: 5px 5px 0 #000;
+            letter-spacing: 2px;
+        }
+
+        p {
+            font-family: 'Roboto', sans-serif;
+            font-size: 24px;
+            color: #d2dae2;
+            margin: 20px 0 40px 0;
+            text-align: center;
+            max-width: 600px;
+        }
+
+        button {
+            padding: 20px 50px;
+            font-family: 'Bangers', cursive;
+            font-size: 30px;
+            color: #fff;
+            background: #ef5777;
+            border: none;
+            border-radius: 5px;
+            box-shadow: 0 10px 0 #b33939;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        button:active {
+            transform: translateY(5px);
+            box-shadow: 0 5px 0 #b33939;
+        }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="combo-display">COMBO!</div>
+
+    <div id="ui-layer">
+        <div class="hud">
+            <div id="score-el">Score: 0</div>
+            <div id="strikes-el" class="strikes">XXX</div>
+        </div>
+    </div>
+
+    <div id="menu">
+        <h1>BOND BREAKER</h1>
+        <p>Swipe across the Molecules to break their bonds!<br>
+        Release the atoms for points.<br>
+        <span style="color:#ff3f34">DO NOT slice the Radioactive Barrels!</span></p>
+        <button id="start-btn">START EXPERIMENT</button>
+    </div>
+
+    <div id="game-over" class="hidden">
+        <h1 style="color:#ff3f34">MELTDOWN!</h1>
+        <p>Final Score: <span id="final-score">0</span></p>
+        <button id="restart-btn">TRY AGAIN</button>
+    </div>
+</div>
+
+<script>
+/**
+ * AUDIO SYSTEM
+ * Synthesized SFX
+ */
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playSound(type) {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    
+    osc.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    const now = audioCtx.currentTime;
+
+    if (type === 'slice') {
+        // High frequency swoosh
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(800, now);
+        osc.frequency.exponentialRampToValueAtTime(100, now + 0.15);
+        gainNode.gain.setValueAtTime(0.1, now);
+        gainNode.gain.linearRampToValueAtTime(0, now + 0.15);
+        osc.start();
+        osc.stop(now + 0.15);
+    } else if (type === 'break') {
+        // Glassy pop
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(400, now);
+        osc.frequency.linearRampToValueAtTime(800, now + 0.1);
+        gainNode.gain.setValueAtTime(0.2, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+        osc.start();
+        osc.stop(now + 0.1);
+    } else if (type === 'boom') {
+        // Explosion
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(100, now);
+        osc.frequency.exponentialRampToValueAtTime(10, now + 0.5);
+        gainNode.gain.setValueAtTime(0.5, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+        osc.start();
+        osc.stop(now + 0.5);
+    } else if (type === 'miss') {
+        // Low buzz
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(150, now);
+        osc.frequency.linearRampToValueAtTime(100, now + 0.2);
+        gainNode.gain.setValueAtTime(0.1, now);
+        gainNode.gain.linearRampToValueAtTime(0, now + 0.2);
+        osc.start();
+        osc.stop(now + 0.2);
+    }
+}
+
+/**
+ * GAME DATA
+ */
+const MOLECULES = [
+    { label: "H₂O", name: "Water", color: "#3498db", atoms: ["H","H","O"] },
+    { label: "CO₂", name: "Carbon Dioxide", color: "#95a5a6", atoms: ["C","O","O"] },
+    { label: "NaCl", name: "Salt", color: "#ecf0f1", atoms: ["Na","Cl"] },
+    { label: "CH₄", name: "Methane", color: "#2ecc71", atoms: ["C","H","H","H","H"] },
+    { label: "O₂", name: "Oxygen", color: "#e74c3c", atoms: ["O","O"] },
+    { label: "NH₃", name: "Ammonia", color: "#9b59b6", atoms: ["N","H","H","H"] }
+];
+
+/**
+ * GAME ENGINE
+ */
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('score-el');
+const strikesEl = document.getElementById('strikes-el');
+const comboDisplay = document.getElementById('combo-display');
+
+let w, h;
+function resize() {
+    w = window.innerWidth;
+    h = window.innerHeight;
+    canvas.width = w;
+    canvas.height = h;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// Game State
+let gameState = 'MENU';
+let score = 0;
+let strikes = 3;
+let entities = []; // Flying objects
+let particles = []; // Debris
+let trail = []; // Mouse trail
+let spawnTimer = 0;
+let spawnRate = 60;
+let gravity = 0.2;
+let difficulty = 1;
+let mouse = { x: 0, y: 0, isDown: false };
+let lastMouse = { x: 0, y: 0 };
+let comboCount = 0;
+let comboTimer = 0;
+
+class Entity {
+    constructor() {
+        this.r = 40;
+        this.x = Math.random() * (w - 100) + 50;
+        this.y = h + this.r;
+        
+        // Throw physics
+        // Try to throw somewhat towards center
+        const centerX = w / 2;
+        const drift = (centerX - this.x) * 0.005;
+        this.vx = (Math.random() - 0.5) * 4 + drift;
+        this.vy = -(Math.random() * 5 + 10 + difficulty);
+        
+        this.rotation = 0;
+        this.rotSpeed = (Math.random() - 0.5) * 0.2;
+        
+        // Type determination
+        // 10% chance of bomb
+        if (Math.random() < 0.15) {
+            this.type = 'bomb';
+            this.color = '#ff3f34';
+            this.label = '☢️';
+        } else {
+            this.type = 'molecule';
+            const data = MOLECULES[Math.floor(Math.random() * MOLECULES.length)];
+            this.color = data.color;
+            this.label = data.label;
+            this.atoms = data.atoms; // For splitting
+        }
+        
+        this.active = true;
+        this.sliced = false;
+    }
+
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.vy += gravity;
+        this.rotation += this.rotSpeed;
+
+        // Out of bounds check
+        if (this.y > h + 100 && this.vy > 0) {
+            this.active = false;
+            // If it was a molecule and we missed it, lose a life?
+            // Usually in Fruit Ninja you lose a life for dropping fruit.
+            if (this.type === 'molecule' && !this.sliced) {
+                strikes--;
+                updateStrikes();
+                playSound('miss');
+                if (strikes <= 0) gameOver();
+            }
+        }
+    }
+
+    draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.rotation);
+
+        if (this.type === 'bomb') {
+            // Draw Bomb
+            ctx.beginPath();
+            ctx.arc(0, 0, this.r, 0, Math.PI*2);
+            ctx.fillStyle = '#2d3436';
+            ctx.fill();
+            ctx.strokeStyle = this.color;
+            ctx.lineWidth = 4;
+            ctx.stroke();
+            
+            ctx.fillStyle = this.color;
+            ctx.font = "40px Arial";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(this.label, 0, 2);
+            
+            // Pulse effect
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = this.color;
+        } else {
+            // Draw Molecule Bubble
+            ctx.beginPath();
+            ctx.arc(0, 0, this.r, 0, Math.PI*2);
+            ctx.fillStyle = this.color;
+            ctx.fill();
+            
+            // Shininess
+            ctx.beginPath();
+            ctx.arc(-10, -10, 10, 0, Math.PI*2);
+            ctx.fillStyle = 'rgba(255,255,255,0.3)';
+            ctx.fill();
+
+            ctx.fillStyle = '#fff';
+            ctx.font = "bold 30px sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.shadowColor = 'rgba(0,0,0,0.5)';
+            ctx.shadowBlur = 4;
+            ctx.fillText(this.label, 0, 0);
+        }
+
+        ctx.restore();
+    }
+}
+
+class Particle {
+    constructor(x, y, label, color, velocityScale = 1) {
+        this.x = x; this.y = y;
+        this.vx = (Math.random() - 0.5) * 10 * velocityScale;
+        this.vy = (Math.random() - 0.5) * 10 * velocityScale;
+        this.life = 1.0;
+        this.label = label;
+        this.color = color;
+    }
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.vy += gravity * 0.5;
+        this.life -= 0.02;
+    }
+    draw() {
+        ctx.globalAlpha = this.life;
+        
+        if (this.label) {
+            // Atom visualization
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, 15, 0, Math.PI*2);
+            ctx.fillStyle = '#fff';
+            ctx.fill();
+            ctx.strokeStyle = this.color;
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            
+            ctx.fillStyle = '#000';
+            ctx.font = "14px sans-serif";
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(this.label, this.x, this.y);
+        } else {
+            // Just a spark
+            ctx.fillStyle = this.color;
+            ctx.fillRect(this.x, this.y, 5, 5);
+        }
+        
+        ctx.globalAlpha = 1;
+    }
+}
+
+// Input Handling
+function handleInput(x, y, isDown) {
+    mouse.x = x;
+    mouse.y = y;
+    mouse.isDown = isDown;
+    
+    if (isDown) {
+        trail.push({x: x, y: y, life: 1.0});
+        checkSlice(x, y);
+    } else {
+        // Reset combo if finger lifted? No, usually combo is based on time window.
+    }
+}
+
+function checkSlice(mx, my) {
+    // We check distance from the line created by LastMouse -> Mouse
+    // But for simplicity in JS without complex collision lib, we check steps.
+    // Calculate distance between last mouse and current mouse
+    const dx = mx - lastMouse.x;
+    const dy = my - lastMouse.y;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    const steps = Math.ceil(dist / 10); // check every 10px
+    
+    for (let i = 0; i <= steps; i++) {
+        const checkX = lastMouse.x + (dx * (i/steps));
+        const checkY = lastMouse.y + (dy * (i/steps));
+        
+        entities.forEach(ent => {
+            if (!ent.active || ent.sliced) return;
+            
+            const distToEnt = Math.sqrt(Math.pow(checkX - ent.x, 2) + Math.pow(checkY - ent.y, 2));
+            
+            if (distToEnt < ent.r) {
+                sliceEntity(ent);
+            }
+        });
+    }
+}
+
+function sliceEntity(ent) {
+    ent.sliced = true;
+    ent.active = false; // Remove immediately or play animation? Remove and replace with particles.
+    
+    if (ent.type === 'bomb') {
+        playSound('boom');
+        // Screen shake
+        createExplosion(ent.x, ent.y, '#ff3f34');
+        strikes = 0; // Instant death or -1? Instant game over usually for bombs.
+        gameOver();
+    } else {
+        playSound('break');
+        score += 10;
+        
+        // Spawn Atoms
+        ent.atoms.forEach(atom => {
+            particles.push(new Particle(ent.x, ent.y, atom, ent.color));
+        });
+        
+        // Combo Logic
+        comboCount++;
+        comboTimer = 30; // frames
+        if (comboCount > 1) {
+            showCombo(comboCount);
+            score += comboCount * 2;
+        }
+        scoreEl.innerText = "Score: " + score;
+    }
+}
+
+function createExplosion(x, y, color) {
+    for(let i=0; i<30; i++) {
+        particles.push(new Particle(x, y, null, color, 2));
+    }
+}
+
+function showCombo(count) {
+    comboDisplay.innerText = count + " COMBO!";
+    comboDisplay.style.transform = "translate(-50%, -50%) scale(1.5) rotate(-10deg)";
+    setTimeout(() => {
+        comboDisplay.style.transform = "translate(-50%, -50%) scale(0)";
+    }, 500);
+}
+
+function updateStrikes() {
+    let s = "";
+    for(let i=0; i<3; i++) {
+        if (i < strikes) s += "<span style='color:#fff'>X</span> ";
+        else s += "<span style='color:#ff3f34'>X</span> ";
+    }
+    strikesEl.innerHTML = s;
+}
+
+function gameOver() {
+    gameState = 'GAMEOVER';
+    document.getElementById('final-score').innerText = score;
+    document.getElementById('game-over').classList.remove('hidden');
+    document.getElementById('ui-layer').classList.add('hidden');
+}
+
+function gameLoop() {
+    if (gameState !== 'PLAYING') return;
+    
+    ctx.clearRect(0, 0, w, h);
+    
+    // Update Spawn
+    spawnTimer++;
+    if (spawnTimer > spawnRate) {
+        entities.push(new Entity());
+        spawnTimer = 0;
+        
+        // Difficulty scaling
+        if (spawnRate > 20) spawnRate -= 0.1;
+        difficulty += 0.01;
+    }
+
+    // Draw Trail
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 8;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#00d2d3';
+    ctx.strokeStyle = '#fff';
+    
+    if (trail.length > 1) {
+        ctx.beginPath();
+        for (let i = 0; i < trail.length - 1; i++) {
+            let p1 = trail[i];
+            let p2 = trail[i+1];
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            p1.life -= 0.1;
+        }
+        ctx.stroke();
+    }
+    // Remove old trail points
+    trail = trail.filter(p => p.life > 0);
+    ctx.shadowBlur = 0; // reset
+
+    // Update Entities
+    for (let i = entities.length - 1; i >= 0; i--) {
+        let ent = entities[i];
+        ent.update();
+        ent.draw();
+        if (!ent.active) entities.splice(i, 1);
+    }
+
+    // Update Particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+        particles[i].update();
+        particles[i].draw();
+        if (particles[i].life <= 0) particles.splice(i, 1);
+    }
+    
+    // Combo Timer
+    if (comboTimer > 0) comboTimer--;
+    else comboCount = 0;
+
+    // Last Mouse Update
+    lastMouse.x = mouse.x;
+    lastMouse.y = mouse.y;
+
+    requestAnimationFrame(gameLoop);
+}
+
+// Event Listeners
+window.addEventListener('mousedown', e => handleInput(e.clientX, e.clientY, true));
+window.addEventListener('mousemove', e => {
+    if(mouse.isDown) handleInput(e.clientX, e.clientY, true);
+});
+window.addEventListener('mouseup', () => handleInput(mouse.x, mouse.y, false));
+
+// Touch
+window.addEventListener('touchstart', e => {
+    e.preventDefault();
+    handleInput(e.touches[0].clientX, e.touches[0].clientY, true);
+}, {passive: false});
+window.addEventListener('touchmove', e => {
+    e.preventDefault();
+    handleInput(e.touches[0].clientX, e.touches[0].clientY, true);
+}, {passive: false});
+window.addEventListener('touchend', () => handleInput(mouse.x, mouse.y, false));
+
+document.getElementById('start-btn').addEventListener('click', () => {
+    initGame();
+});
+
+document.getElementById('restart-btn').addEventListener('click', () => {
+    initGame();
+});
+
+function initGame() {
+    score = 0;
+    strikes = 3;
+    spawnRate = 60;
+    difficulty = 1;
+    entities = [];
+    particles = [];
+    trail = [];
+    comboCount = 0;
+    
+    scoreEl.innerText = "Score: 0";
+    updateStrikes();
+    
+    document.getElementById('menu').classList.add('hidden');
+    document.getElementById('game-over').classList.add('hidden');
+    document.getElementById('ui-layer').classList.remove('hidden');
+    
+    gameState = 'PLAYING';
+    
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    gameLoop();
+}
+
+// Initial draw needed?
+resize();
+
+</script>
+</body>
+</html>

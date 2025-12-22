@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Nucleus: Atomic Evolution</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Exo+2:wght@400;600&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #050510;
+            font-family: 'Exo 2', sans-serif;
+            touch-action: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* UI Overlay */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        /* Top HUD */
+        .hud-top {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 20px;
+            text-align: center;
+        }
+
+        #atomic-number-display {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 60px;
+            color: rgba(255, 255, 255, 0.1);
+            font-weight: 700;
+            line-height: 1;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 0; /* Behind the player */
+        }
+
+        #element-info {
+            z-index: 10;
+            text-shadow: 0 0 10px #00d2d3;
+        }
+
+        #element-symbol {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 50px;
+            color: #00d2d3;
+            margin: 0;
+        }
+
+        #element-name {
+            font-size: 24px;
+            color: #fff;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        #progress-bar-container {
+            width: 300px;
+            height: 6px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+
+        #progress-fill {
+            width: 0%;
+            height: 100%;
+            background: #00d2d3;
+            box-shadow: 0 0 10px #00d2d3;
+            transition: width 0.2s;
+        }
+
+        /* Start / Game Over */
+        #menu-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(5, 5, 16, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+            z-index: 20;
+            backdrop-filter: blur(5px);
+        }
+
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 48px;
+            color: #fff;
+            text-shadow: 0 0 20px #00d2d3, 0 0 40px #00d2d3;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        p.subtitle {
+            color: #a29bfe;
+            font-size: 18px;
+            margin-bottom: 40px;
+            text-align: center;
+            max-width: 500px;
+            line-height: 1.5;
+        }
+
+        button {
+            background: transparent;
+            color: #00d2d3;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 24px;
+            padding: 15px 40px;
+            border: 2px solid #00d2d3;
+            border-radius: 5px;
+            cursor: pointer;
+            box-shadow: 0 0 10px #00d2d3;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: #00d2d3;
+            color: #000;
+            box-shadow: 0 0 20px #00d2d3;
+        }
+
+        .hidden { display: none !important; }
+
+        .tutorial-key {
+            display: inline-block;
+            background: #333;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid #555;
+            font-size: 14px;
+            margin: 0 2px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="atomic-number-display">1</div>
+
+    <div id="ui-layer">
+        <div class="hud-top">
+            <div id="element-info">
+                <h2 id="element-symbol">H</h2>
+                <div id="element-name">Hydrogen</div>
+            </div>
+            <div id="progress-bar-container">
+                <div id="progress-fill"></div>
+            </div>
+            <div style="margin-top:5px; color:#aaa; font-size:12px;">Next Evolution</div>
+        </div>
+    </div>
+
+    <div id="menu-screen">
+        <h1>NEON NUCLEUS</h1>
+        <p class="subtitle">
+            You are a tiny proton.<br>
+            Collect <b>Electrons (Blue)</b> to increase your Atomic Number.<br>
+            Evolve from Hydrogen → Helium → Lithium...<br>
+            Avoid the <b>Red Unstable Particles</b>!
+        </p>
+        <button id="start-btn">INITIALIZE</button>
+    </div>
+</div>
+
+<script>
+/**
+ * AUDIO SYSTEM
+ * Synth-wave style sounds
+ */
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playSound(type) {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    
+    osc.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    const now = audioCtx.currentTime;
+
+    if (type === 'collect') {
+        // Soft digital ping
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(600, now);
+        osc.frequency.exponentialRampToValueAtTime(1200, now + 0.1);
+        gainNode.gain.setValueAtTime(0.1, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+        osc.start();
+        osc.stop(now + 0.2);
+    } else if (type === 'evolve') {
+        // Power up sweep
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(200, now);
+        osc.frequency.exponentialRampToValueAtTime(800, now + 0.5);
+        
+        // Add a low bass thump
+        const bass = audioCtx.createOscillator();
+        const bassGain = audioCtx.createGain();
+        bass.connect(bassGain);
+        bassGain.connect(audioCtx.destination);
+        bass.frequency.setValueAtTime(100, now);
+        bass.frequency.exponentialRampToValueAtTime(50, now + 0.5);
+        bassGain.gain.setValueAtTime(0.5, now);
+        bassGain.gain.linearRampToValueAtTime(0, now + 0.5);
+        bass.start();
+        bass.stop(now + 0.5);
+
+        gainNode.gain.setValueAtTime(0.1, now);
+        gainNode.gain.linearRampToValueAtTime(0, now + 0.5);
+        osc.start();
+        osc.stop(now + 0.5);
+    } else if (type === 'hit') {
+        // Static noise / glitch
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(100, now);
+        osc.frequency.linearRampToValueAtTime(50, now + 0.1);
+        gainNode.gain.setValueAtTime(0.2, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+        osc.start();
+        osc.stop(now + 0.2);
+    }
+}
+
+/**
+ * CHEMISTRY DATA
+ * The first 18 elements
+ */
+const ELEMENTS = [
+    { num: 1, sym: "H", name: "Hydrogen", color: "#74b9ff" },
+    { num: 2, sym: "He", name: "Helium", color: "#ffeaa7" },
+    { num: 3, sym: "Li", name: "Lithium", color: "#ff7675" },
+    { num: 4, sym: "Be", name: "Beryllium", color: "#55efc4" },
+    { num: 5, sym: "B", name: "Boron", color: "#a29bfe" },
+    { num: 6, sym: "C", name: "Carbon", color: "#636e72" },
+    { num: 7, sym: "N", name: "Nitrogen", color: "#0984e3" },
+    { num: 8, sym: "O", name: "Oxygen", color: "#ff6b6b" },
+    { num: 9, sym: "F", name: "Fluorine", color: "#fdcb6e" },
+    { num: 10, sym: "Ne", name: "Neon", color: "#e84393" },
+    { num: 11, sym: "Na", name: "Sodium", color: "#fd79a8" },
+    { num: 12, sym: "Mg", name: "Magnesium", color: "#00b894" },
+    { num: 13, sym: "Al", name: "Aluminium", color: "#b2bec3" },
+    { num: 14, sym: "Si", name: "Silicon", color: "#dfe6e9" },
+    { num: 15, sym: "P", name: "Phosphorus", color: "#d63031" },
+    { num: 16, sym: "S", name: "Sulfur", color: "#f9ca24" },
+    { num: 17, sym: "Cl", name: "Chlorine", color: "#6ab04c" },
+    { num: 18, sym: "Ar", name: "Argon", color: "#22a6b3" }
+];
+
+/**
+ * GAME ENGINE
+ */
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const startBtn = document.getElementById('start-btn');
+const menuScreen = document.getElementById('menu-screen');
+const bgNum = document.getElementById('atomic-number-display');
+
+// HUD
+const elSym = document.getElementById('element-symbol');
+const elName = document.getElementById('element-name');
+const elProgress = document.getElementById('progress-fill');
+
+let w, h;
+let mouse = { x: 0, y: 0 };
+
+function resize() {
+    w = window.innerWidth;
+    h = window.innerHeight;
+    canvas.width = w;
+    canvas.height = h;
+}
+window.addEventListener('resize', resize);
+window.addEventListener('mousemove', e => {
+    mouse.x = e.clientX;
+    mouse.y = e.clientY;
+});
+window.addEventListener('touchmove', e => {
+    mouse.x = e.touches[0].clientX;
+    mouse.y = e.touches[0].clientY;
+});
+
+// Game State
+let gameState = 'MENU';
+let currentAtomicNumber = 0; // Starts at 0, first collect makes 1 (H)
+let currentElementIndex = 0; 
+let electronsCollected = 0;
+let electronsNeeded = 1; // Need 1 to start
+let score = 0;
+let difficulty = 1;
+
+// Entities
+let player = {
+    x: 0, y: 0,
+    radius: 20,
+    color: '#fff',
+    trail: []
+};
+
+let entities = []; // Holds both electrons and enemies
+let particles = [];
+
+class Entity {
+    constructor(type) {
+        this.type = type; // 'electron' or 'enemy'
+        // Spawn edge logic
+        if (Math.random() < 0.5) {
+            this.x = Math.random() < 0.5 ? -50 : w + 50;
+            this.y = Math.random() * h;
+        } else {
+            this.x = Math.random() * w;
+            this.y = Math.random() < 0.5 ? -50 : h + 50;
+        }
+        
+        // Move towards center roughly
+        let angle = Math.atan2(h/2 - this.y, w/2 - this.x);
+        // Add randomness
+        angle += (Math.random() - 0.5);
+        
+        const speed = (Math.random() * 2 + 1) * difficulty;
+        this.vx = Math.cos(angle) * speed;
+        this.vy = Math.sin(angle) * speed;
+        
+        this.radius = type === 'electron' ? 8 : 12;
+        this.life = 600; // Disappear after 10 seconds if not caught
+    }
+
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.life--;
+        
+        // Bounce off walls? No, let them float through.
+    }
+
+    draw() {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        
+        if (this.type === 'electron') {
+            ctx.fillStyle = '#00d2d3';
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#00d2d3';
+        } else {
+            ctx.fillStyle = '#ff6b6b';
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#ff6b6b';
+            
+            // Draw spikes for enemy
+            // Simple visual hack for spikes
+            ctx.strokeStyle = '#ff6b6b';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(this.x - this.radius, this.y - this.radius, this.radius*2, this.radius*2);
+        }
+        
+        ctx.fill();
+        ctx.shadowBlur = 0;
+    }
+}
+
+class Particle {
+    constructor(x, y, color) {
+        this.x = x; this.y = y;
+        this.vx = (Math.random() - 0.5) * 5;
+        this.vy = (Math.random() - 0.5) * 5;
+        this.life = 1;
+        this.color = color;
+    }
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.life -= 0.03;
+    }
+    draw() {
+        ctx.globalAlpha = this.life;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+    }
+}
+
+function updateHUD() {
+    // Current Element
+    if (currentAtomicNumber === 0) {
+        // Prologue state
+        elSym.innerText = "?";
+        elName.innerText = "Proto-Nucleus";
+        elSym.style.color = "#fff";
+        bgNum.innerText = "0";
+    } else {
+        const data = ELEMENTS[currentElementIndex];
+        elSym.innerText = data.sym;
+        elName.innerText = data.name;
+        elSym.style.color = data.color;
+        player.color = data.color;
+        bgNum.innerText = data.num;
+    }
+
+    // Progress
+    // We need 'currentAtomicNumber' electrons to evolve to next? 
+    // Simplified: Collect 5 electrons to evolve.
+    const progress = (electronsCollected / electronsNeeded) * 100;
+    elProgress.style.width = `${progress}%`;
+}
+
+function evolve() {
+    playSound('evolve');
+    currentElementIndex++;
+    
+    // Check if game won (passed Argon)
+    if (currentElementIndex >= ELEMENTS.length) {
+        gameOver(true);
+        return;
+    }
+
+    currentAtomicNumber = ELEMENTS[currentElementIndex].num;
+    
+    // Reset collection for next level
+    electronsCollected = 0;
+    // Difficulty increases: Need slightly more electrons or just faster enemies?
+    // Let's keep collection needed static to keep pace fast, but increase enemy speed
+    difficulty += 0.2;
+    
+    // Screen shake visual (spawn particles)
+    for(let i=0; i<20; i++) {
+        particles.push(new Particle(player.x, player.y, player.color));
+    }
+
+    updateHUD();
+}
+
+function gameOver(win) {
+    gameState = 'GAMEOVER';
+    menuScreen.classList.remove('hidden');
+    menuScreen.innerHTML = win 
+        ? `<h1>STABLE ELEMENT!</h1><p class="subtitle">You reached Argon and stabilized the universe.</p><button onclick="startGame()">RESTART</button>`
+        : `<h1>DE-IONIZED</h1><p class="subtitle">You hit an unstable particle.<br>Element Reached: ${ELEMENTS[currentElementIndex]?.name || "None"}</p><button onclick="startGame()">TRY AGAIN</button>`;
+}
+
+function gameLoop() {
+    if (gameState !== 'PLAYING') return;
+
+    ctx.fillStyle = 'rgba(5, 5, 16, 0.3)'; // Trail effect
+    ctx.fillRect(0, 0, w, h);
+
+    // Player Movement (Lerp towards mouse)
+    player.x += (mouse.x - player.x) * 0.1;
+    player.y += (mouse.y - player.y) * 0.1;
+
+    // Draw Player Nucleus
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, player.radius, 0, Math.PI*2);
+    ctx.fillStyle = player.color;
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = player.color;
+    ctx.fill();
+    
+    // Draw "Orbitals" (Decor rings around player)
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(player.x, player.y, 30, 0, Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(player.x, player.y, 45, 0, Math.PI*2); ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Spawning logic
+    if (Math.random() < 0.05) entities.push(new Entity('electron'));
+    if (Math.random() < 0.02 * difficulty) entities.push(new Entity('enemy'));
+
+    // Entities Loop
+    for (let i = entities.length - 1; i >= 0; i--) {
+        let ent = entities[i];
+        ent.update();
+        ent.draw();
+
+        // Distance Check
+        const dx = player.x - ent.x;
+        const dy = player.y - ent.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+
+        if (dist < player.radius + ent.radius) {
+            // Collision
+            if (ent.type === 'electron') {
+                playSound('collect');
+                electronsCollected++;
+                
+                // Spawn small particle burst
+                particles.push(new Particle(ent.x, ent.y, '#00d2d3'));
+                
+                // Check Evolution
+                if (electronsCollected >= electronsNeeded) {
+                    evolve();
+                } else {
+                    updateHUD();
+                }
+            } else {
+                // Enemy
+                playSound('hit');
+                gameOver(false);
+            }
+            entities.splice(i, 1);
+            continue;
+        }
+
+        if (ent.life <= 0) entities.splice(i, 1);
+    }
+
+    // Particles Loop
+    for (let i = particles.length - 1; i >= 0; i--) {
+        particles[i].update();
+        particles[i].draw();
+        if (particles[i].life <= 0) particles.splice(i, 1);
+    }
+
+    requestAnimationFrame(gameLoop);
+}
+
+function startGame() {
+    resize();
+    mouse.x = w/2;
+    mouse.y = h/2;
+    player.x = w/2;
+    player.y = h/2;
+    
+    entities = [];
+    particles = [];
+    currentElementIndex = 0;
+    currentAtomicNumber = 1; // H
+    electronsCollected = 0;
+    electronsNeeded = 5; // Fixed number per level for gameplay flow
+    difficulty = 1;
+    
+    updateHUD();
+    
+    gameState = 'PLAYING';
+    menuScreen.classList.add('hidden');
+    gameLoop();
+}
+
+startBtn.addEventListener('click', () => {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    startGame();
+});
+
+// Initial Setup
+resize();
+updateHUD();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Element Striker</title>
+    <style>
+        :root {
+            --bg: #111827;
+            --card: #1f2937;
+            --primary: #8b5cf6; /* Violet */
+            --accent: #06b6d4;  /* Cyan */
+            --success: #10b981;
+            --error: #ef4444;
+            --text: #f3f4f6;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: radial-gradient(circle at center, #1f2937 0%, #111827 100%);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* HUD (Heads Up Display) */
+        .hud {
+            position: absolute;
+            top: 20px;
+            width: 90%;
+            max-width: 500px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 1.2rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            z-index: 10;
+        }
+
+        .hud-item span {
+            color: var(--accent);
+        }
+
+        /* The Game Container */
+        .game-stage {
+            width: 90%;
+            max-width: 450px;
+            height: 500px;
+            position: relative;
+            perspective: 1000px;
+        }
+
+        /* The Card */
+        .card {
+            background: rgba(31, 41, 55, 0.9);
+            border: 2px solid var(--primary);
+            border-radius: 20px;
+            padding: 30px;
+            width: 100%;
+            height: 100%;
+            box-sizing: border-box;
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            position: absolute;
+            top: 0;
+            left: 0;
+            backdrop-filter: blur(10px);
+            /* Initial State */
+            transform: translateX(0);
+            opacity: 1;
+            transition: transform 0.4s ease-in-out, opacity 0.4s;
+        }
+
+        .category-tag {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--primary);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .question-text {
+            font-size: 1.5rem;
+            text-align: center;
+            margin: 40px 0;
+            line-height: 1.4;
+        }
+
+        .emphasis {
+            color: var(--accent);
+            font-weight: bold;
+            font-size: 1.8rem;
+            display: block;
+            margin-top: 10px;
+        }
+
+        /* Buttons Grid */
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: auto;
+        }
+
+        .opt-btn {
+            background: transparent;
+            border: 2px solid #374151;
+            color: var(--text);
+            padding: 15px;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 600;
+        }
+
+        .opt-btn:hover {
+            border-color: var(--accent);
+            background: rgba(6, 182, 212, 0.1);
+            transform: translateY(-2px);
+        }
+
+        /* Feedback Classes */
+        .opt-btn.correct {
+            background: var(--success);
+            border-color: var(--success);
+            color: white;
+            box-shadow: 0 0 15px var(--success);
+        }
+
+        .opt-btn.wrong {
+            background: var(--error);
+            border-color: var(--error);
+            color: white;
+            animation: shake 0.4s;
+        }
+
+        /* Card Animations */
+        .slide-out-left {
+            transform: translateX(-120%) rotate(-10deg) !important;
+            opacity: 0 !important;
+        }
+
+        .slide-in-right {
+            animation: slideIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(120%) rotate(10deg); opacity: 0; }
+            to { transform: translateX(0) rotate(0); opacity: 1; }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-8px); }
+            75% { transform: translateX(8px); }
+        }
+
+        /* Game Over Screen */
+        .game-over {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100vh;
+            background: rgba(0,0,0,0.9);
+            z-index: 100;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .restart-btn {
+            background: var(--primary);
+            border: none;
+            padding: 15px 40px;
+            color: white;
+            font-size: 1.5rem;
+            border-radius: 50px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="hud">
+        <div class="hud-item">Score: <span id="score">0</span></div>
+        <div class="hud-item" style="color:#ef4444">Lives: <span id="lives">❤❤❤</span></div>
+    </div>
+
+    <div class="game-stage" id="stage">
+        </div>
+
+    <div class="game-over" id="game-over-screen">
+        <h1 style="color:var(--error); font-size:3rem; margin:0;">SYSTEM FAILURE</h1>
+        <p style="font-size:1.5rem">Final Score: <span id="final-score">0</span></p>
+        <button class="restart-btn" onclick="resetGame()">Reboot System</button>
+    </div>
+
+    <script>
+        // --- DATASET (Teens 13-18) ---
+        const elements = [
+            { s: 'H', n: 'Hydrogen', num: 1, g: 'Non-metal' },
+            { s: 'He', n: 'Helium', num: 2, g: 'Noble Gas' },
+            { s: 'Li', n: 'Lithium', num: 3, g: 'Alkali Metal' },
+            { s: 'C', n: 'Carbon', num: 6, g: 'Non-metal' },
+            { s: 'N', n: 'Nitrogen', num: 7, g: 'Non-metal' },
+            { s: 'O', n: 'Oxygen', num: 8, g: 'Non-metal' },
+            { s: 'Na', n: 'Sodium', num: 11, g: 'Alkali Metal' },
+            { s: 'Mg', n: 'Magnesium', num: 12, g: 'Alkaline Earth' },
+            { s: 'Al', n: 'Aluminum', num: 13, g: 'Metal' },
+            { s: 'Si', n: 'Silicon', num: 14, g: 'Metalloid' },
+            { s: 'Cl', n: 'Chlorine', num: 17, g: 'Halogen' },
+            { s: 'K', n: 'Potassium', num: 19, g: 'Alkali Metal' },
+            { s: 'Ca', n: 'Calcium', num: 20, g: 'Alkaline Earth' },
+            { s: 'Fe', n: 'Iron', num: 26, g: 'Transition Metal' },
+            { s: 'Cu', n: 'Copper', num: 29, g: 'Transition Metal' },
+            { s: 'Zn', n: 'Zinc', num: 30, g: 'Transition Metal' },
+            { s: 'Br', n: 'Bromine', num: 35, g: 'Halogen' },
+            { s: 'Ag', n: 'Silver', num: 47, g: 'Transition Metal' },
+            { s: 'Au', n: 'Gold', num: 79, g: 'Transition Metal' },
+            { s: 'Pb', n: 'Lead', num: 82, g: 'Post-transition Metal' },
+            { s: 'Rn', n: 'Radon', num: 86, g: 'Noble Gas' },
+            { s: 'U', n: 'Uranium', num: 92, g: 'Actinide' }
+        ];
+
+        let score = 0;
+        let lives = 3;
+        let currentCard = null;
+        let isLocked = false;
+
+        // --- AUDIO ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playTone(freq, type, dur) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + dur);
+            osc.start();
+            osc.stop(audioCtx.currentTime + dur);
+        }
+
+        function sfx(type) {
+            if(type === 'correct') { playTone(600, 'sine', 0.1); setTimeout(()=>playTone(900, 'sine', 0.2), 100); }
+            if(type === 'wrong') { playTone(150, 'sawtooth', 0.4); }
+            if(type === 'slide') { playTone(300, 'triangle', 0.1); }
+        }
+
+        // --- LOGIC ---
+
+        function getRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+        function generateQuestion() {
+            const type = Math.floor(Math.random() * 3); // 0, 1, or 2
+            const el = getRandom(elements);
+            let q = {};
+
+            // Type 0: Symbol to Name
+            if (type === 0) {
+                q.category = "Identify";
+                q.text = "Which element is this?";
+                q.highlight = el.s;
+                q.correct = el.n;
+                q.options = [el.n];
+                while(q.options.length < 4) {
+                    let r = getRandom(elements).n;
+                    if(!q.options.includes(r)) q.options.push(r);
+                }
+            } 
+            // Type 1: Name to Group
+            else if (type === 1) {
+                q.category = "Classification";
+                q.text = "What group is this in?";
+                q.highlight = el.n;
+                q.correct = el.g;
+                q.options = [el.g];
+                const allGroups = [...new Set(elements.map(e => e.g))];
+                while(q.options.length < 4) {
+                    let r = getRandom(allGroups);
+                    if(!q.options.includes(r)) q.options.push(r);
+                }
+            }
+            // Type 2: Atomic Number Math (Harder)
+            else {
+                q.category = "Data Analysis";
+                q.text = "What is the Atomic Number?";
+                q.highlight = `${el.n} (${el.s})`;
+                q.correct = el.num;
+                q.options = [el.num];
+                while(q.options.length < 4) {
+                    let offset = Math.floor(Math.random() * 10) - 5;
+                    let val = el.num + offset;
+                    if(val > 0 && !q.options.includes(val)) q.options.push(val);
+                }
+            }
+            
+            q.options.sort(() => Math.random() - 0.5);
+            return q;
+        }
+
+        function renderCard() {
+            isLocked = false;
+            const data = generateQuestion();
+            const stage = document.getElementById('stage');
+            
+            // Create Card HTML
+            const card = document.createElement('div');
+            card.className = 'card slide-in-right';
+            
+            let btnHtml = '';
+            data.options.forEach(opt => {
+                btnHtml += `<button class="opt-btn" onclick="checkAnswer(this, '${opt}', '${data.correct}')">${opt}</button>`;
+            });
+
+            card.innerHTML = `
+                <div class="category-tag">${data.category}</div>
+                <div class="question-text">
+                    ${data.text}
+                    <span class="emphasis">${data.highlight}</span>
+                </div>
+                <div class="options-grid">
+                    ${btnHtml}
+                </div>
+            `;
+
+            // Clear stage and add new card
+            stage.innerHTML = '';
+            stage.appendChild(card);
+            
+            currentCard = card;
+            sfx('slide');
+        }
+
+        function checkAnswer(btn, value, correct) {
+            if(isLocked) return;
+            isLocked = true; // Prevent multiple clicks
+
+            // Convert to string just in case
+            if (String(value) === String(correct)) {
+                // Correct
+                btn.classList.add('correct');
+                score += 100;
+                document.getElementById('score').innerText = score;
+                sfx('correct');
+                
+                // Wait 1s then Next
+                setTimeout(() => {
+                    transitionNext();
+                }, 1000);
+
+            } else {
+                // Wrong
+                btn.classList.add('wrong');
+                lives--;
+                updateLives();
+                sfx('wrong');
+
+                // Highlight correct one
+                const buttons = currentCard.querySelectorAll('.opt-btn');
+                buttons.forEach(b => {
+                    if(String(b.innerText) === String(correct)) b.classList.add('correct');
+                });
+
+                if(lives <= 0) {
+                    setTimeout(endGame, 1000);
+                } else {
+                    setTimeout(transitionNext, 1500);
+                }
+            }
+        }
+
+        function transitionNext() {
+            if(currentCard) {
+                currentCard.classList.remove('slide-in-right');
+                currentCard.classList.add('slide-out-left');
+                // Wait for animation to finish before rendering new one
+                setTimeout(renderCard, 400); 
+            }
+        }
+
+        function updateLives() {
+            let hearts = "";
+            for(let i=0; i<lives; i++) hearts += "❤";
+            document.getElementById('lives').innerText = hearts;
+        }
+
+        function endGame() {
+            document.getElementById('game-over-screen').style.display = 'flex';
+            document.getElementById('final-score').innerText = score;
+        }
+
+        function resetGame() {
+            score = 0;
+            lives = 3;
+            document.getElementById('score').innerText = "0";
+            updateLives();
+            document.getElementById('game-over-screen').style.display = 'none';
+            renderCard();
+        }
+
+        // Start
+        renderCard();
+
+    </script>
+</body>
+</html>

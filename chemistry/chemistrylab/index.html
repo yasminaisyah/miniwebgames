@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dr. Atom's Chemistry Lab - Missions</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Share+Tech+Mono&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0d1117; /* Dark background */
+            color: #e5e7eb;
+        }
+        
+        /* Custom Glowing Button */
+        .lab-btn {
+            transition: all 0.3s ease;
+            box-shadow: 0 0 5px #0ff, 0 0 10px #0ff, 0 0 15px #0ff;
+        }
+
+        .lab-btn:hover:not(:disabled) {
+            box-shadow: 0 0 10px #0ff, 0 0 20px #0ff, 0 0 30px #0ff;
+            transform: translateY(-2px);
+        }
+
+        .lab-container {
+            font-family: 'Share Tech Mono', monospace;
+            border: 3px solid #165b6f;
+            background-color: #161b22;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.4);
+        }
+        
+        /* Reaction Animation (Bubbling/Success) */
+        @keyframes bubbling {
+            0% { transform: scale(1); opacity: 1; border-color: #00ff00; }
+            50% { transform: scale(1.05); opacity: 0.8; border-color: #00ffff; }
+            100% { transform: scale(1); opacity: 1; border-color: #00ff00; }
+        }
+
+        .reaction-success {
+            animation: bubbling 0.5s ease-in-out 3;
+            background-color: #004400 !important;
+        }
+
+        /* Explosion Animation (Failure) */
+        @keyframes explosion {
+            0% { transform: scale(1); opacity: 1; background-color: #440000; }
+            25% { transform: scale(1.1); opacity: 0; background-color: #ff0000; }
+            75% { transform: scale(1.1); opacity: 0; background-color: #ff0000; }
+            100% { transform: scale(1); opacity: 1; background-color: #440000; }
+        }
+
+        .reaction-fail {
+            animation: explosion 0.3s ease-out 3;
+        }
+
+        /* Progress Bar styles */
+        .progress-bar {
+            transition: width 0.5s ease-out;
+        }
+        
+        /* Styling for Chemical Elements/Compounds (Kept for other missions) */
+        .chemical-label {
+            display: inline-block;
+            padding: 8px 12px;
+            margin: 4px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+
+        .chemical-label:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 2px 8px rgba(0, 255, 255, 0.3);
+        }
+
+        .compound { background-color: #1e40af; } /* Blue for Compounds */
+        .element { background-color: #b45309; } /* Orange for Elements */
+        
+        .selected {
+            border: 2px solid #00ffff;
+            background-color: #008888 !important;
+            box-shadow: 0 0 15px #00ffff;
+        }
+
+        /* Modal Animation */
+        .animate-bounce-in {
+            animation: bounceIn 0.5s ease-out;
+        }
+        @keyframes bounceIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            80% { transform: scale(1.1); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 min-h-screen flex items-center justify-center">
+
+    <div id="app" class="lab-container max-w-4xl w-full p-6 md:p-10 rounded-xl">
+        <h1 class="text-3xl md:text-5xl font-bold text-center mb-6 text-teal-300">
+            <span class="text-4xl">&#x1F9EA;</span> Dr. Atom's Chemistry Lab
+        </h1>
+
+        <!-- Mission Selector Screen -->
+        <div id="mission-selector-screen" class="p-4 text-center">
+            <h2 class="text-2xl font-bold text-cyan-400 mb-6">Select Your Mission</h2>
+            <div id="mission-list" class="space-y-4">
+                <!-- Mission buttons rendered here -->
+            </div>
+            <p class="mt-8 text-sm text-gray-400">Complete missions to unlock harder challenges!</p>
+        </div>
+
+        <!-- Quiz Screen -->
+        <div id="quiz-screen" class="hidden">
+            <!-- Progress Bar & Score -->
+            <div class="mb-6">
+                <div class="text-sm font-semibold mb-2 flex justify-between items-center">
+                    <div>
+                        <span>Level <span id="level-display">1</span>/4</span>
+                        <span class="ml-4">Q <span id="question-index-display">0</span>/5</span>
+                    </div>
+                    <div class="text-xl font-bold text-yellow-400">
+                        Score: <span id="score-display">0</span>
+                    </div>
+                </div>
+                <div class="w-full bg-gray-700 rounded-full h-3">
+                    <div id="progress-bar" class="progress-bar h-3 rounded-full bg-cyan-400" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Mission Control -->
+            <div class="bg-gray-800 p-4 rounded-lg mb-6 border border-teal-600">
+                <h2 class="text-xl font-bold text-teal-400 mb-2">MISSION: <span id="mission-title">Initialize</span></h2>
+                <p id="mission-description" class="text-sm text-gray-300">Help Dr. Atom mix the right compounds to unlock the next experiment!</p>
+            </div>
+
+            <!-- Game Area (The "Beaker") -->
+            <div id="game-area" class="bg-gray-900 p-8 rounded-xl text-center min-h-[250px] flex flex-col justify-center items-center relative transition-colors duration-500">
+                <div id="beaker-content" class="text-2xl md:text-3xl font-bold">
+                    Loading Experiment...
+                </div>
+                <!-- Feedback Overlay -->
+                <div id="feedback" class="absolute inset-0 bg-black bg-opacity-80 flex items-center justify-center text-5xl font-black text-white hidden"></div>
+            </div>
+
+            <!-- Controls -->
+            <div id="controls" class="mt-6 p-4 bg-gray-800 rounded-lg flex flex-col items-center">
+                <!-- Dynamic Choice/Input Area -->
+                <div id="choices-area" class="flex flex-wrap justify-center gap-3 mb-4">
+                    <!-- Choices will be rendered here for multiple-choice only -->
+                </div>
+                
+                <!-- Text input field -->
+                <input type="text" id="answer-input" class="w-full max-w-sm p-3 text-lg rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 hidden" placeholder="Type your answer here (e.g., NaCl)">
+
+                <!-- Action Buttons -->
+                <div class="flex space-x-4 mt-8 w-full justify-center">
+                    <button id="hint-btn" class="lab-btn bg-blue-600 text-white font-bold py-3 px-6 rounded-lg text-sm disabled:opacity-50" onclick="getHint()">
+                        Get Hint (-5 Pts)
+                    </button>
+                    <button id="submit-btn" class="lab-btn bg-teal-600 text-white font-bold py-3 px-8 rounded-lg disabled:opacity-50">
+                        Submit Solution
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Level Up / Mission Complete Modal -->
+        <div id="level-up-modal" class="fixed inset-0 bg-black bg-opacity-75 items-center justify-center hidden" onclick="hideModal()">
+            <div class="bg-gray-900 p-8 rounded-xl border-4 border-yellow-400 shadow-2xl text-center animate-bounce-in max-w-sm" onclick="event.stopPropagation()">
+                <div class="text-6xl mb-4" id="modal-icon">&#x1F389;</div>
+                <h2 class="text-4xl font-bold text-yellow-300" id="modal-title">LEVEL UP!</h2>
+                <p class="text-xl mt-3 text-gray-200" id="levelup-message"></p>
+                <button class="lab-btn bg-yellow-500 text-gray-900 font-bold py-2 px-6 rounded-lg mt-6" id="modal-action-btn" onclick="modalAction()">
+                    Continue
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Global Variables and Constants
+        const LEVEL_COUNT = 4;
+        const Q_PER_LEVEL = 5;
+        let currentMissionKey = '';
+        let currentLevelIndex = 0; // 0 to 3
+        let questionIndex = 0; // 0 to 4
+        let score = 0; // NEW: To track the player's score
+        let hintUsedForQuestion = false; // NEW: Flag to limit hint usage
+        let currentChallenge = null;
+        let selectedChoice = null;
+        
+        // DOM Elements
+        const Dom = {
+            app: document.getElementById('app'),
+            missionSelectorScreen: document.getElementById('mission-selector-screen'),
+            quizScreen: document.getElementById('quiz-screen'),
+            levelDisplay: document.getElementById('level-display'),
+            questionIndexDisplay: document.getElementById('question-index-display'),
+            progressBar: document.getElementById('progress-bar'),
+            scoreDisplay: document.getElementById('score-display'), // NEW
+            missionTitle: document.getElementById('mission-title'),
+            missionDescription: document.getElementById('mission-description'),
+            beakerContent: document.getElementById('beaker-content'),
+            feedbackEl: document.getElementById('feedback'),
+            choicesArea: document.getElementById('choices-area'),
+            answerInput: document.getElementById('answer-input'),
+            submitBtn: document.getElementById('submit-btn'),
+            hintBtn: document.getElementById('hint-btn'), // NEW
+            levelUpModal: document.getElementById('level-up-modal'),
+            modalIcon: document.getElementById('modal-icon'),
+            modalTitle: document.getElementById('modal-title'),
+            levelupMessage: document.getElementById('levelup-message'),
+            modalActionBtn: document.getElementById('modal-action-btn'),
+            gameArea: document.getElementById('game-area'),
+            missionList: document.getElementById('mission-list'),
+        };
+
+        // --- Core Game Data - Consolidated and Expanded ---
+        const MISSIONS = {
+            'Easy: Basic Formulas': {
+                unlocked: true,
+                description: "Master the most common element symbols, simple compounds, and basic equation balancing using text input.",
+                levels: [
+                    // Level 1: Match element symbols (Text Input) - Now Text Input
+                    { title: "Identify Element Symbol", type: "text-input", inputType: "text", challenges: [
+                        { q: "What is the symbol for Sodium?", a: "Na" },
+                        { q: "What is the symbol for Iron?", a: "Fe" },
+                        { q: "What is the symbol for Potassium?", a: "K" },
+                        { q: "What is the symbol for Silver?", a: "Ag" },
+                        { q: "What is the symbol for Chlorine?", a: "Cl" },
+                    ]},
+                    // Level 2: Identify chemical compounds (Text Input) - Now Text Input
+                    { title: "Name or Formula Identification", type: "text-input", inputType: "text", challenges: [
+                        { q: "What is the name of H₂O?", a: "Water" },
+                        { q: "What is the formula for Salt (Sodium Chloride)?", a: "NaCl" },
+                        { q: "What is the formula for Carbon Dioxide?", a: "CO2" },
+                        { q: "What is the name of CH₄?", a: "Methane" },
+                        { q: "What is the name of O₂?", a: "OxygenGas" },
+                    ]},
+                    // Level 3: Balance simple equations (Text Input - Coefficient)
+                    { title: "Balance Simple Equations (Coefficient)", type: "text-input", inputType: "number", challenges: [
+                        { q: "H₂ + Cl₂ → _HCl", a: "2" },
+                        { q: "2Mg + O₂ → _MgO", a: "2" },
+                        { q: "N₂ + 3H₂ → _NH₃", a: "2" },
+                        { q: "C + O₂ → _CO₂", a: "1" },
+                        { q: "2K + Br₂ → _KBr", a: "2" },
+                    ]},
+                    // Level 4: Reaction Puzzle (Text Input - Formula)
+                    { title: "Predict Reaction Product (Formula)", type: "text-input", inputType: "text", challenges: [
+                        { q: "Sodium (Na) + Chlorine (Cl) → ?", a: "NaCl" },
+                        { q: "Hydrogen (H₂) + Oxygen (O₂) → ?", a: "H2O" },
+                        { q: "Calcium (Ca) + Oxygen (O₂) → ?", a: "CaO" },
+                        { q: "Methane (CH₄) + Oxygen (O₂) (Incomplete) → ?", a: "CO + H2O" }, 
+                        { q: "Hydrochloric Acid (HCl) + Sodium Hydroxide (NaOH) → ?", a: "NaCl + H2O" },
+                    ]}
+                ]
+            },
+            'Medium: Advanced Compounds': {
+                unlocked: false,
+                description: "Identify polyatomic ions, name common acids/bases, and recognize basic organic structures.",
+                levels: [
+                    // Level 1: Polyatomic Ions (Multiple Choice) - KEPT MC
+                    { title: "Identify Polyatomic Ion", type: "multiple-choice", challenges: [
+                        { q: "OH⁻", options: ["Sulfate", "Carbonate", "Hydroxide", "Nitrate"], a: "Hydroxide" },
+                        { q: "SO₄²⁻", options: ["Sulfate", "Sulfide", "Sulfite", "Thiosulfate"], a: "Sulfate" },
+                        { q: "NH₄⁺", options: ["Nitride", "Ammonium", "Ammonia", "Hydrazine"], a: "Ammonium" },
+                        { q: "PO₄³⁻", options: ["Phosphate", "Phosphide", "Phosphite", "Phosphonium"], a: "Phosphate" },
+                        { q: "NO₃⁻", options: ["Nitrite", "Nitrate", "Nitride", "Nitrous"], a: "Nitrate" },
+                    ]},
+                    // Level 2: Acid/Base Naming (Multiple Choice) - KEPT MC
+                    { title: "Acid/Base Naming", type: "multiple-choice", challenges: [
+                        { q: "H₂SO₄", options: ["Hydrosulfuric Acid", "Sulfurous Acid", "Sulfuric Acid", "Hydrogen Sulfide"], a: "Sulfuric Acid" },
+                        { q: "NaOH", options: ["Sodium Hydroxide", "Sodium Hydride", "Sodium Oxide", "Natrium Hydroxide"], a: "Sodium Hydroxide" },
+                        { q: "HCl", options: ["Hydrochloric Acid", "Chloric Acid", "Perchloric Acid", "Hydrogen Chloride"], a: "Hydrochloric Acid" },
+                        { q: "HNO₃", options: ["Nitrous Acid", "Hydronitric Acid", "Nitric Acid", "Nitrogen Oxide"], a: "Nitric Acid" },
+                        { q: "KOH", options: ["Potassium Hydroxide", "Potassium Hydride", "Potassium Oxide", "Kalium Hydroxide"], a: "Potassium Hydroxide" },
+                    ]},
+                    // Level 3: Basic Organic Formula (Text Input - Formula)
+                    { title: "Basic Organic Formula (Formula)", type: "text-input", inputType: "text", challenges: [
+                        { q: "What is the formula for Ethane?", a: "C2H6" },
+                        { q: "What is the formula for Propane?", a: "C3H8" },
+                        { q: "What is the formula for Ethanol (drinking alcohol)?", a: "C2H5OH" },
+                        { q: "What is the formula for Glucose (a simple sugar)?", a: "C6H12O6" },
+                        { q: "What is the formula for Methanol (wood alcohol)?", a: "CH3OH" },
+                    ]},
+                    // Level 4: Stoichiometry Concepts (Multiple Choice)
+                    { title: "Stoichiometry Concepts", type: "multiple-choice", challenges: [
+                        { q: "The mole is equivalent to what number of particles?", options: ["6.02 x 10²²", "6.02 x 10²³", "1.00 x 10²³", "1.00 x 10²²"], a: "6.02 x 10²³" },
+                        { q: "What is the reactant that limits the amount of product formed?", options: ["Excess Reactant", "Catalyst", "Limiting Reactant", "Product Yield"], a: "Limiting Reactant" },
+                        { q: "What unit is typically used to describe the amount of substance in stoichiometry?", options: ["Grams", "Liters", "Moles", "Milliliters"], a: "Moles" },
+                        { q: "The mass of 1 mole of a substance is its:", options: ["Atomic Mass", "Molecular Mass", "Molar Mass", "Atomic Number"], a: "Molar Mass" },
+                        { q: "A chemical equation must be *balanced* to satisfy which law?", options: ["Law of Definite Proportions", "Law of Multiple Proportions", "Law of Conservation of Mass", "Ideal Gas Law"], a: "Law of Conservation of Mass" },
+                    ]}
+                ]
+            },
+            'Expert: Advanced Reactions': {
+                unlocked: false,
+                description: "Tackle complex balancing, oxidation states, and non-trivial reaction types.",
+                levels: [
+                    // Level 1: Harder Balancing (Text Input - Coefficient)
+                    { title: "Balance Complex Equation (Coefficient)", type: "text-input", inputType: "number", challenges: [
+                        { q: "S₈ + 12O₂ → _SO₃", a: "8" },
+                        { q: "2Al + _Fe₃N₂ → 2AlN + 3Fe", a: "1" },
+                        { q: "2C₂H₆ + 7O₂ → _CO₂ + 6H₂O", a: "4" },
+                        { q: "4NH₃ + 5O₂ → _NO + 6H₂O", a: "4" },
+                        { q: "P₄ + 6Cl₂ → _PCl₃", a: "4" },
+                    ]},
+                    // Level 2: Identify Oxidation States (Text Input - Number)
+                    { title: "Identify Oxidation State (Number)", type: "text-input", inputType: "number", challenges: [
+                        { q: "What is the oxidation state of *S* in H₂SO₄? (Enter only the number, e.g., 6)", a: "6" },
+                        { q: "What is the oxidation state of *N* in NO₃⁻? (Enter only the number, e.g., 5)", a: "5" },
+                        { q: "What is the oxidation state of *Mn* in KMnO₄? (Enter only the number, e.g., 7)", a: "7" },
+                        { q: "What is the oxidation state of *Cr* in Cr₂O₇²⁻? (Enter only the number, e.g., 6)", a: "6" },
+                        { q: "What is the oxidation state of *P* in PO₄³⁻? (Enter only the number, e.g., 5)", a: "5" },
+                    ]},
+                    // Level 3: Reaction Type Classification (Multiple Choice) - KEPT MC
+                    { title: "Reaction Type Classification", type: "multiple-choice", challenges: [
+                        { q: "A + B → AB", options: ["Decomposition", "Synthesis", "Single Replacement", "Combustion"], a: "Synthesis" },
+                        { q: "AX + BY → AY + BX", options: ["Single Replacement", "Double Replacement", "Combustion", "Decomposition"], a: "Double Replacement" },
+                        { q: "Acid + Base → Salt + Water", options: ["Precipitation", "Redox", "Neutralization", "Synthesis"], a: "Neutralization" },
+                        { q: "Fe + CuSO₄ → FeSO₄ + Cu", options: ["Synthesis", "Double Replacement", "Single Replacement", "Decomposition"], a: "Single Replacement" },
+                        { q: "Compound breaking down into simpler substances", options: ["Synthesis", "Decomposition", "Combustion", "Neutralization"], a: "Decomposition" },
+                    ]},
+                    // Level 4: Quantum/Structural Concepts (Multiple Choice) - KEPT MC
+                    { title: "Advanced Concepts", type: "multiple-choice", challenges: [
+                        { q: "What orbital shape is represented by the azimuthal quantum number $l=1$?", options: ["s", "p", "d", "f"], a: "p" },
+                        { q: "What is the total number of valence electrons in the molecule $NH_3$?", options: ["5", "8", "6", "7"], a: "8" },
+                        { q: "Which type of bond involves the transfer of electrons?", options: ["Covalent", "Metallic", "Hydrogen", "Ionic"], a: "Ionic" },
+                        { q: "The process of a solid turning directly into a gas is called:", options: ["Evaporation", "Sublimation", "Deposition", "Condensation"], a: "Sublimation" },
+                        { q: "Which particle determines the identity of an element?", options: ["Neutron", "Electron", "Proton", "Ion"], a: "Proton" },
+                    ]}
+                ]
+            }
+        };
+
+        // --- Utility Functions ---
+        
+        // Function to clean answers, removing whitespace and converting common subscripts
+        function cleanAnswer(str) {
+            return str.trim().toLowerCase().replace(/\s/g, '')
+                      .replace(/[₂]/g, '2')
+                      .replace(/[₃]/g, '3')
+                      .replace(/[₄]/g, '4')
+                      .replace(/[₅]/g, '5')
+                      .replace(/[₆]/g, '6')
+                      .replace(/[₇]/g, '7')
+                      .replace(/[₈]/g, '8')
+                      .replace(/[₉]/g, '9')
+                      .replace(/[₀]/g, '0');
+        }
+
+        // Function to handle localStorage for mission unlocks
+        function loadMissionStatus() {
+            try {
+                const status = JSON.parse(localStorage.getItem('missionStatus')) || {};
+                // Ensure Easy is always unlocked
+                status['Easy: Basic Formulas'] = true;
+                return status;
+            } catch (e) {
+                console.error("Error loading mission status from localStorage:", e);
+                return { 'Easy: Basic Formulas': true };
+            }
+        }
+
+        function saveMissionStatus(key, unlocked) {
+            const status = loadMissionStatus();
+            status[key] = unlocked;
+            localStorage.setItem('missionStatus', JSON.stringify(status));
+        }
+
+        // Simple utility to show a message and remove it after a delay
+        function showFeedback(message, type) {
+            Dom.feedbackEl.textContent = message;
+            Dom.feedbackEl.classList.remove('hidden');
+            
+            // Clear previous classes
+            Dom.feedbackEl.classList.remove('reaction-success', 'reaction-fail', 'bg-green-700', 'text-green-300', 'bg-red-700', 'text-red-300', 'bg-blue-700', 'text-blue-300');
+
+
+            if (type === 'success') {
+                Dom.feedbackEl.classList.add('reaction-success');
+                Dom.feedbackEl.classList.add('bg-green-700', 'text-green-300');
+                setTimeout(() => Dom.feedbackEl.classList.add('hidden'), 1500); // Hide success/fail quickly
+            } else if (type === 'fail') {
+                Dom.feedbackEl.classList.add('reaction-fail');
+                Dom.feedbackEl.classList.add('bg-red-700', 'text-red-300');
+                setTimeout(() => Dom.feedbackEl.classList.add('hidden'), 1000); // Hide success/fail quickly
+            } else if (type === 'info') { // NEW: Style for Hint/Info
+                Dom.feedbackEl.classList.add('bg-blue-700', 'text-blue-300', 'text-2xl');
+                Dom.feedbackEl.textContent = message;
+                setTimeout(() => Dom.feedbackEl.classList.add('hidden'), 3000); // Keep hint message longer
+            }
+        }
+
+        function updateProgress() {
+            const totalQuestionsAnswered = (currentLevelIndex * Q_PER_LEVEL) + questionIndex;
+            const totalQuestions = LEVEL_COUNT * Q_PER_LEVEL;
+            const percentage = Math.round((totalQuestionsAnswered / totalQuestions) * 100);
+            
+            Dom.levelDisplay.textContent = currentLevelIndex + 1;
+            Dom.questionIndexDisplay.textContent = questionIndex;
+            Dom.progressBar.style.width = `${percentage}%`;
+            Dom.scoreDisplay.textContent = score; // NEW: Update score display
+        }
+
+        function showModal(title, message, icon, buttonText, action) {
+            Dom.modalTitle.textContent = title;
+            Dom.levelupMessage.innerHTML = message;
+            Dom.modalIcon.innerHTML = icon;
+            Dom.modalActionBtn.textContent = buttonText;
+            Dom.modalActionBtn.onclick = action;
+            Dom.levelUpModal.style.display = 'flex';
+        }
+
+        function hideModal() {
+            Dom.levelUpModal.style.display = 'none';
+        }
+
+        // --- Screen Management ---
+        function setScreen(screenId) {
+            Dom.missionSelectorScreen.classList.add('hidden');
+            Dom.quizScreen.classList.add('hidden');
+            
+            document.getElementById(screenId).classList.remove('hidden');
+            Dom.feedbackEl.classList.add('hidden');
+        }
+
+        function showMissionSelector() {
+            setScreen('mission-selector-screen');
+            renderMissionList();
+        }
+
+        function renderMissionList() {
+            Dom.missionList.innerHTML = '';
+            const missionStatus = loadMissionStatus();
+            
+            Object.keys(MISSIONS).forEach(key => {
+                const mission = MISSIONS[key];
+                const isUnlocked = missionStatus[key] || mission.unlocked;
+                
+                const btn = document.createElement('button');
+                btn.className = `lab-btn w-full py-4 rounded-lg font-bold text-xl text-left px-6 transition duration-300 ${isUnlocked ? 'bg-teal-600 hover:bg-teal-500' : 'bg-gray-600 cursor-not-allowed opacity-50'}`;
+                btn.innerHTML = `<span class="text-white">${key}</span> <br> <span class="text-sm font-normal text-gray-200 block mt-1">${mission.description}</span>`;
+                
+                if (isUnlocked) {
+                    btn.onclick = () => startMission(key);
+                } else {
+                    btn.innerHTML += `<span class="text-sm font-normal text-red-300 block mt-1">🔒 Complete previous mission to unlock</span>`;
+                    btn.disabled = true;
+                }
+                Dom.missionList.appendChild(btn);
+            });
+        }
+        
+        // --- Game Flow Functions ---
+
+        function startMission(missionKey) {
+            currentMissionKey = missionKey;
+            currentLevelIndex = 0;
+            questionIndex = 0;
+            score = 0; // NEW: Initialize score
+            setScreen('quiz-screen');
+            
+            // Deep copy all challenges for the mission to ensure no permanent data modification
+            const missionData = MISSIONS[missionKey];
+            missionData.levels.forEach(level => {
+                // Shuffle challenges once per level startup
+                level.availableChallenges = [...level.challenges];
+                shuffleArray(level.availableChallenges);
+            });
+
+            loadLevel(0);
+        }
+        
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            // Ensure the list has enough challenges for the Q_PER_LEVEL
+            if (array.length < Q_PER_LEVEL) {
+                 // Duplicate list if needed to ensure enough questions (shouldn't happen with current data)
+                 while (array.length < Q_PER_LEVEL) {
+                     array.push(array[array.length % array.length]);
+                 }
+            }
+        }
+
+        function loadLevel(levelIndex) {
+            currentLevelIndex = levelIndex;
+            questionIndex = 0;
+            
+            if (currentLevelIndex >= LEVEL_COUNT) {
+                // Mission Complete
+                const nextMissionKeys = Object.keys(MISSIONS).filter((k, i) => i > Object.keys(MISSIONS).indexOf(currentMissionKey));
+                const nextMissionKey = nextMissionKeys[0];
+                
+                if (nextMissionKey) {
+                    saveMissionStatus(nextMissionKey, true);
+                    showModal(
+                        'MISSION COMPLETE!', 
+                        `You successfully completed the **${currentMissionKey}** mission with a score of **${score}**! The next mission, **${nextMissionKey}**, is now unlocked.`,
+                        '&#x1F9E9;', // Beaker
+                        'Go to Mission Selector',
+                        showMissionSelector
+                    );
+                } else {
+                    showModal(
+                        'MASTER CHEMIST!', 
+                        `You have completed ALL available missions with a final score of **${score}**! Dr. Atom is proud.`,
+                        '&#x1F3C6;', // Trophy
+                        'Start New Mission',
+                        showMissionSelector
+                    );
+                }
+                return;
+            }
+
+            // Load Level
+            Dom.missionTitle.textContent = currentMissionKey;
+            Dom.missionDescription.textContent = MISSIONS[currentMissionKey].levels[currentLevelIndex].title;
+            loadNextQuestion();
+        }
+
+        function loadNextQuestion() {
+            const currentLevelData = MISSIONS[currentMissionKey].levels[currentLevelIndex];
+            
+            if (questionIndex >= Q_PER_LEVEL || currentLevelData.availableChallenges.length === 0) {
+                // Level Complete
+                showModal(
+                    'LEVEL UP!', 
+                    `Experiment ${currentLevelIndex + 1} complete! Advancing to Experiment ${currentLevelIndex + 2}.`,
+                    '&#x1F389;',
+                    'Start Next Level',
+                    () => loadLevel(currentLevelIndex + 1)
+                );
+                return;
+            }
+            
+            questionIndex++;
+            updateProgress();
+
+            // Reset hint state for the new question
+            hintUsedForQuestion = false; 
+            Dom.hintBtn.disabled = false;
+            Dom.hintBtn.classList.remove('opacity-50');
+
+            // Reset selected choice for multiple choice in case we switch modes
+            selectedChoice = null;
+
+            // Get next question (from the shuffled and non-repeating pool)
+            currentChallenge = currentLevelData.availableChallenges.pop(); 
+            
+            Dom.beakerContent.innerHTML = `<p class="text-gray-400 mb-2 text-xl">Challenge Q${questionIndex}:</p><span class="text-cyan-300 text-5xl font-extrabold">${currentChallenge.q}</span>`;
+            
+            renderControls();
+        }
+
+        // --- Hint Logic ---
+        function getHint() {
+            if (hintUsedForQuestion) return;
+
+            score -= 5; // Penalty for using hint
+            updateProgress();
+            
+            hintUsedForQuestion = true;
+            Dom.hintBtn.disabled = true;
+            Dom.hintBtn.classList.add('opacity-50');
+
+            // Simple hint logic:
+            const correctAnswer = currentChallenge.a;
+            let hintMessage = `Hint used! **-5 points.**`;
+            
+            const type = MISSIONS[currentMissionKey].levels[currentLevelIndex].type;
+            
+            if (type === 'text-input' || type === 'multiple-choice') {
+                const firstChar = correctAnswer[0];
+                
+                if (currentChallenge.q.includes('symbol for')) {
+                    hintMessage += ` The element's symbol starts with: "${firstChar.toUpperCase()}".`;
+                } else if (currentChallenge.q.includes('formula for') || currentChallenge.q.includes('formula of')) {
+                    hintMessage += ` The formula begins with: "${firstChar.toUpperCase()}".`;
+                } else if (currentChallenge.q.includes('name of')) {
+                    hintMessage += ` The compound's name starts with: "${firstChar.toUpperCase()}".`;
+                } else if (currentChallenge.q.includes('coefficient')) {
+                     hintMessage += ` The coefficient is a small whole number: $\\{1, 2, 3, 4\\}$.`;
+                } else if (currentChallenge.q.includes('oxidation state')) {
+                     hintMessage += ` Remember, Oxygen is usually $-2$ and Hydrogen is $+1$.`;
+                } else {
+                     hintMessage += ` The first letter of the answer is: "${firstChar}".`;
+                }
+            }
+
+            showFeedback(hintMessage, 'info'); 
+        }
+
+        // --- Controls Rendering ---
+        function renderControls() {
+            Dom.choicesArea.innerHTML = '';
+            Dom.submitBtn.classList.remove('hidden');
+            Dom.submitBtn.disabled = false;
+            
+            const type = MISSIONS[currentMissionKey].levels[currentLevelIndex].type;
+            
+            if (type === 'multiple-choice') {
+                Dom.answerInput.classList.add('hidden'); // Hide input for MC
+                Dom.submitBtn.disabled = true; // Disabled until selection is made
+
+                // Combine element and compound classes for styling
+                const baseClass = 'chemical-label lab-btn text-base md:text-lg font-semibold px-4 py-2 rounded-full ';
+                
+                currentChallenge.options.forEach(option => {
+                    const btn = document.createElement('button');
+                    btn.textContent = option;
+                    btn.className = baseClass + (currentChallenge.q.length <= 2 ? 'element' : 'compound');
+                    btn.addEventListener('click', () => handleChoiceSelection(btn, option));
+                    Dom.choicesArea.appendChild(btn);
+                });
+
+            } else if (type === 'text-input') {
+                Dom.choicesArea.innerHTML = ''; // Clear choices area
+                Dom.answerInput.classList.remove('hidden'); // Show input for text mode
+                Dom.answerInput.value = '';
+                Dom.answerInput.type = currentChallenge.inputType || 'text';
+                
+                let placeholderText = '';
+                if (currentChallenge.inputType === 'number') {
+                    placeholderText = 'Enter coefficient (e.g., 2)';
+                } else if (currentChallenge.a.length < 5) {
+                    placeholderText = 'Enter Symbol/Formula (e.g., Na or H2O)';
+                } else {
+                    placeholderText = 'Enter Name or Formula (e.g., Water)';
+                }
+
+                Dom.answerInput.placeholder = placeholderText;
+            }
+            
+            if (type === 'text-input') {
+                Dom.answerInput.focus();
+            }
+        }
+
+        function handleChoiceSelection(element, choice) {
+            // Deselect previous choice
+            const prevSelected = Dom.choicesArea.querySelector('.chemical-label.selected');
+            if (prevSelected) {
+                prevSelected.classList.remove('selected');
+            }
+
+            // Select new choice
+            selectedChoice = choice;
+            element.classList.add('selected');
+            Dom.submitBtn.disabled = false;
+        }
+
+        // --- Submission Logic ---
+        function handleSubmission() {
+            const currentLevelData = MISSIONS[currentMissionKey].levels[currentLevelIndex];
+            Dom.submitBtn.disabled = true;
+
+            let userAnswer = null;
+            
+            // Clean correct answer for comparison (case-insensitive, space-agnostic, subscript-agnostic)
+            const correctAnswerCleaned = cleanAnswer(currentChallenge.a);
+
+            if (currentLevelData.type === 'multiple-choice') {
+                userAnswer = selectedChoice ? cleanAnswer(selectedChoice) : null;
+            } else {
+                // Text Input Submission
+                userAnswer = cleanAnswer(Dom.answerInput.value);
+            }
+
+            if (!userAnswer) {
+                showFeedback("Please provide an answer!", 'fail');
+                Dom.submitBtn.disabled = currentLevelData.type === 'multiple-choice' ? true : false; // Re-enable if text input and wasn't empty
+                return;
+            }
+            
+            let isCorrect = (userAnswer === correctAnswerCleaned);
+            
+            // Special handling for Level 4 of Easy mission (reaction products can be in any order)
+            if (!isCorrect && currentMissionKey === 'Easy: Basic Formulas' && currentLevelIndex === 3) {
+                 // Check common alternative formula order for reaction products (e.g., A+B is the same as B+A)
+                 const partsA = correctAnswerCleaned.split('+').map(p => p.trim());
+                 const partsB = userAnswer.split('+').map(p => p.trim());
+                 isCorrect = partsA.sort().join('+') === partsB.sort().join('+');
+            }
+
+
+            if (isCorrect) {
+                score += 10; // NEW: Add points for correct answer
+                showFeedback("SUCCESS! Cool Reaction! (+10 Pts)", 'success');
+                Dom.gameArea.classList.add('reaction-success');
+
+                setTimeout(() => {
+                    Dom.gameArea.classList.remove('reaction-success');
+                    loadNextQuestion();
+                }, 1500);
+
+            } else {
+                // Note: The displayed correct answer shows the original formatting from the data.
+                showFeedback(`💥 EXPLOSION! Correct: ${currentChallenge.a}`, 'fail');
+                Dom.gameArea.classList.add('reaction-fail');
+                Dom.answerInput.value = '';
+
+                setTimeout(() => {
+                    Dom.gameArea.classList.remove('reaction-fail');
+                    Dom.submitBtn.disabled = false;
+                    if (currentLevelData.type === 'text-input') {
+                        Dom.answerInput.focus(); // Re-focus on error
+                    }
+                }, 1000);
+            }
+            updateProgress(); // Update progress/score after submission
+        }
+        
+        // --- Event Bindings ---
+
+        Dom.submitBtn.addEventListener('click', handleSubmission);
+
+        Dom.answerInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !Dom.submitBtn.disabled) {
+                handleSubmission();
+            }
+        });
+        
+        function modalAction() {
+            // This function is dynamically assigned the correct action (loadNextLevel or showMissionSelector)
+            hideModal();
+            // Note: The modal action button's onclick is set directly in showModal/loadNextLevel, 
+            // so we execute the assigned function here.
+        }
+
+        // Make getHint globally accessible for the onclick attribute
+        window.getHint = getHint;
+
+        // --- Initialization ---
+
+        document.addEventListener('DOMContentLoaded', showMissionSelector);
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>State Jumper: Chemistry Climb</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Open+Sans:wght@600&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #222;
+            font-family: 'Open Sans', sans-serif;
+            touch-action: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(to bottom, #1e272e, #485460);
+        }
+
+        canvas {
+            display: block;
+            margin: 0 auto;
+        }
+
+        /* UI Overlay */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .header {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 20px;
+            box-sizing: border-box;
+            color: white;
+            font-family: 'Fredoka One', cursive;
+            font-size: 24px;
+            text-shadow: 2px 2px 0 rgba(0,0,0,0.3);
+            z-index: 5;
+        }
+
+        /* The Rule Banner */
+        #rule-display {
+            margin-top: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #2d3436;
+            padding: 15px 40px;
+            border-radius: 50px;
+            font-family: 'Fredoka One', cursive;
+            font-size: 32px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+            text-align: center;
+            transform: scale(1);
+            transition: transform 0.2s, background-color 0.2s;
+        }
+        
+        .rule-pop {
+            animation: pop 0.3s ease-out;
+        }
+
+        @keyframes pop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.3); }
+            100% { transform: scale(1); }
+        }
+
+        /* Screens */
+        #start-screen, #game-over-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(30, 39, 46, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+            z-index: 20;
+            color: white;
+            text-align: center;
+        }
+
+        h1 {
+            font-family: 'Fredoka One', cursive;
+            font-size: 50px;
+            color: #00d2d3;
+            margin-bottom: 10px;
+            text-shadow: 4px 4px 0 #000;
+        }
+
+        p {
+            font-size: 18px;
+            max-width: 500px;
+            line-height: 1.6;
+            color: #c8d6e5;
+            margin-bottom: 30px;
+        }
+
+        button {
+            padding: 15px 50px;
+            font-family: 'Fredoka One', cursive;
+            font-size: 28px;
+            background: #ff9f43;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            box-shadow: 0 6px 0 #e67e22;
+            transition: transform 0.1s;
+        }
+
+        button:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #e67e22;
+        }
+
+        .hidden { display: none !important; }
+
+        /* Floating text for helium */
+        .float-msg {
+            position: absolute;
+            font-weight: bold;
+            font-family: 'Fredoka One', cursive;
+            font-size: 24px;
+            color: #ffeaa7;
+            animation: floatUp 1s forwards;
+        }
+
+        @keyframes floatUp {
+            from { transform: translateY(0); opacity: 1; }
+            to { transform: translateY(-50px); opacity: 0; }
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        <div class="header">
+            <div id="score-el">Height: 0m</div>
+            <div id="high-score-el">Best: 0m</div>
+        </div>
+        <div id="rule-display">JUMP ON SOLIDS!</div>
+    </div>
+
+    <div id="start-screen">
+        <h1>STATE JUMPER</h1>
+        <p>You are a bouncy beaker.<br>
+        Move your mouse (or drag) to steer left/right.<br>
+        <strong>Watch the Rule!</strong> Only land on the correct platforms.<br>
+        Wrong platforms will break!</p>
+        <button id="start-btn">JUMP!</button>
+    </div>
+
+    <div id="game-over-screen" class="hidden">
+        <h1 style="color:#ff6b6b">LAB ACCIDENT!</h1>
+        <p>You fell into the acid pit.<br>Height Reached: <span id="final-score">0m</span></p>
+        <button id="restart-btn">TRY AGAIN</button>
+    </div>
+</div>
+
+<script>
+/**
+ * AUDIO SYSTEM
+ */
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playSound(type) {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    
+    osc.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    const now = audioCtx.currentTime;
+
+    if (type === 'jump') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(300, now);
+        osc.frequency.linearRampToValueAtTime(600, now + 0.1);
+        gainNode.gain.setValueAtTime(0.2, now);
+        gainNode.gain.linearRampToValueAtTime(0, now + 0.1);
+        osc.start();
+        osc.stop(now + 0.1);
+    } else if (type === 'break') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(200, now);
+        osc.frequency.linearRampToValueAtTime(50, now + 0.1);
+        gainNode.gain.setValueAtTime(0.2, now);
+        gainNode.gain.linearRampToValueAtTime(0, now + 0.1);
+        osc.start();
+        osc.stop(now + 0.1);
+    } else if (type === 'powerup') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(500, now);
+        osc.frequency.linearRampToValueAtTime(1000, now + 0.3);
+        gainNode.gain.setValueAtTime(0.2, now);
+        gainNode.gain.linearRampToValueAtTime(0, now + 0.3);
+        osc.start();
+        osc.stop(now + 0.3);
+    } else if (type === 'alert') {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(800, now);
+        osc.frequency.linearRampToValueAtTime(600, now + 0.3);
+        gainNode.gain.setValueAtTime(0.1, now);
+        gainNode.gain.linearRampToValueAtTime(0, now + 0.3);
+        osc.start();
+        osc.stop(now + 0.3);
+    }
+}
+
+/**
+ * GAME DATA
+ */
+const PLATFORM_TYPES = {
+    solid: {
+        color: '#ff9f43', // Orange/Brown
+        labels: ['Ice', 'Rock', 'Fe', 'Au', 'Cu', 'Wood', 'C'],
+        decor: 'rect'
+    },
+    liquid: {
+        color: '#54a0ff', // Blue
+        labels: ['H₂O', 'Oil', 'Milk', 'Juice', 'Hg', 'Br'],
+        decor: 'wave'
+    },
+    gas: {
+        color: '#c8d6e5', // Grey/White
+        labels: ['He', 'O₂', 'N', 'CO₂', 'Ne', 'Ar', 'Steam'],
+        decor: 'cloud'
+    }
+};
+
+/**
+ * GAME ENGINE
+ */
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('score-el');
+const highScoreEl = document.getElementById('high-score-el');
+const ruleEl = document.getElementById('rule-display');
+const uiLayer = document.getElementById('ui-layer');
+
+let w, h;
+let scale = 1;
+
+function resize() {
+    w = window.innerWidth;
+    h = window.innerHeight;
+    // Limit width for playability on desktop
+    if (w > 600) {
+        w = 600;
+        canvas.style.width = '600px';
+    } else {
+        canvas.style.width = '100%';
+    }
+    canvas.width = w;
+    canvas.height = h;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// State
+let gameState = 'MENU';
+let score = 0;
+let highScore = 0;
+let platforms = [];
+let particles = [];
+let cameraY = 0;
+let currentRule = 'solid'; // solid, liquid, gas
+let ruleTimer = 0;
+let heliumMode = 0; // Frames remaining of helium boost
+
+// Player
+let player = {
+    x: 0,
+    y: 0,
+    vx: 0,
+    vy: 0,
+    r: 20,
+    color: '#1dd1a1',
+    face: 'right'
+};
+
+// Input
+let mouseX = w/2;
+
+function setRule(type) {
+    currentRule = type;
+    const colors = {
+        solid: '#ff9f43',
+        liquid: '#54a0ff',
+        gas: '#8395a7'
+    };
+    
+    ruleEl.innerText = `JUMP ON ${type.toUpperCase()}!`;
+    ruleEl.style.color = colors[type];
+    ruleEl.classList.remove('rule-pop');
+    void ruleEl.offsetWidth; // trigger reflow
+    ruleEl.classList.add('rule-pop');
+    playSound('alert');
+}
+
+class Platform {
+    constructor(y) {
+        this.w = 100;
+        this.h = 25;
+        this.x = Math.random() * (w - this.w);
+        this.y = y;
+        
+        // Random Type
+        const types = Object.keys(PLATFORM_TYPES);
+        this.type = types[Math.floor(Math.random() * types.length)];
+        const data = PLATFORM_TYPES[this.type];
+        
+        this.color = data.color;
+        this.label = data.labels[Math.floor(Math.random() * data.labels.length)];
+        
+        // Items
+        this.hasHelium = false;
+        if (Math.random() < 0.05) this.hasHelium = true;
+
+        this.broken = false;
+        this.vy = 0; // For falling animation
+    }
+
+    draw() {
+        if (this.broken) {
+            ctx.globalAlpha = 0.5;
+            ctx.fillStyle = '#ff6b6b';
+        } else {
+            ctx.fillStyle = this.color;
+        }
+
+        // Draw Platform
+        ctx.beginPath();
+        ctx.roundRect(this.x, this.y - cameraY, this.w, this.h, 10);
+        ctx.fill();
+
+        // Label
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 16px "Open Sans"';
+        ctx.textAlign = 'center';
+        ctx.fillText(this.label, this.x + this.w/2, this.y - cameraY + 18);
+
+        // Decor
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        if (this.type === 'liquid') {
+            // wavy line
+            ctx.moveTo(this.x, this.y - cameraY);
+            ctx.bezierCurveTo(this.x+25, this.y - cameraY - 10, this.x+75, this.y - cameraY + 10, this.x+100, this.y - cameraY);
+            ctx.stroke();
+        } else if (this.type === 'gas') {
+            // cloud bumps
+            ctx.arc(this.x + 20, this.y - cameraY, 10, Math.PI, 0);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(this.x + 80, this.y - cameraY, 10, Math.PI, 0);
+            ctx.stroke();
+        }
+
+        // Helium Item
+        if (this.hasHelium && !this.broken) {
+            const by = this.y - cameraY - 30;
+            const bx = this.x + this.w/2;
+            
+            // String
+            ctx.beginPath();
+            ctx.moveTo(bx, this.y - cameraY);
+            ctx.lineTo(bx, by + 15);
+            ctx.strokeStyle = '#fff';
+            ctx.stroke();
+
+            // Balloon
+            ctx.beginPath();
+            ctx.ellipse(bx, by, 12, 15, 0, 0, Math.PI * 2);
+            ctx.fillStyle = '#ff9ff3';
+            ctx.fill();
+            ctx.fillStyle = 'white';
+            ctx.font = '10px sans-serif';
+            ctx.fillText('He', bx, by + 3);
+        }
+        
+        ctx.globalAlpha = 1.0;
+    }
+}
+
+class Particle {
+    constructor(x, y, color) {
+        this.x = x; this.y = y;
+        this.vx = (Math.random() - 0.5) * 8;
+        this.vy = (Math.random() - 0.5) * 8;
+        this.life = 1;
+        this.color = color;
+    }
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.life -= 0.05;
+        this.vy += 0.2;
+    }
+    draw() {
+        ctx.globalAlpha = this.life;
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x - cameraY, this.y - cameraY, 5, 5); // Parallax fix not needed here really
+        ctx.beginPath();
+        ctx.arc(this.x, this.y - cameraY, 3, 0, Math.PI*2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+    }
+}
+
+function initGame() {
+    player.x = w/2;
+    player.y = h - 200;
+    player.vy = -15;
+    cameraY = 0;
+    score = 0;
+    ruleTimer = 0;
+    heliumMode = 0;
+    setRule('solid');
+
+    platforms = [];
+    // Initial platforms
+    for(let i=0; i<h; i+=100) {
+        let p = new Platform(h - i);
+        p.type = 'solid'; // Force solid start
+        p.label = 'Start';
+        p.color = PLATFORM_TYPES.solid.color;
+        platforms.push(p);
+    }
+    
+    gameState = 'PLAYING';
+    document.getElementById('start-screen').classList.add('hidden');
+    document.getElementById('game-over-screen').classList.add('hidden');
+    gameLoop();
+}
+
+function gameOver() {
+    gameState = 'GAMEOVER';
+    if(score > highScore) highScore = score;
+    highScoreEl.innerText = `Best: ${Math.floor(highScore)}m`;
+    document.getElementById('final-score').innerText = Math.floor(score) + 'm';
+    document.getElementById('game-over-screen').classList.remove('hidden');
+}
+
+function showFloatingText(txt, x, y) {
+    const el = document.createElement('div');
+    el.innerText = txt;
+    el.className = 'float-msg';
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+    uiLayer.appendChild(el);
+    setTimeout(() => el.remove(), 1000);
+}
+
+function gameLoop() {
+    if (gameState !== 'PLAYING') return;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Rule Logic
+    ruleTimer++;
+    if (ruleTimer > 900) { // 15 seconds (60fps)
+        const types = ['solid', 'liquid', 'gas'];
+        let next = types[Math.floor(Math.random() * types.length)];
+        while (next === currentRule) next = types[Math.floor(Math.random() * types.length)];
+        setRule(next);
+        ruleTimer = 0;
+    }
+
+    // Input Handling
+    // Lerp player x to mouse x
+    player.x += (mouseX - player.x) * 0.15;
+    
+    // Physics
+    if (heliumMode > 0) {
+        player.vy = -12; // Constant fly up
+        heliumMode--;
+        
+        // Spawn sparkles
+        if (heliumMode % 5 === 0) particles.push(new Particle(player.x, player.y + 20, '#ff9ff3'));
+    } else {
+        player.vy += 0.5; // Gravity
+    }
+    
+    player.y += player.vy;
+
+    // Camera follow
+    if (player.y < cameraY + h/2) {
+        cameraY = player.y - h/2;
+        score = Math.max(score, -player.y/10); // Simple score formula
+        scoreEl.innerText = `Height: ${Math.floor(score)}m`;
+    }
+
+    // Death
+    if (player.y > cameraY + h + 50) {
+        gameOver();
+        return;
+    }
+
+    // Wrap around screen
+    if (player.x < 0) player.x = w;
+    if (player.x > w) player.x = 0;
+
+    // Platform Logic
+    // Recycle / Spawn
+    let lowestP = platforms[platforms.length-1];
+    if (lowestP.y > cameraY + h) {
+        platforms.pop(); // Remove bottom
+    }
+    
+    let highestP = platforms[0];
+    if (highestP.y > cameraY - 100) {
+        // Need new platform at top
+        let y = highestP.y - (Math.random() * 80 + 60);
+        platforms.unshift(new Platform(y));
+    }
+
+    // Draw & Collide Platforms
+    for (let p of platforms) {
+        // Falling broken platforms
+        if (p.broken) {
+            p.y += 10;
+        }
+
+        p.draw();
+
+        // Collision: Only if falling down and player foot is near platform top
+        if (player.vy > 0 && 
+            player.x > p.x && player.x < p.x + p.w &&
+            player.y + player.r > p.y && player.y + player.r < p.y + 20 &&
+            !p.broken) {
+            
+            // Check Rule
+            if (p.type === currentRule || heliumMode > 0 || p.label === 'Start') {
+                // Good Jump
+                player.vy = -13;
+                playSound('jump');
+                
+                // Helium Check
+                if (p.hasHelium) {
+                    heliumMode = 180; // 3 seconds
+                    p.hasHelium = false;
+                    playSound('powerup');
+                    showFloatingText("HELIUM BOOST!", player.x, player.y - cameraY - 50);
+                }
+
+            } else {
+                // Bad Platform!
+                p.broken = true;
+                playSound('break');
+                // Create debris
+                for(let i=0; i<5; i++) particles.push(new Particle(p.x + p.w/2, p.y, p.color));
+            }
+        }
+    }
+
+    // Draw Player (Beaker)
+    ctx.save();
+    ctx.translate(player.x, player.y - cameraY);
+    
+    // Body
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.beginPath();
+    ctx.moveTo(-10, -20); // Neck L
+    ctx.lineTo(-10, 0);
+    ctx.lineTo(-20, 20); // Base L
+    ctx.lineTo(20, 20); // Base R
+    ctx.lineTo(10, 0);
+    ctx.lineTo(10, -20); // Neck R
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Liquid inside
+    ctx.fillStyle = player.color;
+    ctx.beginPath();
+    ctx.moveTo(-12, 5); 
+    ctx.lineTo(-18, 18);
+    ctx.lineTo(18, 18);
+    ctx.lineTo(12, 5);
+    ctx.fill();
+    
+    // Eyes
+    ctx.fillStyle = '#2d3436';
+    ctx.beginPath();
+    ctx.arc(-5, 10, 2, 0, Math.PI*2);
+    ctx.arc(5, 10, 2, 0, Math.PI*2);
+    ctx.fill();
+
+    // Helium Balloon attachment
+    if (heliumMode > 0) {
+        ctx.beginPath();
+        ctx.moveTo(0, -20);
+        ctx.lineTo(0, -50);
+        ctx.strokeStyle = '#fff';
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.ellipse(0, -60, 15, 18, 0, 0, Math.PI*2);
+        ctx.fillStyle = '#ff9ff3';
+        ctx.fill();
+    }
+
+    ctx.restore();
+
+    // Particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+        particles[i].update();
+        particles[i].draw();
+        if (particles[i].life <= 0) particles.splice(i, 1);
+    }
+
+    requestAnimationFrame(gameLoop);
+}
+
+// Input Events
+window.addEventListener('mousemove', e => {
+    // Normalize mouse relative to canvas if simplified view
+    if (w < window.innerWidth) {
+        const rect = canvas.getBoundingClientRect();
+        mouseX = e.clientX - rect.left;
+    } else {
+        mouseX = e.clientX;
+    }
+});
+
+window.addEventListener('touchmove', e => {
+    e.preventDefault();
+    const t = e.touches[0];
+    if (w < window.innerWidth) {
+        const rect = canvas.getBoundingClientRect();
+        mouseX = t.clientX - rect.left;
+    } else {
+        mouseX = t.clientX;
+    }
+}, {passive: false});
+
+document.getElementById('start-btn').addEventListener('click', () => {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    initGame();
+});
+
+document.getElementById('restart-btn').addEventListener('click', () => {
+    initGame();
+});
+
+</script>
+</body>
+</html>

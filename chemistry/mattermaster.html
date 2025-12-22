@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Matter Master: Chemistry Edition</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            font-family: 'Nunito', sans-serif;
+            touch-action: none; /* Prevent scrolling on mobile */
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            background: rgba(255, 255, 255, 0.4);
+            border-radius: 15px;
+            backdrop-filter: blur(5px);
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .hud-top {
+            display: flex;
+            justify-content: space-between;
+            padding: 20px;
+            font-family: 'Fredoka One', cursive;
+            font-size: 24px;
+            color: #2d3436;
+            text-shadow: 2px 2px 0px rgba(255,255,255,0.5);
+        }
+
+        #start-screen, #game-over-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+            z-index: 10;
+        }
+
+        h1 {
+            font-family: 'Fredoka One', cursive;
+            font-size: 60px;
+            color: #6c5ce7;
+            margin: 0 0 20px 0;
+            text-shadow: 4px 4px 0px #a29bfe;
+            text-align: center;
+        }
+
+        p {
+            font-size: 20px;
+            color: #636e72;
+            margin-bottom: 30px;
+            text-align: center;
+            max-width: 600px;
+            line-height: 1.5;
+        }
+
+        button {
+            padding: 15px 40px;
+            font-family: 'Fredoka One', cursive;
+            font-size: 28px;
+            background: #00cec9;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 8px 0 #00b894;
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+
+        button:active {
+            transform: translateY(4px);
+            box-shadow: 0 4px 0 #00b894;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        #target-display {
+            position: absolute;
+            top: 80px;
+            width: 100%;
+            text-align: center;
+            font-family: 'Fredoka One', cursive;
+            font-size: 32px;
+            color: #d63031;
+            animation: pulse 1.5s infinite;
+            text-shadow: 2px 2px 0px white;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            h1 { font-size: 40px; }
+            button { font-size: 22px; }
+            #target-display { font-size: 24px; top: 70px; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        <div class="hud-top">
+            <div id="score-display">Score: 0</div>
+            <div id="lives-display">❤️ ❤️ ❤️</div>
+        </div>
+        <div id="target-display">Catch: SOLIDS</div>
+    </div>
+
+    <div id="start-screen">
+        <h1>Matter Master</h1>
+        <p>Welcome to the Chemistry Lab!<br>Move the bin to catch falling items based on their state of matter.<br>Watch out! The rule changes!</p>
+        <button id="start-btn">Play Now</button>
+    </div>
+
+    <div id="game-over-screen" class="hidden">
+        <h1>Lab Accident!</h1>
+        <p>You caught the wrong matter.<br>Final Score: <span id="final-score">0</span></p>
+        <button id="restart-btn">Try Again</button>
+    </div>
+</div>
+
+<script>
+/**
+ * AUDIO SYSTEM
+ * Synthesized sounds to avoid external assets.
+ */
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playSound(type) {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    
+    osc.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    if (type === 'catch') {
+        // High pitched happy ping
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(500, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(1000, audioCtx.currentTime + 0.1);
+        gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.1);
+    } else if (type === 'hurt') {
+        // Low pitched error buzz
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+        osc.frequency.linearRampToValueAtTime(100, audioCtx.currentTime + 0.3);
+        gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gainNode.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.3);
+    } else if (type === 'switch') {
+        // Whoosh sound for changing rules
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(600, audioCtx.currentTime + 0.3);
+        gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gainNode.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.3);
+    }
+}
+
+/**
+ * GAME DATA
+ * Chemistry items categorized by state of matter.
+ */
+const GAME_DATA = {
+    Solid: [
+        { name: "Ice Cube", color: "#74b9ff", icon: "🧊" },
+        { name: "Rock", color: "#636e72", icon: "🪨" },
+        { name: "Gold", color: "#fdcb6e", icon: "🪙" },
+        { name: "Wood", color: "#e17055", icon: "🪵" },
+        { name: "Iron", color: "#b2bec3", icon: "🔩" },
+        { name: "Salt", color: "#dfe6e9", icon: "🧂" }
+    ],
+    Liquid: [
+        { name: "Water", color: "#0984e3", icon: "💧" },
+        { name: "Juice", color: "#fab1a0", icon: "🧃" },
+        { name: "Milk", color: "#ffffff", icon: "🥛" },
+        { name: "Oil", color: "#ffeaa7", icon: "🛢️" },
+        { name: "Honey", color: "#fdcb6e", icon: "🍯" },
+        { name: "Lava", color: "#ff7675", icon: "🌋" }
+    ],
+    Gas: [
+        { name: "Steam", color: "#dff9fb", icon: "💨" },
+        { name: "Helium", color: "#ff7675", icon: "🎈" },
+        { name: "Oxygen", color: "#74b9ff", icon: "🌬️" },
+        { name: "Cloud", color: "#dfe6e9", icon: "☁️" },
+        { name: "Smoke", color: "#636e72", icon: "🏭" },
+        { name: "Argon", color: "#a29bfe", icon: "🟣" }
+    ]
+};
+
+/**
+ * GAME ENGINE
+ */
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('score-display');
+const livesEl = document.getElementById('lives-display');
+const targetEl = document.getElementById('target-display');
+const finalScoreEl = document.getElementById('final-score');
+
+// Screen Management
+const startScreen = document.getElementById('start-screen');
+const gameOverScreen = document.getElementById('game-over-screen');
+const startBtn = document.getElementById('start-btn');
+const restartBtn = document.getElementById('restart-btn');
+
+let canvasWidth, canvasHeight;
+
+function resize() {
+    canvasWidth = window.innerWidth;
+    canvasHeight = window.innerHeight;
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// Game State
+let gameState = 'START'; // START, PLAYING, GAMEOVER
+let score = 0;
+let lives = 3;
+let frameCount = 0;
+let gameSpeed = 3;
+let spawnRate = 100; // Frames between spawns
+let currentTarget = "Solid"; // Solid, Liquid, Gas
+let items = [];
+let particles = [];
+let difficultyMultiplier = 1;
+
+// Player (The Bin)
+const player = {
+    x: canvasWidth / 2,
+    y: canvasHeight - 100,
+    width: 100,
+    height: 80,
+    color: '#00cec9',
+    draw: function() {
+        // Draw Bin Body
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.roundRect(this.x - this.width/2, this.y, this.width, this.height, [10, 10, 20, 20]);
+        ctx.fill();
+        
+        // Draw Label
+        ctx.fillStyle = "white";
+        ctx.font = "bold 20px Nunito";
+        ctx.textAlign = "center";
+        ctx.fillText(currentTarget.toUpperCase(), this.x, this.y + 50);
+
+        // Draw Rim
+        ctx.fillStyle = "#00b894";
+        ctx.beginPath();
+        ctx.roundRect(this.x - this.width/2 - 5, this.y, this.width + 10, 15, 10);
+        ctx.fill();
+    }
+};
+
+// Mouse/Touch Controls
+function movePlayer(clientX) {
+    if (gameState !== 'PLAYING') return;
+    player.x = clientX;
+    // Clamp to screen
+    if (player.x < player.width/2) player.x = player.width/2;
+    if (player.x > canvasWidth - player.width/2) player.x = canvasWidth - player.width/2;
+}
+
+window.addEventListener('mousemove', e => movePlayer(e.clientX));
+window.addEventListener('touchmove', e => movePlayer(e.touches[0].clientX));
+
+class Item {
+    constructor() {
+        // Randomly choose a category
+        const categories = Object.keys(GAME_DATA);
+        this.category = categories[Math.floor(Math.random() * categories.length)];
+        
+        // Pick random item from that category
+        const itemData = GAME_DATA[this.category][Math.floor(Math.random() * GAME_DATA[this.category].length)];
+        
+        this.name = itemData.name;
+        this.icon = itemData.icon;
+        this.color = itemData.color;
+        
+        this.x = Math.random() * (canvasWidth - 60) + 30;
+        this.y = -50;
+        this.size = 30; // Radius
+        this.speed = (Math.random() * 2 + 2) * difficultyMultiplier;
+        this.rotation = Math.random() * Math.PI;
+        this.rotSpeed = (Math.random() - 0.5) * 0.1;
+    }
+
+    update() {
+        this.y += this.speed;
+        this.rotation += this.rotSpeed;
+    }
+
+    draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.rotation);
+        
+        // Draw Bubble Background
+        ctx.beginPath();
+        ctx.arc(0, 0, this.size, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+        ctx.fill();
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // Draw Icon
+        ctx.font = "30px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(this.icon, 0, 0);
+
+        // Draw Name (tiny below)
+        ctx.fillStyle = "#2d3436";
+        ctx.font = "bold 12px Nunito";
+        ctx.fillText(this.name, 0, 40);
+
+        ctx.restore();
+    }
+}
+
+class Particle {
+    constructor(x, y, color) {
+        this.x = x;
+        this.y = y;
+        this.vx = (Math.random() - 0.5) * 10;
+        this.vy = (Math.random() - 0.5) * 10;
+        this.life = 1.0;
+        this.color = color;
+    }
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.vy += 0.2; // Gravity
+        this.life -= 0.05;
+    }
+    draw() {
+        ctx.globalAlpha = this.life;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
+    }
+}
+
+function spawnParticles(x, y, color) {
+    for(let i=0; i<8; i++) {
+        particles.push(new Particle(x, y, color));
+    }
+}
+
+function switchTarget() {
+    const targets = ["Solid", "Liquid", "Gas"];
+    let newTarget = targets[Math.floor(Math.random() * targets.length)];
+    // Make sure it changes
+    while(newTarget === currentTarget) {
+        newTarget = targets[Math.floor(Math.random() * targets.length)];
+    }
+    currentTarget = newTarget;
+    
+    // Update UI
+    targetEl.innerText = `Catch: ${currentTarget.toUpperCase()}`;
+    
+    if(currentTarget === 'Solid') {
+        targetEl.style.color = '#e17055';
+        player.color = '#e17055';
+    } else if (currentTarget === 'Liquid') {
+        targetEl.style.color = '#0984e3';
+        player.color = '#0984e3';
+    } else {
+        targetEl.style.color = '#a29bfe';
+        player.color = '#a29bfe';
+    }
+    playSound('switch');
+}
+
+function updateGame() {
+    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+    // Background Pattern (Bubbles)
+    ctx.fillStyle = "rgba(255, 255, 255, 0.2)";
+    for(let i=0; i<5; i++) {
+        let bx = (frameCount * 2 + i * 100) % canvasWidth;
+        let by = canvasHeight - ((frameCount + i * 50) % canvasHeight);
+        ctx.beginPath();
+        ctx.arc(bx, by, 10 + i*5, 0, Math.PI*2);
+        ctx.fill();
+    }
+
+    // Spawning Logic
+    if (frameCount % Math.floor(spawnRate) === 0) {
+        items.push(new Item());
+    }
+
+    // Difficulty Progression
+    if (frameCount % 600 === 0) { // Every 10 seconds approx
+        difficultyMultiplier += 0.1;
+        spawnRate = Math.max(30, spawnRate - 5);
+        // Sometimes switch target
+        switchTarget();
+    }
+    // Also switch target based on score milestones
+    if (score > 0 && score % 10 === 0 && !items.some(i => i.y > canvasHeight - 150)) {
+         // Check ensures we don't switch while an item is right about to be caught
+    }
+
+    // Update Items
+    for (let i = items.length - 1; i >= 0; i--) {
+        let item = items[i];
+        item.update();
+        item.draw();
+
+        // Collision Detection
+        // Check if item hit the bin top
+        if (item.y + item.size >= player.y && 
+            item.y - item.size <= player.y + player.height &&
+            item.x >= player.x - player.width/2 && 
+            item.x <= player.x + player.width/2) {
+            
+            // CAUGHT
+            if (item.category === currentTarget) {
+                // Correct
+                score++;
+                scoreEl.innerText = `Score: ${score}`;
+                spawnParticles(item.x, item.y, "#00b894");
+                playSound('catch');
+                
+                // Speed up slightly on catch
+                if(score % 5 === 0) switchTarget();
+            } else {
+                // Wrong Item
+                lives--;
+                spawnParticles(item.x, item.y, "#d63031");
+                playSound('hurt');
+                updateLives();
+                if (lives <= 0) gameOver();
+            }
+            items.splice(i, 1);
+            continue;
+        }
+
+        // Missed item (fell off screen)
+        if (item.y > canvasHeight) {
+            // If we missed a correct item, do we punish? 
+            // For kids, let's just let it slide to keep it "not too hard".
+            // Only punish catching wrong things.
+            items.splice(i, 1);
+        }
+    }
+
+    // Update Particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+        particles[i].update();
+        particles[i].draw();
+        if (particles[i].life <= 0) particles.splice(i, 1);
+    }
+
+    player.draw();
+
+    frameCount++;
+    if (gameState === 'PLAYING') {
+        requestAnimationFrame(updateGame);
+    }
+}
+
+function updateLives() {
+    let hearts = "";
+    for(let i=0; i<lives; i++) hearts += "❤️ ";
+    livesEl.innerText = hearts;
+}
+
+function gameOver() {
+    gameState = 'GAMEOVER';
+    finalScoreEl.innerText = score;
+    gameOverScreen.classList.remove('hidden');
+    document.getElementById('ui-layer').classList.add('hidden');
+}
+
+function startGame() {
+    score = 0;
+    lives = 3;
+    frameCount = 0;
+    spawnRate = 100;
+    difficultyMultiplier = 1;
+    items = [];
+    particles = [];
+    scoreEl.innerText = "Score: 0";
+    updateLives();
+    
+    // Initial Target
+    currentTarget = "Solid";
+    targetEl.innerText = "Catch: SOLIDS";
+    targetEl.style.color = '#e17055';
+    player.color = '#e17055';
+
+    startScreen.classList.add('hidden');
+    gameOverScreen.classList.add('hidden');
+    document.getElementById('ui-layer').classList.remove('hidden');
+    
+    gameState = 'PLAYING';
+    resize(); // Ensure alignment
+    updateGame();
+}
+
+startBtn.addEventListener('click', () => {
+    // Init Audio Context on first interaction
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    startGame();
+});
+
+restartBtn.addEventListener('click', startGame);
+
+</script>
+</body>
+</html>

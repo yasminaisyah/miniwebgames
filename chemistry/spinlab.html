@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>pH Spin Lab: Acid vs Base</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;700&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #2d3436;
+            font-family: 'Baloo 2', cursive;
+            touch-action: none; /* Prevent zoom/scroll */
+            user-select: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle at center, #dfe6e9 0%, #636e72 100%);
+        }
+
+        canvas {
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+            border-radius: 50%; /* Circular canvas feel */
+            background: rgba(255,255,255,0.1);
+        }
+
+        /* UI Overlay */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .hud-header {
+            display: flex;
+            justify-content: space-between;
+            padding: 20px 40px;
+            font-size: 32px;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 2px 2px 0 #2d3436;
+        }
+
+        /* Legend for Kids */
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            pointer-events: none;
+        }
+
+        .legend-item {
+            background: rgba(0,0,0,0.6);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .dot { width: 15px; height: 15px; border-radius: 50%; }
+
+        /* Screens */
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(45, 52, 54, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+            z-index: 20;
+            text-align: center;
+            color: white;
+        }
+
+        h1 {
+            font-size: 60px;
+            margin: 0;
+            background: -webkit-linear-gradient(#ff7675, #55efc4, #74b9ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 10px rgba(255,255,255,0.3));
+        }
+
+        p {
+            font-size: 22px;
+            max-width: 600px;
+            line-height: 1.6;
+            color: #dfe6e9;
+            margin-bottom: 40px;
+        }
+
+        button {
+            padding: 20px 60px;
+            font-family: 'Baloo 2', cursive;
+            font-size: 30px;
+            font-weight: bold;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            background: white;
+            color: #2d3436;
+            box-shadow: 0 10px 0 #b2bec3;
+            transition: transform 0.1s;
+        }
+
+        button:active {
+            transform: translateY(5px);
+            box-shadow: 0 5px 0 #b2bec3;
+        }
+
+        .hidden { display: none !important; }
+
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        <div class="hud-header">
+            <div id="score-display">Score: 0</div>
+            <div id="health-display">❤️❤️❤️</div>
+        </div>
+        
+        <div class="legend">
+            <div class="legend-item"><div class="dot" style="background:#ff7675"></div> Acid (pH 0-6)</div>
+            <div class="legend-item"><div class="dot" style="background:#55efc4"></div> Neutral (pH 7)</div>
+            <div class="legend-item"><div class="dot" style="background:#0984e3"></div> Base (pH 8-14)</div>
+        </div>
+    </div>
+
+    <div id="overlay">
+        <h1>pH SPIN LAB</h1>
+        <p>
+            Bubbles are floating towards the center.<br>
+            <strong>Tap anywhere</strong> to spin the wheel.<br>
+            Match the bubble to the correct color sector!<br><br>
+            <span style="color:#ff7675">Red = Acid (Lemon, Cola)</span><br>
+            <span style="color:#55efc4">Green = Neutral (Water)</span><br>
+            <span style="color:#0984e3">Blue = Base (Soap, Bleach)</span>
+        </p>
+        <button id="start-btn">SPIN!</button>
+    </div>
+</div>
+
+<script>
+/**
+ * AUDIO SYSTEM
+ */
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playSound(type) {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    
+    osc.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    
+    const now = audioCtx.currentTime;
+
+    if (type === 'spin') {
+        // Quick "Whoosh"
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(200, now);
+        osc.frequency.linearRampToValueAtTime(400, now + 0.1);
+        gainNode.gain.setValueAtTime(0.1, now);
+        gainNode.gain.linearRampToValueAtTime(0, now + 0.1);
+        osc.start();
+        osc.stop(now + 0.1);
+    } else if (type === 'match') {
+        // Happy ding
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(500, now);
+        osc.frequency.exponentialRampToValueAtTime(1000, now + 0.1);
+        gainNode.gain.setValueAtTime(0.2, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+        osc.start();
+        osc.stop(now + 0.3);
+    } else if (type === 'crash') {
+        // Low crash
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(150, now);
+        osc.frequency.exponentialRampToValueAtTime(50, now + 0.3);
+        gainNode.gain.setValueAtTime(0.3, now);
+        gainNode.gain.linearRampToValueAtTime(0, now + 0.3);
+        osc.start();
+        osc.stop(now + 0.3);
+    }
+}
+
+/**
+ * GAME DATA
+ * Categorized by pH level
+ */
+const PH_DATA = {
+    acid: [
+        { text: "Lemon", sub: "pH 2" },
+        { text: "Vinegar", sub: "pH 3" },
+        { text: "Apple", sub: "pH 3" },
+        { text: "Cola", sub: "pH 2.5" },
+        { text: "Battery", sub: "pH 0" },
+        { text: "Tomato", sub: "pH 4" },
+        { text: "Milk", sub: "pH 6" }, // Slightly acidic
+        { text: "pH 1", sub: "Strong Acid" },
+        { text: "pH 5", sub: "Weak Acid" }
+    ],
+    neutral: [
+        { text: "Water", sub: "Pure" },
+        { text: "Salt", sub: "Solution" },
+        { text: "Blood", sub: "pH 7.4" },
+        { text: "pH 7", sub: "Neutral" }
+    ],
+    base: [
+        { text: "Soap", sub: "pH 10" },
+        { text: "Bleach", sub: "pH 13" },
+        { text: "Soda", sub: "Baking" },
+        { text: "Egg", sub: "White" },
+        { text: "Ammonia", sub: "pH 11" },
+        { text: "Drain", sub: "Cleaner" },
+        { text: "pH 9", sub: "Weak Base" },
+        { text: "pH 14", sub: "Strong Base" }
+    ]
+};
+
+/**
+ * GAME ENGINE
+ */
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('score-display');
+const healthEl = document.getElementById('health-display');
+const overlay = document.getElementById('overlay');
+const startBtn = document.getElementById('start-btn');
+
+let width, height;
+
+function resize() {
+    width = Math.min(window.innerWidth, window.innerHeight) * 0.9;
+    height = width;
+    canvas.width = width;
+    canvas.height = height;
+    // Keep canvas centered
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
+}
+window.addEventListener('resize', resize);
+resize();
+
+// Constants
+const COLORS = {
+    acid: '#ff7675',   // Redish
+    neutral: '#55efc4', // Greenish
+    base: '#0984e3'    // Blueish
+};
+
+// State
+let gameState = 'MENU';
+let score = 0;
+let health = 3;
+let rotationIndex = 0; // 0, 1, 2 representing which sector is at Top/Incoming angle
+let targetRotation = 0;
+let currentRotation = 0;
+let orbs = [];
+let particles = [];
+let frame = 0;
+let spawnRate = 120;
+let speed = 2;
+
+// The Wheel
+const WHEEL_RADIUS = 80;
+
+class Orb {
+    constructor() {
+        // Spawn at random angle
+        const angle = Math.random() * Math.PI * 2;
+        const dist = width/2 + 50; // Outside screen
+        
+        this.x = width/2 + Math.cos(angle) * dist;
+        this.y = height/2 + Math.sin(angle) * dist;
+        
+        // Target center
+        this.targetX = width/2;
+        this.targetY = height/2;
+        
+        // Type
+        const types = ['acid', 'neutral', 'base'];
+        this.type = types[Math.floor(Math.random() * types.length)];
+        const data = PH_DATA[this.type][Math.floor(Math.random() * PH_DATA[this.type].length)];
+        this.text = data.text;
+        this.sub = data.sub;
+        
+        this.r = 35;
+        this.speed = speed;
+        this.active = true;
+    }
+
+    update() {
+        // Move towards center
+        const dx = this.targetX - this.x;
+        const dy = this.targetY - this.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        
+        this.x += (dx/dist) * this.speed;
+        this.y += (dy/dist) * this.speed;
+        
+        // Collision check with wheel surface
+        if (dist < WHEEL_RADIUS + this.r) {
+            this.active = false;
+            checkCollision(this);
+        }
+    }
+
+    draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        
+        // Draw Orb Body
+        ctx.beginPath();
+        ctx.arc(0, 0, this.r, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+        
+        // Border (Hint? Maybe subtle)
+        ctx.strokeStyle = '#b2bec3';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Text
+        ctx.fillStyle = '#2d3436';
+        ctx.textAlign = 'center';
+        
+        ctx.font = 'bold 18px "Baloo 2"';
+        ctx.fillText(this.text, 0, 0);
+        
+        ctx.fillStyle = '#636e72';
+        ctx.font = '12px "Baloo 2"';
+        ctx.fillText(this.sub, 0, 15);
+        
+        ctx.restore();
+    }
+}
+
+class Particle {
+    constructor(x, y, color) {
+        this.x = x; this.y = y;
+        this.vx = (Math.random() - 0.5) * 10;
+        this.vy = (Math.random() - 0.5) * 10;
+        this.life = 1;
+        this.color = color;
+    }
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.life -= 0.05;
+    }
+    draw() {
+        ctx.globalAlpha = this.life;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 5, 0, Math.PI*2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+    }
+}
+
+function checkCollision(orb) {
+    // Calculate angle of orb relative to center
+    let angle = Math.atan2(orb.y - height/2, orb.x - width/2);
+    // Normalize angle to 0 - 2PI
+    if (angle < 0) angle += Math.PI * 2;
+    
+    // Adjust for current wheel rotation
+    // We need to find which sector the orb hit
+    // The wheel rotates. We can apply the reverse rotation to the orb angle to see where it landed relative to the "Zero" state of the wheel.
+    let relativeAngle = angle - currentRotation;
+    // Normalize again
+    while(relativeAngle < 0) relativeAngle += Math.PI * 2;
+    while(relativeAngle >= Math.PI * 2) relativeAngle -= Math.PI * 2;
+
+    // Sectors definition (Visual setup below: 0-120 is Red, 120-240 is Green, 240-360 is Blue)
+    // Wait, let's look at how we draw:
+    // Sector 1 (Red): 0 to 2PI/3
+    // Sector 2 (Green): 2PI/3 to 4PI/3
+    // Sector 3 (Blue): 4PI/3 to 2PI
+    
+    let hitColor = '';
+    const oneThird = (Math.PI * 2) / 3;
+    
+    if (relativeAngle >= 0 && relativeAngle < oneThird) {
+        hitColor = 'acid';
+    } else if (relativeAngle >= oneThird && relativeAngle < oneThird * 2) {
+        hitColor = 'neutral';
+    } else {
+        hitColor = 'base';
+    }
+
+    if (hitColor === orb.type) {
+        // Success
+        score += 10;
+        scoreEl.innerText = "Score: " + score;
+        playSound('match');
+        createParticles(orb.x, orb.y, COLORS[orb.type]);
+        
+        // Difficulty
+        if (score % 50 === 0) {
+            speed += 0.5;
+            spawnRate = Math.max(40, spawnRate - 10);
+        }
+    } else {
+        // Fail
+        health--;
+        healthEl.innerText = "❤️".repeat(health);
+        playSound('crash');
+        createParticles(orb.x, orb.y, "#636e72");
+        if (health <= 0) gameOver();
+    }
+}
+
+function createParticles(x, y, color) {
+    for(let i=0; i<15; i++) {
+        particles.push(new Particle(x, y, color));
+    }
+}
+
+function gameOver() {
+    gameState = 'GAMEOVER';
+    overlay.classList.remove('hidden');
+    overlay.querySelector('h1').innerText = "GAME OVER";
+    overlay.querySelector('p').innerHTML = `Final Score: ${score}<br>Great Research!`;
+    startBtn.innerText = "Try Again";
+}
+
+function handleClick() {
+    if (gameState !== 'PLAYING') return;
+    
+    // Rotate 120 degrees (2PI/3)
+    targetRotation += (Math.PI * 2) / 3;
+    playSound('spin');
+}
+
+window.addEventListener('mousedown', handleClick);
+window.addEventListener('touchstart', (e) => {
+    e.preventDefault(); // prevent zoom
+    handleClick();
+});
+
+function drawWheel() {
+    ctx.save();
+    ctx.translate(width/2, height/2);
+    ctx.rotate(currentRotation);
+    
+    const radius = WHEEL_RADIUS;
+    const third = (Math.PI * 2) / 3;
+
+    // Draw Sectors
+    
+    // Acid (Red)
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.arc(0, 0, radius, 0, third);
+    ctx.fillStyle = COLORS.acid;
+    ctx.fill();
+    ctx.stroke();
+
+    // Neutral (Green)
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.arc(0, 0, radius, third, third*2);
+    ctx.fillStyle = COLORS.neutral;
+    ctx.fill();
+    ctx.stroke();
+
+    // Base (Blue)
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.arc(0, 0, radius, third*2, Math.PI*2);
+    ctx.fillStyle = COLORS.base;
+    ctx.fill();
+    ctx.stroke();
+
+    // Inner Hub
+    ctx.beginPath();
+    ctx.arc(0, 0, 20, 0, Math.PI*2);
+    ctx.fillStyle = "#fff";
+    ctx.fill();
+
+    // Labels on Wheel
+    ctx.fillStyle = "rgba(0,0,0,0.3)";
+    ctx.font = "bold 16px Arial";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    
+    // Position text in middle of wedges
+    // Red wedge center: PI/3
+    ctx.fillText("ACID", Math.cos(Math.PI/3)*50, Math.sin(Math.PI/3)*50);
+    // Green wedge center: PI
+    ctx.fillText("NEUTRAL", Math.cos(Math.PI)*50, Math.sin(Math.PI)*50);
+    // Blue wedge center: 5PI/3
+    ctx.fillText("BASE", Math.cos(5*Math.PI/3)*50, Math.sin(5*Math.PI/3)*50);
+
+    ctx.restore();
+}
+
+function gameLoop() {
+    if (gameState !== 'PLAYING') return;
+
+    ctx.clearRect(0, 0, width, height);
+
+    // Smooth Rotation
+    currentRotation += (targetRotation - currentRotation) * 0.2;
+
+    drawWheel();
+
+    // Spawn
+    if (frame % Math.floor(spawnRate) === 0) {
+        orbs.push(new Orb());
+    }
+
+    // Update Orbs
+    for (let i = orbs.length - 1; i >= 0; i--) {
+        orbs[i].update();
+        orbs[i].draw();
+        if (!orbs[i].active) orbs.splice(i, 1);
+    }
+
+    // Update Particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+        particles[i].update();
+        particles[i].draw();
+        if (particles[i].life <= 0) particles.splice(i, 1);
+    }
+
+    frame++;
+    requestAnimationFrame(gameLoop);
+}
+
+function startGame() {
+    score = 0;
+    health = 3;
+    speed = 2;
+    spawnRate = 120;
+    orbs = [];
+    particles = [];
+    rotationIndex = 0;
+    targetRotation = 0;
+    currentRotation = 0;
+    frame = 0;
+    
+    scoreEl.innerText = "Score: 0";
+    healthEl.innerText = "❤️❤️❤️";
+    
+    gameState = 'PLAYING';
+    overlay.classList.add('hidden');
+    gameLoop();
+}
+
+startBtn.addEventListener('click', () => {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    startGame();
+});
+
+</script>
+</body>
+</html>

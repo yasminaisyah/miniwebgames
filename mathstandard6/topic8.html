@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>The Probability Carnival (No Repeats)</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Rye&family=Roboto:wght@400;700&display=swap');
+
+        body {
+            margin: 0;
+            background-color: #2c0000;
+            background-image: repeating-linear-gradient(90deg, #2c0000, #2c0000 20px, #3e0000 20px, #3e0000 40px);
+            font-family: 'Roboto', sans-serif;
+            color: white;
+            overflow-y: auto;
+            touch-action: pan-y;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        #game-container {
+            width: 100%;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-bottom: 50px;
+        }
+
+        /* --- MARQUEE HEADER --- */
+        header {
+            width: 100%;
+            background: #ffcc00;
+            color: #8b0000;
+            text-align: center;
+            border-bottom: 5px solid #ff9900;
+            padding: 15px 0;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        /* Lights on header */
+        header::before, header::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            width: 10px;
+            height: 10px;
+            background: white;
+            border-radius: 50%;
+            box-shadow: 10px 0 0 white, -10px 0 0 white;
+            animation: blink 1s infinite alternate;
+        }
+        header::before { left: 20px; }
+        header::after { right: 20px; }
+
+        @keyframes blink { from { opacity: 0.5; } to { opacity: 1; } }
+
+        h1 {
+            font-family: 'Rye', serif;
+            font-size: 32px;
+            margin: 0;
+            text-shadow: 2px 2px 0px rgba(0,0,0,0.2);
+        }
+
+        /* --- STAGE AREA --- */
+        #stage {
+            background: #fff8e1; /* Cream */
+            border: 8px solid #8b0000;
+            border-radius: 10px;
+            width: 90%;
+            padding: 20px;
+            box-sizing: border-box;
+            color: #333;
+            text-align: center;
+            position: relative;
+            box-shadow: 0 0 30px rgba(255, 204, 0, 0.2);
+        }
+
+        #stage::before {
+            content: '';
+            position: absolute;
+            top: -15px; left: 50%; transform: translateX(-50%);
+            width: 0; height: 0;
+            border-left: 20px solid transparent;
+            border-right: 20px solid transparent;
+            border-bottom: 20px solid #8b0000;
+        }
+
+        /* Canvas for Pie Charts */
+        #chart-canvas {
+            background: white;
+            border-radius: 50%;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            margin: 20px auto;
+            display: block;
+        }
+
+        #question-box {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* --- BUTTONS --- */
+        #ticket-booth {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 20px;
+            width: 95%;
+        }
+
+        .ticket-btn {
+            background: #d32f2f;
+            color: #fff;
+            border: 2px dashed #ffcc00;
+            padding: 15px 20px;
+            font-family: 'Rye', serif;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 5px;
+            box-shadow: 0 4px 0 #8b0000;
+            transition: transform 0.1s;
+            flex: 1 1 40%; /* 2 buttons per row usually */
+            min-width: 120px;
+        }
+
+        .ticket-btn:active {
+            transform: translateY(4px);
+            box-shadow: none;
+        }
+        
+        .ticket-btn:disabled {
+            background: #555;
+            border-color: #777;
+            box-shadow: none;
+            cursor: default;
+        }
+
+        /* --- SCORING --- */
+        #score-board {
+            background: #000;
+            color: #0f0;
+            font-family: monospace;
+            padding: 10px 20px;
+            border: 2px solid #555;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        /* --- START OVERLAY --- */
+        #curtain-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle, #8b0000 0%, #2c0000 100%);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .big-btn {
+            font-size: 28px;
+            padding: 20px 40px;
+            background: #ffcc00;
+            color: #8b0000;
+            border: none;
+            font-family: 'Rye', serif;
+            cursor: pointer;
+            box-shadow: 0 0 20px #ffcc00;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .hidden { display: none !important; }
+
+        /* Confetti */
+        .confetti {
+            position: absolute;
+            width: 10px; height: 10px;
+            background: #f00;
+            animation: fall 1s linear forwards;
+        }
+
+        @keyframes fall {
+            to { transform: translateY(100px) rotate(360deg); opacity: 0; }
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="curtain-overlay">
+    <h1 style="font-size: 50px; color: #ffcc00; margin-bottom: 20px;">The Probability<br>Carnival</h1>
+    <p style="font-size: 18px; max-width: 500px; margin-bottom: 40px; color: #fff;">
+        Step right up! Test your luck and logic.<br><br>
+        1. Read the <strong>Pie Charts</strong>.<br>
+        2. Predict the <strong>Likelihood</strong>.<br>
+        <br>
+        <em>No repeats until you beat the whole deck!</em>
+    </p>
+    <button class="big-btn" onclick="Game.init()">ENTER CARNIVAL</button>
+</div>
+
+<div id="game-container">
+    <header>
+        <h1>CARNIVAL OF CHANCE</h1>
+    </header>
+
+    <div id="score-board">
+        TICKETS WON: <span id="score-val">0</span>
+    </div>
+
+    <div id="stage">
+        <canvas id="chart-canvas" width="200" height="200" class="hidden"></canvas>
+        <div id="question-box">Loading...</div>
+    </div>
+
+    <div id="ticket-booth">
+        </div>
+</div>
+
+<script>
+/* --- AUDIO SYSTEM --- */
+const AudioSys = {
+    ctx: null,
+    init() {
+        if(!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    },
+    playTone(freq, type, duration) {
+        if(!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+        gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + duration);
+    },
+    playWin() {
+        this.playTone(600, 'square', 0.1);
+        setTimeout(() => this.playTone(800, 'square', 0.1), 100);
+        setTimeout(() => this.playTone(1000, 'square', 0.2), 200);
+    },
+    playLose() {
+        this.playTone(200, 'sawtooth', 0.3);
+        setTimeout(() => this.playTone(150, 'sawtooth', 0.4), 200);
+    }
+};
+
+/* --- MATH ENGINE (Deck System) --- */
+const MathEngine = {
+    deck: [], // Holds current questions
+    options: ["Impossible", "Less Likely", "Equally Likely", "More Likely", "Certain"],
+
+    // MASTER LIST OF CONTENT
+    masterList: [
+        // --- WORD PROBLEMS ---
+        { q: "The sun rising in the West tomorrow.", a: "Impossible" },
+        { q: "Picking a RED ball from a bag of only RED balls.", a: "Certain" },
+        { q: "Flipping a fair coin and getting Heads.", a: "Equally Likely" },
+        { q: "Rolling a number greater than 1 on a dice (2,3,4,5,6).", a: "More Likely" },
+        { q: "Picking a Cat from a bag with 1 Cat and 10 Dogs.", a: "Less Likely" },
+        { q: "A week having 8 days.", a: "Impossible" },
+        { q: "Your next birthday will happen in the future.", a: "Certain" },
+        { q: "Picking a Green marble from a bag of 5 Green and 5 Blue.", a: "Equally Likely" },
+        { q: "It will rain orange juice tomorrow.", a: "Impossible" },
+        { q: "Pulling a King from a deck of 52 cards (only 4 Kings).", a: "Less Likely" },
+        { q: "A triangle having 3 sides.", a: "Certain" },
+        { q: "Rolling a 7 on a standard 6-sided dice.", a: "Impossible" },
+        
+        // --- PIE CHART PROBLEMS ---
+        { 
+            q: "Spinning Red is...", a: "Equally Likely",
+            segs: [{c:'Red', v:0.5}, {c:'Blue', v:0.5}]
+        },
+        { 
+            q: "Spinning Red is...", a: "More Likely",
+            segs: [{c:'Red', v:0.8}, {c:'Blue', v:0.2}]
+        },
+        { 
+            q: "Spinning Red is...", a: "Less Likely",
+            segs: [{c:'Red', v:0.2}, {c:'Blue', v:0.8}]
+        },
+        { 
+            q: "Spinning Red is...", a: "Certain",
+            segs: [{c:'Red', v:1.0}]
+        },
+        { 
+            q: "Spinning Red is...", a: "Impossible",
+            segs: [{c:'Blue', v:1.0}]
+        },
+        { 
+            q: "Spinning Blue is...", a: "Less Likely",
+            segs: [{c:'Red', v:0.7}, {c:'Blue', v:0.3}]
+        },
+        { 
+            q: "Spinning Blue is...", a: "More Likely",
+            segs: [{c:'Red', v:0.1}, {c:'Blue', v:0.9}]
+        }
+    ],
+
+    init() {
+        this.shuffleDeck();
+    },
+
+    shuffleDeck() {
+        // Clone master list
+        this.deck = [...this.masterList];
+        // Fisher-Yates Shuffle
+        for (let i = this.deck.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [this.deck[i], this.deck[j]] = [this.deck[j], this.deck[i]];
+        }
+        console.log("Deck shuffled. Items: " + this.deck.length);
+    },
+
+    getNext() {
+        if (this.deck.length === 0) {
+            this.shuffleDeck(); // Refill if empty
+        }
+        return this.deck.pop();
+    }
+};
+
+/* --- RENDERER --- */
+const Renderer = {
+    drawChart(segments) {
+        const canvas = document.getElementById('chart-canvas');
+        const ctx = canvas.getContext('2d');
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+        const r = canvas.width / 2 - 10;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        let startAngle = 0;
+        
+        segments.forEach(seg => {
+            const sliceAngle = seg.v * 2 * Math.PI;
+            
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.arc(cx, cy, r, startAngle, startAngle + sliceAngle);
+            ctx.closePath();
+            
+            // Colors
+            ctx.fillStyle = seg.c === 'Red' ? '#ff4444' : '#4444ff';
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            startAngle += sliceAngle;
+        });
+
+        // Add a spinner arrow
+        ctx.fillStyle = '#ffcc00';
+        ctx.beginPath();
+        ctx.moveTo(cx + r + 5, cy);
+        ctx.lineTo(cx + r + 20, cy - 10);
+        ctx.lineTo(cx + r + 20, cy + 10);
+        ctx.fill();
+    }
+};
+
+/* --- GAME LOGIC --- */
+const Game = {
+    score: 0,
+    
+    init() {
+        AudioSys.init();
+        MathEngine.init(); // Create the shuffled deck
+        document.getElementById('curtain-overlay').classList.add('hidden');
+        this.nextRound();
+    },
+
+    nextRound() {
+        const data = MathEngine.getNext(); // Pull from deck
+        document.getElementById('question-box').innerText = data.q;
+        
+        const canvas = document.getElementById('chart-canvas');
+        if (data.segs) {
+            canvas.classList.remove('hidden');
+            Renderer.drawChart(data.segs);
+        } else {
+            canvas.classList.add('hidden');
+        }
+
+        // Generate Buttons
+        const booth = document.getElementById('ticket-booth');
+        booth.innerHTML = '';
+        
+        MathEngine.options.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.className = 'ticket-btn';
+            btn.innerText = opt;
+            btn.onclick = () => this.check(opt, data.a, btn);
+            booth.appendChild(btn);
+        });
+    },
+
+    check(sel, corr, btnElem) {
+        if (sel === corr) {
+            AudioSys.playWin();
+            this.score++;
+            document.getElementById('score-val').innerText = this.score;
+            this.spawnConfetti();
+            btnElem.style.background = '#4caf50'; // Green
+            setTimeout(() => this.nextRound(), 1000);
+        } else {
+            AudioSys.playLose();
+            btnElem.style.background = '#555';
+            btnElem.disabled = true;
+        }
+    },
+
+    spawnConfetti() {
+        const stage = document.getElementById('stage');
+        for(let i=0; i<20; i++) {
+            const c = document.createElement('div');
+            c.className = 'confetti';
+            c.style.left = (Math.random() * 100) + '%';
+            c.style.backgroundColor = `hsl(${Math.random()*360}, 100%, 50%)`;
+            c.style.animationDuration = (0.5 + Math.random()) + 's';
+            stage.appendChild(c);
+            setTimeout(() => c.remove(), 1000);
+        }
+    }
+};
+
+</script>
+</body>
+</html>

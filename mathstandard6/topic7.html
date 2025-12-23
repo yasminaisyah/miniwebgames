@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Island of Ratios: Treasure Hunt</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Vt323&display=swap');
+
+        body {
+            margin: 0;
+            background-color: #2b7fa5; /* Deep Ocean */
+            font-family: 'Vt323', monospace;
+            overflow-y: auto; /* Allow scrolling */
+            touch-action: pan-y;
+            color: #3e2723;
+        }
+
+        #game-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding-bottom: 50px;
+        }
+
+        /* --- HEADER --- */
+        header {
+            text-align: center;
+            padding: 20px;
+            color: #fff;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        h1 { margin: 0; font-size: 40px; color: #ffd700; }
+        .subtitle { font-size: 20px; color: #aed9e0; }
+
+        /* --- GAME BOY STYLE CONTAINER --- */
+        #game-boy {
+            background: #e0e0e0;
+            padding: 20px;
+            border-radius: 10px 10px 40px 10px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5), inset -5px -5px 10px rgba(0,0,0,0.1);
+            max-width: 500px;
+            width: 95%;
+            position: relative;
+        }
+
+        /* --- SCREEN AREA --- */
+        #screen-border {
+            background: #555;
+            padding: 15px 15px 30px 15px; /* Extra bottom padding for "Gameboy" feel */
+            border-radius: 10px 10px 30px 10px;
+            box-shadow: inset 2px 2px 5px rgba(0,0,0,0.5);
+            margin-bottom: 20px;
+        }
+
+        #game-canvas {
+            background: #e6c288; /* Sand color */
+            border: 2px solid #6b5538;
+            image-rendering: pixelated;
+            width: 100%;
+            height: auto;
+            display: block;
+            cursor: crosshair;
+        }
+
+        /* --- UI PANEL (Quest Log) --- */
+        #quest-panel {
+            background: #fff8dc; /* Cornsilk */
+            border: 4px solid #8b4513;
+            padding: 15px;
+            border-radius: 5px;
+            min-height: 150px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            box-shadow: inset 0 0 20px rgba(139, 69, 19, 0.2);
+        }
+
+        #quest-title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #8b4513;
+            border-bottom: 2px dashed #8b4513;
+            width: 100%;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        #quest-text {
+            font-size: 22px;
+            line-height: 1.2;
+            margin-bottom: 15px;
+            flex-grow: 1;
+        }
+
+        #input-area {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            width: 100%;
+        }
+
+        .action-btn {
+            background: #8b4513;
+            color: #ffd700;
+            border: 2px solid #5a2d0c;
+            padding: 10px;
+            font-family: 'Vt323', monospace;
+            font-size: 20px;
+            cursor: pointer;
+            box-shadow: 0 4px 0 #5a2d0c;
+            transition: transform 0.1s;
+        }
+
+        .action-btn:active {
+            transform: translateY(4px);
+            box-shadow: none;
+        }
+
+        /* --- STATS --- */
+        #stats-bar {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            background: #333;
+            color: #0f0;
+            padding: 5px 10px;
+            font-size: 18px;
+            border-radius: 5px;
+            font-family: monospace;
+        }
+
+        /* --- OVERLAYS --- */
+        .overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            text-align: center;
+        }
+        
+        .start-btn {
+            background: #ffd700;
+            color: #8b4513;
+            border: 4px solid #fff;
+            font-size: 30px;
+            padding: 15px 40px;
+            font-family: 'Vt323', monospace;
+            cursor: pointer;
+            animation: bounce 1s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .hidden { display: none !important; }
+
+        /* Floating Text Animation */
+        .float-text {
+            position: absolute;
+            font-family: 'Vt323', monospace;
+            font-size: 24px;
+            font-weight: bold;
+            pointer-events: none;
+            animation: floatUp 1s forwards;
+            text-shadow: 1px 1px 0 #fff;
+        }
+
+        @keyframes floatUp {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-50px); opacity: 0; }
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="game-wrapper">
+    <header>
+        <h1>ISLAND OF RATIOS</h1>
+        <div class="subtitle">Coordinates • Proportion • Logic</div>
+    </header>
+
+    <div id="game-boy">
+        <div id="screen-border">
+            <canvas id="game-canvas" width="400" height="400"></canvas>
+            
+            <div id="stats-bar">
+                <span>GOLD: <span id="gold-val">0</span></span>
+                <span>POS: <span id="coord-val">(0,0)</span></span>
+            </div>
+        </div>
+
+        <div id="quest-panel">
+            <div id="quest-title">CURRENT CHALLENGE</div>
+            <div id="quest-text">Initializing Map...</div>
+            <div id="input-area">
+                </div>
+        </div>
+    </div>
+</div>
+
+<div id="start-screen" class="overlay">
+    <h1 style="color:#ffd700; text-shadow:4px 4px 0 #8b4513; font-size:60px; line-height:0.8; margin-bottom:20px;">
+        TREASURE<br>HUNTER
+    </h1>
+    <p style="font-size: 22px; max-width: 400px; margin-bottom: 40px;">
+        1. Calculate <strong>Distances</strong> to move.<br>
+        2. Solve <strong>Ratio</strong> puzzles to unlock chests.<br>
+        3. Use <strong>Proportion</strong> to trade gems.<br>
+    </p>
+    <button class="start-btn" onclick="Game.init()">OPEN MAP</button>
+</div>
+
+<script>
+/* --- AUDIO SYSTEM --- */
+const AudioSys = {
+    ctx: null,
+    init() {
+        if(!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    },
+    playTone(freq, type, duration, vol=0.1) {
+        if(!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+        gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + duration);
+    },
+    playStep() { this.playTone(150, 'square', 0.05, 0.05); },
+    playCoin() { 
+        this.playTone(1200, 'sine', 0.1, 0.1); 
+        setTimeout(() => this.playTone(1800, 'sine', 0.2, 0.1), 100);
+    },
+    playOpen() { this.playTone(400, 'sawtooth', 0.3, 0.1); },
+    playError() { this.playTone(100, 'sawtooth', 0.3, 0.2); }
+};
+
+/* --- MATH ENGINE --- */
+const MathEngine = {
+    generate(type, playerPos, targetPos) {
+        let q, a, wrongs;
+
+        if (type === 'distance') {
+            // Coordinate Distance (Horizontal or Vertical)
+            // Ensure we ask for the changing axis
+            const isHoriz = Math.abs(playerPos.x - targetPos.x) > 0;
+            const dist = isHoriz ? Math.abs(playerPos.x - targetPos.x) : Math.abs(playerPos.y - targetPos.y);
+            const direction = isHoriz ? "Horizontal" : "Vertical";
+            
+            q = `The Chest is at (${targetPos.x}, ${targetPos.y}).<br>You are at (${playerPos.x}, ${playerPos.y}).<br>What is the <strong>${direction} Distance</strong>?`;
+            a = `${dist} units`;
+            wrongs = [`${dist + 1} units`, `${dist - 1 > 0 ? dist - 1 : 2} units`, `${dist * 2} units`];
+        } 
+        else if (type === 'ratio') {
+            // "Mix 1 part Red to 3 parts Blue. If 2 Red, how many Blue?"
+            const ratioA = 1;
+            const ratioB = Math.floor(Math.random() * 4) + 2; // 2, 3, 4, 5
+            const mult = Math.floor(Math.random() * 3) + 2; // 2, 3, 4
+            
+            q = `The lock requires a Ratio of <strong>${ratioA}:${ratioB}</strong> (Red:Blue).<br>You insert <strong>${ratioA * mult}</strong> Red gems.<br>How many Blue gems do you need?`;
+            a = ratioB * mult;
+            wrongs = [a + 1, a - 1, ratioB];
+        } 
+        else if (type === 'proportion') {
+            // "1 map is 5 gold. How much is 3 maps?"
+            const unitPrice = [5, 10, 20, 50][Math.floor(Math.random()*4)];
+            const qty = Math.floor(Math.random() * 4) + 2;
+            
+            q = `A Merchant appears!<br>"1 Treasure Map costs <strong>${unitPrice} Gold</strong>."<br>How much do <strong>${qty}</strong> maps cost?`;
+            a = unitPrice * qty;
+            wrongs = [unitPrice * qty + 10, unitPrice * (qty+1), unitPrice];
+        }
+
+        return { q, a, wrongs };
+    }
+};
+
+/* --- GAME LOGIC --- */
+const Game = {
+    canvas: null,
+    ctx: null,
+    gold: 0,
+    player: { x: 0, y: 0 },
+    chest: { x: 3, y: 4, active: true },
+    gridSize: 40, // px per unit
+    state: 'idle', // idle, moving, puzzle
+    
+    init() {
+        AudioSys.init();
+        document.getElementById('start-screen').classList.add('hidden');
+        
+        this.canvas = document.getElementById('game-canvas');
+        this.ctx = this.canvas.getContext('2d');
+        
+        // Random start
+        this.player.x = Math.floor(Math.random() * 8);
+        this.player.y = Math.floor(Math.random() * 8);
+        
+        this.spawnChest();
+        this.draw();
+        this.startTravelSequence();
+    },
+
+    spawnChest() {
+        // Random pos different from player
+        do {
+            this.chest.x = Math.floor(Math.random() * 8) + 1;
+            this.chest.y = Math.floor(Math.random() * 8) + 1;
+        } while (this.chest.x === this.player.x && this.chest.y === this.player.y);
+        
+        // Align to one axis to make distance calculation simpler (Stage 1 math)
+        // 50% chance to align X or Y
+        if (Math.random() > 0.5) {
+            this.chest.x = this.player.x; // Vertical move
+        } else {
+            this.chest.y = this.player.y; // Horizontal move
+        }
+        
+        // Ensure not identical
+        if(this.chest.x === this.player.x && this.chest.y === this.player.y) {
+             this.chest.x = (this.chest.x + 3) % 9;
+        }
+
+        this.chest.active = true;
+    },
+
+    startTravelSequence() {
+        this.state = 'puzzle';
+        this.updateStats();
+        
+        // Generate Distance Question
+        const data = MathEngine.generate('distance', this.player, this.chest);
+        this.showQuestion(data, () => {
+            // On Correct Distance
+            this.animateMove(this.chest.x, this.chest.y, () => {
+                // Arrived at chest
+                AudioSys.playStep(); // Arrival sound
+                this.startLootSequence();
+            });
+        });
+    },
+
+    startLootSequence() {
+        // Generate Ratio or Proportion Question
+        const type = Math.random() > 0.5 ? 'ratio' : 'proportion';
+        const data = MathEngine.generate(type, null, null);
+        
+        // Flavor text
+        const pre = type === 'ratio' ? "The chest is locked!" : "You found loot!";
+        data.q = `<strong>${pre}</strong><br>` + data.q;
+
+        this.showQuestion(data, () => {
+            // On Correct
+            AudioSys.playCoin();
+            this.gold += 100;
+            this.updateStats();
+            this.showFloatText("+100 GOLD", "#ffd700");
+            
+            // Next Round
+            this.spawnChest();
+            this.draw();
+            setTimeout(() => this.startTravelSequence(), 1500);
+        });
+    },
+
+    showQuestion(data, onCorrect) {
+        document.getElementById('quest-text').innerHTML = data.q;
+        const grid = document.getElementById('input-area');
+        grid.innerHTML = '';
+        
+        let opts = [data.a, ...data.wrongs];
+        opts.sort(() => Math.random() - 0.5);
+
+        opts.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.className = 'action-btn';
+            btn.innerHTML = opt;
+            btn.onclick = () => {
+                if(opt == data.a) { // Relaxed equality check for string/num
+                    onCorrect();
+                } else {
+                    AudioSys.playError();
+                    btn.style.background = '#555';
+                    btn.disabled = true;
+                }
+            };
+            grid.appendChild(btn);
+        });
+    },
+
+    animateMove(tx, ty, cb) {
+        this.player.x = tx;
+        this.player.y = ty;
+        this.draw();
+        // Simulate travel delay
+        setTimeout(cb, 500);
+    },
+
+    draw() {
+        // Clear
+        this.ctx.fillStyle = '#e6c288';
+        this.ctx.fillRect(0, 0, 400, 400);
+
+        // Draw Grid
+        this.ctx.strokeStyle = 'rgba(107, 85, 56, 0.3)';
+        this.ctx.lineWidth = 1;
+        for(let i=0; i<=10; i++) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(i*40, 0); this.ctx.lineTo(i*40, 400);
+            this.ctx.stroke();
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, i*40); this.ctx.lineTo(400, i*40);
+            this.ctx.stroke();
+        }
+        
+        // Draw Coordinates Numbers
+        this.ctx.fillStyle = '#8b4513';
+        this.ctx.font = '10px monospace';
+        for(let i=0; i<10; i++) {
+            this.ctx.fillText(i, i*40 + 2, 10); // X axis
+            this.ctx.fillText(i, 2, i*40 + 10); // Y axis
+        }
+
+        // Draw Player (Pirate Hat / Dot)
+        const px = this.player.x * 40 + 20;
+        const py = this.player.y * 40 + 20;
+        
+        this.ctx.fillStyle = 'red';
+        this.ctx.beginPath();
+        this.ctx.arc(px, py, 15, 0, Math.PI*2);
+        this.ctx.fill();
+        this.ctx.fillStyle = 'white';
+        this.ctx.font = '20px Arial';
+        this.ctx.fillText("P", px-6, py+7);
+
+        // Draw Chest
+        if (this.chest.active) {
+            const cx = this.chest.x * 40 + 20;
+            const cy = this.chest.y * 40 + 20;
+            this.ctx.fillStyle = '#ffd700';
+            this.ctx.fillRect(cx-15, cy-10, 30, 20); // Chest body
+            this.ctx.strokeStyle = '#000';
+            this.ctx.strokeRect(cx-15, cy-10, 30, 20);
+            this.ctx.fillStyle = '#000';
+            this.ctx.beginPath(); 
+            this.ctx.arc(cx, cy-10, 15, Math.PI, 0); // Lid
+            this.ctx.fill();
+        }
+    },
+
+    updateStats() {
+        document.getElementById('gold-val').innerText = this.gold;
+        document.getElementById('coord-val').innerText = `(${this.player.x},${this.player.y})`;
+    },
+
+    showFloatText(txt, color) {
+        const el = document.createElement('div');
+        el.className = 'float-text';
+        el.style.color = color;
+        el.innerText = txt;
+        el.style.left = '50%';
+        el.style.top = '30%';
+        el.style.transform = 'translateX(-50%)';
+        document.getElementById('game-boy').appendChild(el);
+        setTimeout(() => el.remove(), 1000);
+    }
+};
+
+</script>
+</body>
+</html>

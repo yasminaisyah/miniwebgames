@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Time Zone Commander</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #051e05;
+            font-family: 'Share Tech Mono', monospace;
+            color: #00ff00;
+            touch-action: none;
+            user-select: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: radial-gradient(circle, #0a3d0a 0%, #000000 100%);
+        }
+
+        /* --- RADAR VISUALS --- */
+        #radar-container {
+            position: relative;
+            width: 100vw;
+            height: 55vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        #radar-grid {
+            width: 80vmin;
+            height: 80vmin;
+            border: 2px solid #005500;
+            border-radius: 50%;
+            position: relative;
+            background: repeating-radial-gradient(#002200 0, #002200 10%, #001100 10%, #001100 20%);
+            box-shadow: 0 0 20px #00ff00;
+        }
+
+        #radar-sweep {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 50%;
+            height: 2px;
+            background: linear-gradient(to right, rgba(0,255,0,0), rgba(0,255,0,1));
+            transform-origin: 0 0;
+            animation: sweep 4s infinite linear;
+            box-shadow: 0 0 10px #00ff00;
+        }
+
+        @keyframes sweep {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .map-point {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: #00ff00;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        .plane-icon {
+            position: absolute;
+            font-size: 24px;
+            color: #fff;
+            text-shadow: 0 0 5px #00ff00;
+            transition: all 1s;
+        }
+
+        /* --- UI PANEL --- */
+        #comms-panel {
+            width: 90%;
+            max-width: 600px;
+            background: rgba(0, 20, 0, 0.9);
+            border: 2px solid #00ff00;
+            padding: 15px;
+            box-sizing: border-box;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 10;
+            margin-top: -20px; /* Overlap radar slightly */
+        }
+
+        #message-header {
+            border-bottom: 1px solid #005500;
+            padding-bottom: 5px;
+            font-size: 14px;
+            color: #00aa00;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        #message-body {
+            font-size: 20px;
+            line-height: 1.4;
+            color: #ccffcc;
+            min-height: 80px;
+        }
+
+        #options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .cmd-btn {
+            background: #003300;
+            border: 1px solid #00ff00;
+            color: #00ff00;
+            padding: 15px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+        }
+
+        .cmd-btn:hover {
+            background: #005500;
+            box-shadow: 0 0 10px #00ff00;
+        }
+        
+        .cmd-btn:active {
+            background: #00ff00;
+            color: #000;
+        }
+
+        /* --- SCREENS --- */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 40px;
+            color: #00ff00;
+            text-shadow: 0 0 20px #00ff00;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .start-btn {
+            padding: 20px 50px;
+            font-size: 24px;
+            background: transparent;
+            border: 2px solid #00ff00;
+            color: #00ff00;
+            font-family: 'Share Tech Mono', monospace;
+            cursor: pointer;
+            margin-top: 30px;
+            box-shadow: 0 0 15px #00ff00;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 10px #00ff00; }
+            50% { box-shadow: 0 0 25px #00ff00; }
+            100% { box-shadow: 0 0 10px #00ff00; }
+        }
+
+        .hidden { display: none !important; }
+
+        #score-display {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 24px;
+            text-shadow: 0 0 5px #00ff00;
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    
+    <div id="score-display">FLIGHTS CLEARED: <span id="score-val">0</span></div>
+
+    <div id="radar-container">
+        <div id="radar-grid">
+            <div id="radar-sweep"></div>
+            <div class="map-point" style="top: 50%; left: 50%;"></div> <div class="map-point" style="top: 20%; left: 80%;"></div>
+            <div class="map-point" style="top: 70%; left: 20%;"></div>
+            
+            <div id="plane" class="plane-icon" style="display:none;">✈</div>
+        </div>
+    </div>
+
+    <div id="comms-panel">
+        <div id="message-header">
+            <span>INCOMING TRANSMISSION</span>
+            <span id="freq-id">FREQ: 118.50</span>
+        </div>
+        <div id="message-body">
+            Scanning for flights...
+        </div>
+        <div id="options-grid">
+            </div>
+    </div>
+
+    <div id="start-screen" class="screen">
+        <h1>Time Zone<br>Commander</h1>
+        <p style="max-width: 500px; line-height: 1.5; color: #aaa;">
+            <strong style="color: #fff;">MISSION BRIEFING:</strong><br>
+            Pilots need to sync their clocks.<br>
+            Calculate the correct <strong>Local Time</strong> based on Time Zones.<br><br>
+            Example: KL is +8 Hours. London is +0 Hours.<br>
+            If KL is 16:00, London is 08:00.
+        </p>
+        <button class="start-btn" onclick="Game.start()">INITIATE RADAR</button>
+    </div>
+
+</div>
+
+<script>
+/* --- AUDIO SYSTEM (Synthesized) --- */
+const AudioSys = {
+    ctx: null,
+    init() {
+        if(!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    },
+    playTone(freq, type, duration, vol=0.1) {
+        if(!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+        gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + duration);
+    },
+    playBleep() { // Radar ping
+        if(!this.ctx) return;
+        this.playTone(1200, 'sine', 0.05, 0.05);
+    },
+    playRadio() { // Static burst
+        if(!this.ctx) return;
+        // White noise buffer
+        const bufferSize = this.ctx.sampleRate * 0.2; // 0.2 seconds
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+        }
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buffer;
+        const gain = this.ctx.createGain();
+        gain.gain.value = 0.05;
+        noise.connect(gain);
+        gain.connect(this.ctx.destination);
+        noise.start();
+    },
+    playSuccess() {
+        this.playTone(600, 'square', 0.1, 0.1);
+        setTimeout(() => this.playTone(900, 'square', 0.2, 0.1), 100);
+    },
+    playError() {
+        this.playTone(150, 'sawtooth', 0.4, 0.2);
+    }
+};
+
+/* --- TIME ZONE DATA --- */
+const CITIES = [
+    { name: "London", offset: 0 },
+    { name: "Paris", offset: 1 },
+    { name: "Dubai", offset: 4 },
+    { name: "Kuala Lumpur", offset: 8 },
+    { name: "Singapore", offset: 8 },
+    { name: "Tokyo", offset: 9 },
+    { name: "Sydney", offset: 11 },
+    { name: "New York", offset: -5 },
+    { name: "Los Angeles", offset: -8 }
+];
+
+/* --- LOGIC ENGINE --- */
+const Game = {
+    score: 0,
+    
+    start() {
+        AudioSys.init();
+        document.getElementById('start-screen').classList.add('hidden');
+        this.score = 0;
+        this.updateScore();
+        this.startRadarLoop();
+        this.newFlight();
+    },
+
+    startRadarLoop() {
+        setInterval(() => {
+            if(Math.random() > 0.8) AudioSys.playBleep();
+        }, 2000);
+    },
+
+    newFlight() {
+        // Hide plane
+        const plane = document.getElementById('plane');
+        plane.style.display = 'none';
+        
+        document.getElementById('message-body').innerHTML = '<span style="color:#0f0; animation: blink 1s infinite;">CONNECTING...</span>';
+        document.getElementById('options-grid').innerHTML = '';
+
+        setTimeout(() => {
+            this.generateProblem();
+        }, 1500);
+    },
+
+    generateProblem() {
+        AudioSys.playRadio();
+        const plane = document.getElementById('plane');
+        
+        // Random Position on Radar
+        const randTop = 20 + Math.random() * 60;
+        const randLeft = 20 + Math.random() * 60;
+        plane.style.top = randTop + '%';
+        plane.style.left = randLeft + '%';
+        plane.style.display = 'block';
+
+        // 1. Pick two cities
+        let c1 = CITIES[Math.floor(Math.random() * CITIES.length)];
+        let c2 = CITIES[Math.floor(Math.random() * CITIES.length)];
+        while(c1 === c2) c2 = CITIES[Math.floor(Math.random() * CITIES.length)];
+
+        // 2. Pick a starting time (Whole hours for simplicity)
+        let hours = Math.floor(Math.random() * 24);
+        let timeStr = (hours < 10 ? "0" + hours : hours) + ":00";
+
+        // 3. Calculate difference
+        let diff = c2.offset - c1.offset;
+        
+        // 4. Calculate Answer
+        let ansHour = hours + diff;
+        // Wrap around 24h
+        if(ansHour >= 24) ansHour -= 24;
+        if(ansHour < 0) ansHour += 24;
+        
+        let ansStr = (ansHour < 10 ? "0" + ansHour : ansHour) + ":00";
+
+        // 5. Generate Text
+        let txt = `Target ID: FLT-${Math.floor(Math.random()*900)+100}<br><br>`;
+        txt += `Pilot: "Tower, my clock reads <strong>${timeStr}</strong> (${c1.name} Time)."<br>`;
+        txt += `Pilot: "Please confirm local time in <strong>${c2.name}</strong>."`;
+
+        document.getElementById('message-body').innerHTML = txt;
+
+        // 6. Generate Options
+        let opts = [ansStr];
+        while(opts.length < 4) {
+            let fakeH = Math.floor(Math.random() * 24);
+            let fakeStr = (fakeH < 10 ? "0" + fakeH : fakeH) + ":00";
+            if(!opts.includes(fakeStr)) opts.push(fakeStr);
+        }
+        opts.sort();
+
+        const grid = document.getElementById('options-grid');
+        opts.forEach(opt => {
+            let btn = document.createElement('button');
+            btn.className = 'cmd-btn';
+            btn.innerText = opt;
+            btn.onclick = () => this.check(opt, ansStr);
+            grid.appendChild(btn);
+        });
+    },
+
+    check(selected, correct) {
+        if(selected === correct) {
+            AudioSys.playSuccess();
+            document.getElementById('message-body').innerHTML = `<span style="color:#fff;">"Roger that, Tower. Adjusting clocks to ${correct}. Out."</span>`;
+            document.getElementById('options-grid').innerHTML = '';
+            
+            // Animate plane away
+            const plane = document.getElementById('plane');
+            plane.style.transform = "translate(200px, -200px) scale(0)";
+            
+            this.score++;
+            this.updateScore();
+            setTimeout(() => this.newFlight(), 3000);
+        } else {
+            AudioSys.playError();
+            let oldText = document.getElementById('message-body').innerHTML;
+            document.getElementById('message-body').innerHTML = `<span style="color:red;">"Negative Tower! That doesn't match the time zone charts!"</span>`;
+            setTimeout(() => {
+                document.getElementById('message-body').innerHTML = oldText; // Restore question
+            }, 2000);
+        }
+    },
+
+    updateScore() {
+        document.getElementById('score-val').innerText = this.score;
+    }
+};
+
+</script>
+</body>
+</html>

@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>The Royal Alchemist</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Lato:wght@400;700&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #1a0b2e;
+            font-family: 'Lato', sans-serif;
+            touch-action: none;
+            user-select: none;
+            color: #fceeb5;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: radial-gradient(circle at center, #2e1a47 0%, #11051b 100%);
+        }
+
+        /* --- VISUALS --- */
+        #scene {
+            position: relative;
+            width: 100%;
+            height: 60%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* The Cauldron */
+        #cauldron-area {
+            position: relative;
+            width: 200px;
+            height: 180px;
+            margin-top: 50px;
+        }
+
+        #pot {
+            width: 100%;
+            height: 100%;
+            background: #4a4a4a;
+            border-radius: 0 0 80px 80px;
+            position: relative;
+            box-shadow: inset -10px -10px 30px rgba(0,0,0,0.5), 0 10px 20px rgba(0,0,0,0.5);
+            background: linear-gradient(90deg, #333 0%, #555 50%, #333 100%);
+        }
+        
+        #pot-rim {
+            position: absolute;
+            top: -10px;
+            left: -10px;
+            width: 220px;
+            height: 30px;
+            background: #666;
+            border-radius: 15px;
+            box-shadow: 0 5px 10px rgba(0,0,0,0.5);
+        }
+
+        /* Liquid Animation */
+        #liquid {
+            position: absolute;
+            top: 5px;
+            left: 10px;
+            width: 180px;
+            height: 40px;
+            background: #00ff00;
+            border-radius: 50%;
+            opacity: 0.8;
+            box-shadow: 0 0 20px #00ff00;
+            animation: glow 2s infinite alternate;
+        }
+
+        @keyframes glow {
+            from { box-shadow: 0 0 10px #00ff00; background: #00cc00; }
+            to { box-shadow: 0 0 30px #00ff00; background: #55ff55; }
+        }
+
+        .bubble {
+            position: absolute;
+            background: rgba(0, 255, 0, 0.6);
+            border-radius: 50%;
+            animation: rise 3s infinite ease-in;
+            bottom: 20px;
+        }
+
+        @keyframes rise {
+            0% { transform: translateY(0) scale(0.5); opacity: 0; }
+            50% { opacity: 1; }
+            100% { transform: translateY(-150px) scale(1.2); opacity: 0; }
+        }
+
+        /* Recipe Book (Question) */
+        #recipe-book {
+            position: absolute;
+            top: 20px;
+            background: #f4e1d2;
+            color: #3e2723;
+            padding: 20px 40px;
+            border-radius: 5px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            text-align: center;
+            max-width: 600px;
+            width: 80%;
+            border: 10px solid #5d4037;
+            transform: perspective(1000px) rotateX(10deg);
+            z-index: 10;
+        }
+
+        #recipe-title {
+            font-family: 'Cinzel', serif;
+            font-weight: 700;
+            font-size: 16px;
+            color: #8d6e63;
+            text-transform: uppercase;
+            border-bottom: 2px solid #8d6e63;
+            margin-bottom: 10px;
+            display: inline-block;
+        }
+
+        #question-text {
+            font-size: 24px;
+            font-weight: bold;
+            line-height: 1.4;
+        }
+
+        /* --- UI LAYER --- */
+        #shelf-area {
+            width: 100%;
+            height: 40%;
+            background: #28153f;
+            border-top: 5px solid #4a2c68;
+            padding: 20px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+        }
+
+        #shelf-label {
+            font-family: 'Cinzel', serif;
+            color: #b39ddb;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        #ingredients-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            width: 100%;
+            max-width: 500px;
+        }
+
+        .potion-btn {
+            background: linear-gradient(to bottom, #5e35b1, #4527a0);
+            border: 2px solid #9575cd;
+            border-radius: 15px;
+            color: white;
+            font-family: 'Lato', sans-serif;
+            font-size: 20px;
+            font-weight: bold;
+            padding: 15px;
+            cursor: pointer;
+            box-shadow: 0 5px 0 #311b92;
+            transition: transform 0.1s, box-shadow 0.1s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .potion-btn::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 5px;
+            background: rgba(255,255,255,0.2);
+        }
+
+        .potion-btn:active {
+            transform: translateY(5px);
+            box-shadow: none;
+        }
+        
+        /* Particle Effects */
+        .sparkle {
+            position: absolute;
+            pointer-events: none;
+            background: white;
+            border-radius: 50%;
+            animation: fadeOut 1s forwards;
+        }
+
+        @keyframes fadeOut {
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(3); opacity: 0; }
+        }
+
+        /* SCREENS */
+        .screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(20, 10, 30, 0.98);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        h1 {
+            font-family: 'Cinzel', serif;
+            font-size: 48px;
+            color: #ffd700;
+            text-shadow: 0 0 20px #ff0000;
+            margin-bottom: 20px;
+        }
+
+        .btn-main {
+            padding: 15px 40px;
+            font-size: 24px;
+            background: #ffb300;
+            color: #3e2723;
+            border: none;
+            border-radius: 5px;
+            font-family: 'Cinzel', serif;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(255, 179, 0, 0.4);
+        }
+
+        .hidden { display: none !important; }
+
+        #score-display {
+            position: absolute;
+            top: 20px; right: 20px;
+            font-family: 'Cinzel', serif;
+            font-size: 20px;
+            color: #ffd700;
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    
+    <div id="score-display">POTIONS BREWED: <span id="score">0</span></div>
+
+    <div id="scene">
+        <div id="recipe-book">
+            <div id="recipe-title">Current Order</div>
+            <div id="question-text">Loading...</div>
+        </div>
+
+        <div id="cauldron-area">
+            <div id="pot-rim"></div>
+            <div id="pot"></div>
+            <div id="liquid"></div>
+            </div>
+    </div>
+
+    <div id="shelf-area">
+        <div id="shelf-label">SELECT INGREDIENT</div>
+        <div id="ingredients-grid">
+            </div>
+    </div>
+
+    <div id="start-screen" class="screen">
+        <h1>The Royal<br>Alchemist</h1>
+        <p style="font-size: 18px; max-width: 500px; color: #d1c4e9; line-height: 1.6;">
+            The King needs his potions!<br>
+            Measure the correct <strong>Mass</strong> and <strong>Volume</strong>.<br>
+            <br>
+            <em>Hint: 1 kg = 1000 g | 1 Liter = 1000 ml</em>
+        </p>
+        <button class="btn-main" onclick="Game.start()">START BREWING</button>
+    </div>
+
+</div>
+
+<script>
+/* --- AUDIO SYSTEM --- */
+const AudioSys = {
+    ctx: null,
+    init() {
+        if(!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    },
+    playTone(freq, type, duration, vol=0.1) {
+        if(!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+        gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + duration);
+    },
+    playBubble() {
+        if(!this.ctx) return;
+        // Water drop sound
+        this.playTone(400 + Math.random()*200, 'sine', 0.1, 0.05);
+    },
+    playSuccess() {
+        if(!this.ctx) return;
+        // Magical chime
+        this.playTone(600, 'sine', 0.5, 0.1);
+        setTimeout(() => this.playTone(800, 'sine', 0.5, 0.1), 100);
+        setTimeout(() => this.playTone(1200, 'sine', 0.8, 0.1), 200);
+    },
+    playError() {
+        if(!this.ctx) return;
+        // Dull thud
+        this.playTone(150, 'square', 0.3, 0.1);
+    }
+};
+
+/* --- MATH ENGINE (Chapter 5: Measurement) --- */
+const MathEngine = {
+    generate(level) {
+        const types = ['mass_convert', 'vol_convert', 'length_ratio', 'mixed_add'];
+        const type = types[Math.floor(Math.random() * types.length)];
+        
+        let q, a, wrongs;
+
+        switch(type) {
+            case 'mass_convert': // kg <-> g
+                // 1.5kg to g
+                const kg = (Math.floor(Math.random() * 50) + 1) / 10; // 0.1 to 5.0
+                q = `We need <strong>${kg} kg</strong> of Dragon Scale.<br>Which jar has this amount?`;
+                a = `${Math.round(kg * 1000)} g`;
+                wrongs = [
+                    `${Math.round(kg * 100)} g`, 
+                    `${kg * 10} g`, 
+                    `${Math.round(kg * 1000) + 500} g`
+                ];
+                break;
+
+            case 'vol_convert': // l <-> ml
+                // 2500ml to L
+                const ml = Math.floor(Math.random() * 30) * 100 + 100; // 100 to 3000
+                q = `The potion requires <strong>${ml} ml</strong> of Frog Slime.<br>Select the correct flask.`;
+                a = `${ml / 1000} L`;
+                wrongs = [
+                    `${ml / 100} L`,
+                    `${ml / 10} L`,
+                    `${(ml / 1000) + 1} L`
+                ];
+                break;
+
+            case 'length_ratio': // Proportion: "Length and Mass"
+                // 10cm weighs 50g. How much does 30cm weigh?
+                const baseLen = 10;
+                const baseWeight = Math.floor(Math.random() * 5 + 1) * 10; // 10, 20... 50g
+                const mult = Math.floor(Math.random() * 4) + 2; // 2, 3, 4, 5
+                const targetLen = baseLen * mult;
+                
+                q = `<strong>${baseLen} cm</strong> of Gold Wire weighs <strong>${baseWeight} g</strong>.<br>How much does <strong>${targetLen} cm</strong> weigh?`;
+                a = `${baseWeight * mult} g`;
+                wrongs = [
+                    `${baseWeight * mult * 10} g`,
+                    `${baseWeight + (targetLen - baseLen)} g`,
+                    `${baseWeight} g`
+                ];
+                break;
+
+            case 'mixed_add': // "Mass and Volume" logic (Addition)
+                // I have 200ml, need 1L. How much more?
+                const targetL = 1;
+                const haveMl = [200, 250, 500, 750, 800][Math.floor(Math.random()*5)];
+                q = `The recipe needs <strong>1 Liter</strong>.<br>The cauldron only has <strong>${haveMl} ml</strong>.<br>How much more do we need?`;
+                a = `${1000 - haveMl} ml`;
+                wrongs = [
+                    `${haveMl} ml`,
+                    `${1000 - haveMl + 100} ml`,
+                    `100 ml`
+                ];
+                break;
+        }
+
+        return { q, a, wrongs };
+    }
+};
+
+/* --- GAME LOGIC --- */
+const Game = {
+    score: 0,
+    
+    start() {
+        AudioSys.init();
+        document.getElementById('start-screen').classList.add('hidden');
+        this.score = 0;
+        document.getElementById('score').innerText = this.score;
+        this.startBubbles();
+        this.newTurn();
+    },
+
+    startBubbles() {
+        const cauldron = document.getElementById('cauldron-area');
+        setInterval(() => {
+            const b = document.createElement('div');
+            b.className = 'bubble';
+            b.style.left = (20 + Math.random() * 160) + 'px';
+            b.style.width = (10 + Math.random() * 20) + 'px';
+            b.style.height = b.style.width;
+            cauldron.appendChild(b);
+            
+            // Random bubble sound
+            if(Math.random() > 0.7) AudioSys.playBubble();
+
+            setTimeout(() => b.remove(), 3000);
+        }, 500);
+    },
+
+    newTurn() {
+        // Reset Liquid Color
+        const liquid = document.getElementById('liquid');
+        liquid.style.background = `hsl(${Math.random() * 360}, 100%, 50%)`;
+        liquid.style.boxShadow = `0 0 20px hsl(${Math.random() * 360}, 100%, 50%)`;
+
+        // Generate Q
+        const data = MathEngine.generate(1);
+        document.getElementById('question-text').innerHTML = data.q;
+
+        // Generate Buttons
+        const grid = document.getElementById('ingredients-grid');
+        grid.innerHTML = '';
+        
+        let opts = [data.a, ...data.wrongs];
+        opts = opts.slice(0, 4);
+        opts.sort(() => Math.random() - 0.5);
+
+        opts.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.className = 'potion-btn';
+            btn.innerHTML = opt;
+            btn.onclick = (e) => this.check(opt, data.a, e);
+            grid.appendChild(btn);
+        });
+    },
+
+    check(sel, corr, e) {
+        if (sel === corr) {
+            AudioSys.playSuccess();
+            this.createSparkles(e.clientX, e.clientY);
+            this.score++;
+            document.getElementById('score').innerText = this.score;
+            
+            // Success Visual
+            document.getElementById('question-text').innerHTML = "<span style='color:green'>Perfect Mix!</span>";
+            setTimeout(() => this.newTurn(), 1000);
+        } else {
+            AudioSys.playError();
+            // Shake Recipe
+            const book = document.getElementById('recipe-book');
+            book.style.transform = "perspective(1000px) rotateX(10deg) translateX(10px)";
+            setTimeout(() => book.style.transform = "perspective(1000px) rotateX(10deg) translateX(-10px)", 100);
+            setTimeout(() => book.style.transform = "perspective(1000px) rotateX(10deg)", 200);
+        }
+    },
+
+    createSparkles(x, y) {
+        for(let i=0; i<10; i++) {
+            const s = document.createElement('div');
+            s.className = 'sparkle';
+            s.style.left = x + 'px';
+            s.style.top = y + 'px';
+            s.style.width = '10px';
+            s.style.height = '10px';
+            document.body.appendChild(s);
+            setTimeout(() => s.remove(), 1000);
+        }
+    }
+};
+
+</script>
+</body>
+</html>

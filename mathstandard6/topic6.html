@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cosmic Architect: Geometry Edition</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Teko:wght@300;500&family=Roboto+Mono:wght@400;700&display=swap');
+
+        body {
+            margin: 0;
+            background-color: #001122;
+            font-family: 'Roboto Mono', monospace;
+            color: #00ffff;
+            /* ENABLE SCROLLING FIXES: */
+            overflow-y: auto; 
+            touch-action: auto; 
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            /* Allow height to grow so you can scroll */
+            min-height: 100vh; 
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: 
+                linear-gradient(rgba(0, 17, 34, 0.9), rgba(0, 17, 34, 0.9)),
+                repeating-linear-gradient(0deg, transparent, transparent 19px, rgba(0, 255, 255, 0.1) 20px),
+                repeating-linear-gradient(90deg, transparent, transparent 19px, rgba(0, 255, 255, 0.1) 20px);
+            background-size: 100% 100%, 20px 20px, 20px 20px;
+            padding-bottom: 50px; /* Space at bottom for scrolling */
+        }
+
+        /* --- HOLOGRAM AREA --- */
+        #hologram-stage {
+            position: relative;
+            width: 100%;
+            height: 50vh; /* Takes up half the screen height */
+            min-height: 300px; /* Won't get too small */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            perspective: 1000px;
+        }
+
+        #blueprint-base {
+            position: absolute;
+            bottom: 20px;
+            width: 250px;
+            height: 250px;
+            border: 2px solid rgba(0, 255, 255, 0.3);
+            border-radius: 50%;
+            transform: rotateX(60deg);
+            box-shadow: 0 0 50px rgba(0, 255, 255, 0.1), inset 0 0 50px rgba(0, 255, 255, 0.1);
+            animation: spinBase 20s infinite linear;
+        }
+
+        @keyframes spinBase {
+            from { transform: rotateX(60deg) rotateZ(0deg); }
+            to { transform: rotateX(60deg) rotateZ(360deg); }
+        }
+
+        canvas {
+            filter: drop-shadow(0 0 10px #00ffff);
+            z-index: 10;
+        }
+
+        /* --- UI PANEL --- */
+        #control-panel {
+            width: 100%;
+            /* Removed fixed height, allows it to grow */
+            background: #000c18;
+            border-top: 4px solid #00ffff;
+            box-shadow: 0 -10px 30px rgba(0, 255, 255, 0.2);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+            z-index: 20;
+        }
+
+        #readout-screen {
+            width: 90%;
+            max-width: 600px;
+            background: rgba(0, 40, 60, 0.8);
+            border: 1px solid #005555;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+            border-radius: 5px;
+            position: relative;
+        }
+
+        #readout-screen::before {
+            content: "SYSTEM ALERT";
+            position: absolute;
+            top: -10px;
+            left: 10px;
+            background: #000c18;
+            color: #00ffff;
+            font-size: 12px;
+            padding: 0 5px;
+        }
+
+        #question-text {
+            font-family: 'Teko', sans-serif;
+            font-size: 28px;
+            letter-spacing: 1px;
+            color: #fff;
+            text-shadow: 0 0 5px #00ffff;
+        }
+
+        #buttons-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr; /* Two columns */
+            gap: 15px;
+            width: 100%;
+            max-width: 500px;
+        }
+
+        .blueprint-btn {
+            background: rgba(0, 255, 255, 0.1);
+            border: 2px solid #00ffff;
+            color: #00ffff;
+            padding: 20px;
+            font-family: 'Teko', sans-serif;
+            font-size: 24px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            clip-path: polygon(10% 0, 100% 0, 100% 90%, 90% 100%, 0 100%, 0 10%);
+        }
+
+        .blueprint-btn:hover {
+            background: #00ffff;
+            color: #000;
+            box-shadow: 0 0 20px #00ffff;
+        }
+
+        .blueprint-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* --- SCREENS --- */
+        .screen {
+            position: fixed; /* Fixed so it always covers the view */
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 10, 20, 0.95);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            overflow-y: auto; /* Allow scrolling inside start screen */
+        }
+
+        h1 {
+            font-family: 'Teko', sans-serif;
+            font-size: 60px;
+            margin: 0;
+            background: linear-gradient(to bottom, #fff, #00ffff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+        }
+
+        .start-btn {
+            margin-top: 40px;
+            padding: 15px 50px;
+            font-size: 30px;
+            font-family: 'Teko', sans-serif;
+            background: #00ffff;
+            color: #000;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 0 30px #00ffff;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 20px #00ffff; }
+            50% { box-shadow: 0 0 50px #00ffff; }
+            100% { box-shadow: 0 0 20px #00ffff; }
+        }
+
+        .hidden { display: none !important; }
+        
+        #score-display {
+            position: absolute;
+            top: 20px; right: 20px;
+            font-size: 20px;
+            border: 1px solid #00ffff;
+            padding: 5px 10px;
+            background: rgba(0,0,0,0.5);
+            z-index: 50;
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="score-display">MODULES BUILT: <span id="score">0</span></div>
+
+    <div id="hologram-stage">
+        <div id="blueprint-base"></div>
+        <canvas id="holoCanvas"></canvas>
+    </div>
+
+    <div id="control-panel">
+        <div id="readout-screen">
+            <div id="question-text">Initializing Systems...</div>
+        </div>
+        <div id="buttons-grid">
+            </div>
+    </div>
+
+    <div id="start-screen" class="screen">
+        <h1>COSMIC<br>ARCHITECT</h1>
+        <p style="color: #88ccff; max-width: 500px; font-size: 16px; line-height: 1.5; padding: 20px;">
+            The Space Station needs expansion.<br>
+            Identify the correct <strong>Shape</strong> and <strong>Interior Angle</strong> to build the modules.<br>
+            <br>
+            <em>Triangle = 60° | Square = 90° | Pentagon = 108°</em>
+        </p>
+        <button class="start-btn" onclick="Game.start()">BOOT SYSTEM</button>
+    </div>
+</div>
+
+<script>
+/* --- AUDIO SYSTEM --- */
+const AudioSys = {
+    ctx: null,
+    init() {
+        if(!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    },
+    playTone(freq, type, duration, vol=0.1) {
+        if(!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+        gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + duration);
+    },
+    playConstruct() { // Welding sound effect simulation
+        if(!this.ctx) return;
+        this.playTone(100, 'sawtooth', 0.1, 0.2);
+        setTimeout(() => this.playTone(80, 'square', 0.2, 0.2), 100);
+        setTimeout(() => this.playTone(2000, 'sine', 0.1, 0.05), 150); // Spark
+    },
+    playError() {
+        this.playTone(50, 'sawtooth', 0.5, 0.3);
+    }
+};
+
+/* --- MATH ENGINE --- */
+const MathEngine = {
+    // Data based on image content: 50, 90, 108, Equilateral, Square
+    generate(level) {
+        const modes = ['identify_angle', 'shape_angle', 'angle_shape'];
+        const mode = modes[Math.floor(Math.random() * modes.length)];
+        
+        let q, a, wrongs, drawData;
+
+        switch(mode) {
+            case 'identify_angle': 
+                // Draw an angle, ask for value
+                // Focus on 50 (acute), 90 (right), 108 (obtuse/pentagon), 120 (hexagon)
+                const angles = [50, 90, 108];
+                const val = angles[Math.floor(Math.random() * angles.length)];
+                
+                q = `Scanner detects a joint with this angle.<br>What is the measurement?`;
+                a = `${val}°`;
+                
+                // Distractors
+                let w1 = (val === 90) ? 60 : 90;
+                let w2 = (val === 50) ? 100 : val - 20;
+                let w3 = val + 30;
+                wrongs = [`${w1}°`, `${w2}°`, `${w3}°`];
+                
+                drawData = { type: 'angle', val: val };
+                break;
+
+            case 'shape_angle':
+                // Show shape, ask interior angle
+                // Equilateral Triangle (60), Square (90), Pentagon (108)
+                const shapes = [
+                    { name: 'Equilateral Triangle', sides: 3, ang: 60 },
+                    { name: 'Square', sides: 4, ang: 90 },
+                    { name: 'Regular Pentagon', sides: 5, ang: 108 } // 108 is explicitly in book
+                ];
+                const s = shapes[Math.floor(Math.random() * shapes.length)];
+                
+                q = `We need to build a <strong>${s.name}</strong> module.<br>What is the interior angle?`;
+                a = `${s.ang}°`;
+                wrongs = [`100°`, `45°`, `120°`, `180°`].filter(x => x !== a).slice(0,3);
+                
+                drawData = { type: 'shape', sides: s.sides };
+                break;
+
+            case 'angle_shape':
+                // "We need a 108 connector, which shape?"
+                const reqs = [
+                    { ang: 90, name: 'Square', sides: 4 },
+                    { ang: 60, name: 'Equilateral Triangle', sides: 3 },
+                    { ang: 108, name: 'Regular Pentagon', sides: 5 }
+                ];
+                const r = reqs[Math.floor(Math.random() * reqs.length)];
+                
+                q = `Connector requires a <strong>${r.ang}°</strong> angle.<br>Which shape fits?`;
+                a = r.name;
+                wrongs = reqs.filter(x => x.name !== r.name).map(x => x.name);
+                while(wrongs.length < 3) wrongs.push("Circle");
+                
+                // Draw the angle only
+                drawData = { type: 'angle', val: r.ang };
+                break;
+        }
+
+        return { q, a, wrongs, drawData };
+    }
+};
+
+/* --- RENDERER --- */
+const CanvasSys = {
+    canvas: null,
+    ctx: null,
+    angleOffset: 0,
+    
+    init() {
+        this.canvas = document.getElementById('holoCanvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.resize();
+        window.addEventListener('resize', () => this.resize());
+        this.animate = this.animate.bind(this);
+        requestAnimationFrame(this.animate);
+    },
+
+    resize() {
+        // Resize canvas to fit container but keep max size
+        const container = document.getElementById('hologram-stage');
+        this.canvas.width = Math.min(container.clientWidth, 400);
+        this.canvas.height = Math.min(container.clientHeight, 300);
+    },
+
+    currentDraw: null,
+
+    setDraw(data) {
+        this.currentDraw = data;
+    },
+
+    animate() {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.angleOffset += 0.005; // Slow rotation for 3D effect
+
+        if (this.currentDraw) {
+            this.ctx.strokeStyle = '#00ffff';
+            this.ctx.lineWidth = 3;
+            this.ctx.shadowBlur = 10;
+            this.ctx.shadowColor = '#00ffff';
+            this.ctx.lineCap = 'round';
+            this.ctx.lineJoin = 'round';
+
+            const cx = this.canvas.width / 2;
+            const cy = this.canvas.height / 2 + 20;
+
+            if (this.currentDraw.type === 'shape') {
+                this.drawPoly(cx, cy, this.currentDraw.sides, 80);
+            } else if (this.currentDraw.type === 'angle') {
+                this.drawAngle(cx, cy, this.currentDraw.val);
+            }
+        }
+        
+        requestAnimationFrame(this.animate);
+    },
+
+    drawPoly(x, y, sides, r) {
+        this.ctx.beginPath();
+        for (let i = 0; i <= sides; i++) {
+            // Add rotation
+            const theta = (i * 2 * Math.PI / sides) - (Math.PI / 2) + this.angleOffset;
+            const px = x + Math.cos(theta) * r;
+            const py = y + Math.sin(theta) * r;
+            if (i === 0) this.ctx.moveTo(px, py);
+            else this.ctx.lineTo(px, py);
+        }
+        this.ctx.stroke();
+        
+        // Draw interior lines for tech effect
+        this.ctx.lineWidth = 1;
+        this.ctx.globalAlpha = 0.3;
+        this.ctx.beginPath();
+        for (let i = 0; i < sides; i++) {
+             const theta = (i * 2 * Math.PI / sides) - (Math.PI / 2) + this.angleOffset;
+             this.ctx.moveTo(x, y);
+             this.ctx.lineTo(x + Math.cos(theta) * r, y + Math.sin(theta) * r);
+        }
+        this.ctx.stroke();
+        this.ctx.globalAlpha = 1;
+    },
+
+    drawAngle(x, y, deg) {
+        const r = 100;
+        const rad = deg * (Math.PI / 180);
+        
+        // Base line (horizontal)
+        this.ctx.beginPath();
+        this.ctx.moveTo(x, y);
+        this.ctx.lineTo(x + r, y);
+        this.ctx.stroke();
+
+        // Angled line
+        // We flip Y because canvas Y is down
+        this.ctx.beginPath();
+        this.ctx.moveTo(x, y);
+        this.ctx.lineTo(x + Math.cos(-rad)*r, y + Math.sin(-rad)*r);
+        this.ctx.stroke();
+
+        // Arc
+        this.ctx.beginPath();
+        this.ctx.arc(x, y, 40, 0, -rad, true); // true = counter-clockwise
+        this.ctx.stroke();
+
+        // Label
+        this.ctx.fillStyle = "#fff";
+        this.ctx.font = "20px Roboto Mono";
+        this.ctx.fillText(deg + "°", x + 10, y - 10);
+        
+        // Square marker if 90
+        if(deg === 90) {
+            this.ctx.beginPath();
+            this.ctx.rect(x, y - 20, 20, 20);
+            this.ctx.stroke();
+        }
+    }
+};
+
+/* --- GAME LOGIC --- */
+const Game = {
+    score: 0,
+    
+    start() {
+        AudioSys.init();
+        CanvasSys.init();
+        document.getElementById('start-screen').classList.add('hidden');
+        this.score = 0;
+        document.getElementById('score').innerText = this.score;
+        this.nextLevel();
+    },
+
+    nextLevel() {
+        const data = MathEngine.generate(1);
+        
+        document.getElementById('question-text').innerHTML = data.q;
+        CanvasSys.setDraw(data.drawData);
+
+        const grid = document.getElementById('buttons-grid');
+        grid.innerHTML = '';
+
+        let opts = [data.a, ...data.wrongs];
+        opts.sort(() => Math.random() - 0.5);
+
+        opts.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.className = 'blueprint-btn';
+            btn.innerHTML = opt;
+            btn.onclick = () => this.check(opt, data.a);
+            grid.appendChild(btn);
+        });
+    },
+
+    check(sel, corr) {
+        if (sel === corr) {
+            AudioSys.playConstruct();
+            this.score++;
+            document.getElementById('score').innerText = this.score;
+            document.getElementById('question-text').innerHTML = "<span style='color:#00ff00'>MODULE INSTALLED.</span>";
+            
+            // Visual feedback: Spin faster
+            CanvasSys.angleOffset += 0.5;
+            
+            setTimeout(() => this.nextLevel(), 1200);
+        } else {
+            AudioSys.playError();
+            document.getElementById('question-text').innerHTML = "<span style='color:#ff0000'>MALFUNCTION. RETRY.</span>";
+        }
+    }
+};
+
+</script>
+</body>
+</html>

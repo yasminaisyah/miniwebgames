@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Shadow Jump: Pythagoras</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Roboto+Mono:wght@500&display=swap');
+
+        :root {
+            --bg-sky-top: #0b1026;
+            --bg-sky-bot: #2b3266;
+            --building-face: #7f8c8d; /* Much lighter grey */
+            --building-side: #95a5a6;
+            --window-lit: #f1c40f;    /* Bright Yellow */
+            --window-dark: #2c3e50;
+            --moon: #f1f2f6;
+            --accent: #ff4757; 
+            --text: #ffffff;
+        }
+
+        body {
+            margin: 0;
+            background: #000;
+            color: var(--text);
+            font-family: 'Roboto Mono', monospace;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #game-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            background: linear-gradient(to bottom, var(--bg-sky-top), var(--bg-sky-bot));
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        /* Moon */
+        #moon {
+            position: absolute;
+            top: 40px;
+            right: 40px;
+            width: 60px;
+            height: 60px;
+            background: var(--moon);
+            border-radius: 50%;
+            box-shadow: 0 0 30px rgba(255, 255, 255, 0.3);
+            z-index: 1;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            padding: 15px;
+            z-index: 10;
+        }
+
+        .hud-box {
+            background: rgba(0,0,0,0.7);
+            padding: 8px 15px;
+            border-radius: 4px;
+            border-left: 4px solid var(--accent);
+            font-family: 'Black Ops One', cursive;
+            font-size: 1.2rem;
+            text-shadow: 1px 1px 0 #000;
+        }
+
+        #canvas-container {
+            flex: 1;
+            position: relative;
+            z-index: 5;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Bottom UI Panel */
+        #ui-layer {
+            width: 100%;
+            padding: 15px;
+            background: #1e272e;
+            border-top: 3px solid var(--accent);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 20;
+            box-sizing: border-box;
+            min-height: 160px; /* Force space for buttons */
+        }
+
+        #question-box {
+            margin-bottom: 15px;
+            font-size: 1rem;
+            text-align: center;
+            color: #d2dae2;
+            line-height: 1.4;
+        }
+
+        .highlight {
+            color: var(--accent);
+            font-weight: bold;
+            font-size: 1.1rem;
+            display: block;
+            margin-top: 5px;
+        }
+
+        #options-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 10px;
+            width: 100%;
+            max-width: 600px;
+        }
+
+        button.opt-btn {
+            background: #485460;
+            border: 2px solid #808e9b;
+            color: white;
+            padding: 12px;
+            font-family: 'Black Ops One', cursive;
+            font-size: 1.3rem;
+            cursor: pointer;
+            border-radius: 6px;
+            touch-action: manipulation;
+        }
+
+        button.opt-btn:active { background: #fff; color: #000; }
+
+        /* Start/Game Over Screens */
+        #start-screen, #game-over {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(11, 16, 38, 0.98);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            font-family: 'Black Ops One', cursive;
+            font-size: 2.8rem;
+            color: var(--accent);
+            margin: 0 0 20px 0;
+            text-transform: uppercase;
+            text-shadow: 0 0 10px var(--accent);
+        }
+
+        p {
+            font-size: 1.1rem;
+            max-width: 500px;
+            line-height: 1.6;
+            margin-bottom: 30px;
+            color: #ccc;
+        }
+
+        .big-btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 15px 50px;
+            font-size: 1.5rem;
+            font-family: 'Black Ops One', cursive;
+            cursor: pointer;
+            box-shadow: 0 0 15px var(--accent);
+            border-radius: 5px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 15px var(--accent); }
+            50% { transform: scale(1.05); box-shadow: 0 0 30px var(--accent); }
+            100% { transform: scale(1); box-shadow: 0 0 15px var(--accent); }
+        }
+
+        .hidden { display: none !important; }
+        .correct { background-color: #05c46b !important; border-color: #0be881 !important; }
+        .wrong { background-color: #ff3f34 !important; border-color: #ff5e57 !important; }
+
+        @media (max-width: 600px) {
+            #options-container { grid-template-columns: 1fr 1fr; }
+            h1 { font-size: 2rem; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-wrapper">
+    <div id="moon"></div>
+    
+    <header>
+        <div class="hud-box">LEVEL <span id="level">1</span></div>
+        <div class="hud-box">SCORE <span id="score">0</span></div>
+    </header>
+
+    <div id="canvas-container">
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <div id="ui-layer">
+        <div id="question-box">CALCULATING GAP PARAMETERS...</div>
+        <div id="options-container">
+            <button class="opt-btn" onclick="check(0)">A</button>
+            <button class="opt-btn" onclick="check(1)">B</button>
+            <button class="opt-btn" onclick="check(2)">C</button>
+            <button class="opt-btn" onclick="check(3)">D</button>
+        </div>
+    </div>
+
+    <div id="start-screen">
+        <h1>SHADOW JUMP</h1>
+        <p><strong>MISSION:</strong> Cross the rooftops.<br>
+        Calculate the missing side of the triangle to jump safely.</p>
+        <p style="font-size: 0.9rem; color: #7f8c8d">Hint: Look for 3-4-5 and 5-12-13 patterns.</p>
+        <button class="big-btn" onclick="initGame()">START MISSION</button>
+    </div>
+
+    <div id="game-over" class="hidden">
+        <h1>MISSION FAILED</h1>
+        <p>You fell into the alleyway.</p>
+        <p style="font-size: 1.4rem; color: #fff">SCORE: <span id="final-score">0</span></p>
+        <button class="big-btn" onclick="initGame()">RETRY</button>
+    </div>
+</div>
+
+<script>
+    // --- Audio System ---
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    let audioCtx;
+
+    function initAudio() {
+        if (!audioCtx) audioCtx = new AudioContext();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+    }
+
+    function playSound(type) {
+        if (!audioCtx) return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        const t = audioCtx.currentTime;
+
+        if (type === 'jump') {
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(150, t);
+            osc.frequency.linearRampToValueAtTime(600, t + 0.15);
+            gain.gain.setValueAtTime(0.2, t);
+            gain.gain.linearRampToValueAtTime(0, t + 0.3);
+            osc.start(t);
+            osc.stop(t + 0.3);
+        } else if (type === 'land') {
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(100, t);
+            osc.frequency.exponentialRampToValueAtTime(0.01, t + 0.1);
+            gain.gain.setValueAtTime(0.2, t);
+            gain.gain.linearRampToValueAtTime(0, t + 0.1);
+            osc.start(t);
+            osc.stop(t + 0.1);
+        } else if (type === 'crash') {
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(80, t);
+            osc.frequency.linearRampToValueAtTime(20, t + 0.5);
+            gain.gain.setValueAtTime(0.3, t);
+            gain.gain.linearRampToValueAtTime(0, t + 0.5);
+            osc.start(t);
+            osc.stop(t + 0.5);
+        }
+    }
+
+    // --- Game Logic ---
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    let level = 1;
+    let score = 0;
+    let gameState = 'start'; 
+    let player = { x: 50, y: 0, size: 24 };
+    let buildings = []; 
+    let currentProblem = {}; 
+    let correctIndex = 0;
+
+    // Pythagorean Triples (a, b, c)
+    const triples = [
+        [3, 4, 5], [5, 12, 13], [6, 8, 10], [8, 15, 17], 
+        [9, 12, 15], [7, 24, 25], [20, 21, 29]
+    ];
+
+    function resize() {
+        const container = document.getElementById('canvas-container');
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+        if(gameState === 'play') drawScene();
+    }
+    window.addEventListener('resize', resize);
+
+    function initGame() {
+        initAudio();
+        level = 1;
+        score = 0;
+        document.getElementById('score').innerText = score;
+        document.getElementById('level').innerText = level;
+        document.getElementById('start-screen').classList.add('hidden');
+        document.getElementById('game-over').classList.add('hidden');
+        
+        resize(); // Ensure size is correct before drawing
+        generateLevel();
+        gameState = 'play';
+    }
+
+    function generateLevel() {
+        buildings = [];
+        
+        // Ground baseline - push it up a bit so it's not hidden by UI
+        const groundY = canvas.height - 20; 
+
+        // Building 1 (Start)
+        const b1h = 100 + Math.random() * 150;
+        buildings.push({
+            x: -50, // Start offscreen
+            w: 250,
+            h: b1h
+        });
+
+        // Pick Math Problem
+        const t = triples[Math.floor(Math.random() * triples.length)];
+        const scale = 1; 
+        const a = t[0] * scale;
+        const b = t[1] * scale;
+        const c = t[2] * scale;
+
+        // Problem Type: 0=Find Hypotenuse (Jump), 1=Find Leg (Height)
+        let type = Math.random() > 0.4 ? 'jump' : 'height';
+        currentProblem = { a, b, c, type };
+
+        // Visual Scaling (Meters to Pixels)
+        const PXM = 12; // 1 meter = 12 pixels
+        const gapWidth = (type === 'jump' || type === 'height') ? b * PXM : b * PXM;
+        const hDiff = (type === 'jump' || type === 'height') ? a * PXM : a * PXM;
+
+        // Building 2 (Target)
+        const dir = Math.random() > 0.5 ? 1 : -1;
+        let b2h = b1h + (hDiff * dir);
+        
+        // Clamp height so it stays on screen
+        if (b2h < 50) b2h = 50; 
+        if (b2h > groundY - 50) b2h = groundY - 50;
+
+        // Recalculate pixel height difference based on clamped values for visual accuracy
+        // But for game logic we keep the math "pure" (user solves the math, not the pixel distance)
+
+        buildings.push({
+            x: 200 + gapWidth,
+            w: 400,
+            h: b2h
+        });
+
+        // Set Player
+        player.x = buildings[0].x + buildings[0].w - 40;
+        player.y = groundY - buildings[0].h;
+
+        // UI Text
+        let question = "";
+        let ans = 0;
+
+        if (type === 'jump') {
+            question = `GAP WIDTH: ${b}m | HEIGHT DIFF: ${a}m <br><span class='highlight'>CALCULATE JUMP DISTANCE</span>`;
+            ans = c;
+        } else {
+            question = `JUMP DISTANCE: ${c}m | GAP WIDTH: ${b}m <br><span class='highlight'>CALCULATE HEIGHT DIFFERENCE</span>`;
+            ans = a;
+        }
+        document.getElementById('question-box').innerHTML = question;
+
+        generateOptions(ans);
+        drawScene();
+    }
+
+    function generateOptions(ans) {
+        let opts = [ans];
+        while (opts.length < 4) {
+            let fake = ans + Math.floor(Math.random() * 10) - 5;
+            if (fake <= 0 || opts.includes(fake)) fake = ans + 5;
+            opts.push(fake);
+        }
+        opts.sort(() => Math.random() - 0.5);
+        correctIndex = opts.indexOf(ans);
+
+        const btns = document.querySelectorAll('.opt-btn');
+        btns.forEach((btn, i) => {
+            btn.innerText = opts[i] + "m";
+            btn.classList.remove('correct', 'wrong');
+            btn.disabled = false;
+        });
+    }
+
+    function drawScene() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const groundY = canvas.height - 20;
+
+        // Draw Buildings
+        buildings.forEach(b => {
+            // Concrete Face
+            ctx.fillStyle = '#7f8c8d'; 
+            ctx.fillRect(b.x, groundY - b.h, b.w, b.h);
+            
+            // Side/Shadow detail
+            ctx.fillStyle = '#95a5a6';
+            ctx.fillRect(b.x + b.w - 10, groundY - b.h, 10, b.h);
+            
+            // Windows (Bright!)
+            ctx.fillStyle = '#f1c40f';
+            for(let wy = groundY - b.h + 20; wy < groundY - 20; wy += 40) {
+                for(let wx = b.x + 20; wx < b.x + b.w - 20; wx += 40) {
+                    // Random lit windows
+                    if ((wx + wy) % 3 !== 0) { 
+                         ctx.fillRect(wx, wy, 15, 25);
+                    } else {
+                         // Dark windows
+                         ctx.fillStyle = '#2c3e50';
+                         ctx.fillRect(wx, wy, 15, 25);
+                         ctx.fillStyle = '#f1c40f'; // Reset
+                    }
+                }
+            }
+        });
+
+        // Draw Player
+        ctx.fillStyle = '#000';
+        ctx.fillRect(player.x, player.y - player.size, player.size, player.size);
+        // Headband
+        ctx.fillStyle = '#ff4757';
+        ctx.fillRect(player.x + 18, player.y - player.size + 6, 12, 4);
+
+        // Draw The Math Triangle (Dashed lines)
+        if (gameState === 'play') {
+            const b1 = buildings[0];
+            const b2 = buildings[1];
+            
+            const p1 = { x: b1.x + b1.w, y: groundY - b1.h }; // Edge of b1
+            const p2 = { x: b2.x, y: groundY - b2.h }; // Edge of b2
+
+            ctx.beginPath();
+            ctx.strokeStyle = '#ff4757';
+            ctx.setLineDash([6, 6]);
+            ctx.lineWidth = 3;
+
+            // Draw Triangle
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p1.y); // Horizontal
+            ctx.lineTo(p2.x, p2.y); // Vertical
+            ctx.stroke();
+            
+            ctx.setLineDash([]); // Reset
+
+            // Labels on lines
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 16px Roboto Mono';
+            ctx.shadowColor = "black";
+            ctx.shadowBlur = 4;
+            ctx.textAlign = 'center';
+
+            // Horizontal Label
+            let valH = currentProblem.b + "m";
+            ctx.fillText(valH, p1.x + (p2.x - p1.x)/2, p1.y - 15);
+
+            // Vertical Label
+            let valV = (currentProblem.type === 'jump') ? currentProblem.a + "m" : "?";
+            const midY = (p1.y + p2.y) / 2;
+            ctx.fillText(valV, p2.x + 25, midY);
+        }
+    }
+
+    function check(idx) {
+        if (gameState !== 'play') return;
+        
+        const btns = document.querySelectorAll('.opt-btn');
+        btns.forEach(b => b.disabled = true);
+
+        if (idx === correctIndex) {
+            btns[idx].classList.add('correct');
+            animateJump(true);
+        } else {
+            btns[idx].classList.add('wrong');
+            animateJump(false);
+        }
+    }
+
+    function animateJump(success) {
+        gameState = 'animating';
+        playSound('jump');
+        
+        const startX = player.x;
+        const startY = player.y;
+        const targetX = buildings[1].x + 30; // Land inside the building
+        const targetY = canvas.height - 20 - buildings[1].h;
+
+        let progress = 0;
+        
+        const loop = setInterval(() => {
+            progress += 0.03; // Animation speed
+            
+            if (progress >= 1) {
+                clearInterval(loop);
+                if (success) {
+                    player.x = targetX;
+                    player.y = targetY;
+                    playSound('land');
+                    score += 100;
+                    document.getElementById('score').innerText = score;
+                    level++;
+                    document.getElementById('level').innerText = level;
+                    setTimeout(initGame, 800); // Next level
+                } else {
+                    fall();
+                }
+            } else {
+                // Parabolic Arc
+                let dx = targetX - startX;
+                if (!success) dx = dx * 0.65; // Jump short if wrong
+
+                player.x = startX + (dx * progress);
+                
+                // Height Math
+                const linearY = startY + ((targetY - startY) * progress);
+                const arcH = 180; // Arc height
+                const arcY = 4 * arcH * progress * (1 - progress); 
+                
+                player.y = linearY - arcY;
+                drawScene();
+            }
+        }, 16);
+    }
+
+    function fall() {
+        playSound('crash');
+        const loop = setInterval(() => {
+            player.y += 15;
+            drawScene();
+            if (player.y > canvas.height + 100) {
+                clearInterval(loop);
+                document.getElementById('final-score').innerText = score;
+                document.getElementById('game-over').classList.remove('hidden');
+            }
+        }, 16);
+    }
+
+    // Init
+    resize();
+</script>
+</body>
+</html>

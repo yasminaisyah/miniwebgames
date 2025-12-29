@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inequality Factory</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Roboto+Mono:wght@500&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #0b0c10;
+            font-family: 'Roboto Mono', monospace;
+            user-select: none;
+            touch-action: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: radial-gradient(circle at center, #1f2833 0%, #0b0c10 100%);
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* UI Overlay */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #monitor-frame {
+            margin-top: 20px;
+            background: #000;
+            border: 4px solid #66fcf1;
+            box-shadow: 0 0 20px #66fcf1;
+            padding: 20px 40px;
+            border-radius: 10px;
+            text-align: center;
+            position: relative;
+            background: repeating-linear-gradient(
+                0deg,
+                #000,
+                #000 2px,
+                #111 4px
+            );
+        }
+
+        #rule-label {
+            color: #45a29e;
+            font-size: 1rem;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+
+        #rule-text {
+            color: #66fcf1;
+            font-size: 2.5rem;
+            font-family: 'Black Ops One', cursive;
+            text-shadow: 0 0 10px #66fcf1;
+        }
+
+        #stats-bar {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            text-align: right;
+            color: #c5c6c7;
+        }
+
+        .stat { font-size: 1.2rem; margin-bottom: 5px; }
+
+        /* Health Bar (Factory Integrity) */
+        #integrity-bar-container {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 400px;
+            height: 20px;
+            background: #1f2833;
+            border: 2px solid #45a29e;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        #integrity-bar {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #f00, #ff0, #0f0);
+            transition: width 0.3s;
+        }
+
+        #integrity-label {
+            position: absolute;
+            bottom: 55px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #fff;
+            font-size: 0.9rem;
+            letter-spacing: 2px;
+        }
+
+        /* Screens */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(11, 12, 16, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            pointer-events: auto;
+        }
+
+        .hidden { display: none !important; }
+
+        h1 {
+            font-family: 'Black Ops One', cursive;
+            font-size: 3.5rem;
+            color: #66fcf1;
+            text-shadow: 0 0 20px #45a29e;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        p {
+            color: #c5c6c7;
+            font-size: 1.1rem;
+            max-width: 600px;
+            text-align: center;
+            line-height: 1.6;
+            margin-bottom: 40px;
+        }
+
+        button {
+            padding: 20px 50px;
+            font-size: 1.5rem;
+            font-family: 'Black Ops One', cursive;
+            background: transparent;
+            color: #66fcf1;
+            border: 3px solid #66fcf1;
+            cursor: pointer;
+            box-shadow: 0 0 15px #66fcf1;
+            transition: all 0.2s;
+            text-transform: uppercase;
+        }
+
+        button:hover {
+            background: #66fcf1;
+            color: #0b0c10;
+            box-shadow: 0 0 30px #66fcf1;
+        }
+
+        /* Feedback Popup */
+        .popup {
+            position: absolute;
+            font-weight: bold;
+            font-size: 1.5rem;
+            pointer-events: none;
+            animation: floatUp 1s forwards;
+        }
+
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-50px); }
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        <div id="monitor-frame">
+            <div id="rule-label">Current Sorting Rule:</div>
+            <div id="rule-text">LOADING...</div>
+        </div>
+
+        <div id="stats-bar">
+            <div class="stat">SCORE: <span id="scoreVal" style="color:#66fcf1">0</span></div>
+            <div class="stat">LEVEL: <span id="levelVal" style="color:#ffa500">1</span></div>
+        </div>
+
+        <div id="integrity-label">FACTORY INTEGRITY</div>
+        <div id="integrity-bar-container">
+            <div id="integrity-bar"></div>
+        </div>
+    </div>
+
+    <div id="start-screen" class="screen">
+        <h1>INEQUALITY FACTORY</h1>
+        <p>Topic: Linear Inequalities (Chapter 7)<br><br>
+        <strong>YOUR JOB:</strong> Eliminate defective products.<br><br>
+        1. Read the Rule (e.g., "Keep x > 5").<br>
+        2. If a box fits the rule, <strong>LET IT PASS</strong>.<br>
+        3. If a box breaks the rule, <strong>TAP IT TO DESTROY</strong>.<br>
+        (Destroying good boxes or letting bad ones pass hurts the factory!)</p>
+        <button onclick="startGame()">START SHIFT</button>
+    </div>
+
+    <div id="game-over-screen" class="screen hidden">
+        <h1 style="color: #ff4d4d; text-shadow: 0 0 20px #ff0000;">FACTORY SHUTDOWN</h1>
+        <p>Your sorting efficiency dropped too low.<br>Final Score: <span id="finalScore">0</span></p>
+        <button onclick="startGame()">REBOOT SYSTEM</button>
+    </div>
+</div>
+
+<script>
+    /**
+     * AUDIO SYSTEM
+     */
+    const AudioSys = {
+        ctx: null,
+        init: function() {
+            if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            if (this.ctx.state === 'suspended') this.ctx.resume();
+        },
+        playZap: function() {
+            if (!this.ctx) return;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(800, this.ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(100, this.ctx.currentTime + 0.2);
+            gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+            gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.2);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start();
+            osc.stop(this.ctx.currentTime + 0.2);
+        },
+        playPass: function() {
+            // Soft ding for correct pass
+            if (!this.ctx) return;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(1200, this.ctx.currentTime);
+            gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.3);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start();
+            osc.stop(this.ctx.currentTime + 0.3);
+        },
+        playError: function() {
+            // Buzzer
+            if (!this.ctx) return;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+            gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+            gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.3);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start();
+            osc.stop(this.ctx.currentTime + 0.3);
+        }
+    };
+
+    /**
+     * GAME LOGIC
+     */
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let state = {
+        active: false,
+        score: 0,
+        level: 1,
+        health: 100,
+        rule: null,
+        items: [],
+        particles: [],
+        spawnTimer: 0,
+        ruleTimer: 0
+    };
+
+    // Responsive Canvas
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Math Logic
+    function generateRule(level) {
+        // Inequality Forms:
+        // 1. Simple: x > a, x < a
+        // 2. Inclusion: x >= a, x <= a
+        // 3. Expressions: x + b > c (Level 3+)
+        // 4. Multipliers: 2x > c (Level 5+)
+        
+        const ops = ['>', '<', '≥', '≤'];
+        let op = ops[Math.floor(Math.random() * (level > 2 ? 4 : 2))]; // Start with only > <
+        
+        let target, text, validator;
+
+        // Difficulty scaling
+        if (level < 3) {
+            // Simple: x > 5
+            const val = Math.floor(Math.random() * 20) - 5; // -5 to 14
+            text = `Keep x ${op} ${val}`;
+            validator = (x) => checkInequality(x, op, val);
+            target = val;
+        } else {
+            // Expression: x + 3 > 10
+            const offset = Math.floor(Math.random() * 10) + 1;
+            const result = Math.floor(Math.random() * 20) + 5;
+            
+            // Randomly pick operator again
+            const isPlus = Math.random() > 0.5;
+            const sign = isPlus ? '+' : '-';
+            
+            text = `Keep x ${sign} ${offset} ${op} ${result}`;
+            
+            // Logic to find threshold
+            // x + off > res => x > res - off
+            // x - off > res => x > res + off
+            let threshold = isPlus ? (result - offset) : (result + offset);
+            validator = (x) => checkInequality(x, op, threshold);
+        }
+
+        return { text: text, check: validator };
+    }
+
+    function checkInequality(val, op, threshold) {
+        if (op === '>') return val > threshold;
+        if (op === '<') return val < threshold;
+        if (op === '≥') return val >= threshold;
+        if (op === '≤') return val <= threshold;
+        return false;
+    }
+
+    function spawnItem() {
+        // Generate a value that is likely to be close to the rule's threshold to make it tricky
+        // But for now, since we don't store threshold easily in the rule object above without refactoring,
+        // we will just use random numbers -10 to 30.
+        
+        const val = Math.floor(Math.random() * 40) - 10;
+        
+        // Determine if this item is VALID (should pass) or INVALID (should destroy)
+        const isValid = state.rule.check(val);
+        
+        // Visual properties
+        const size = 60;
+        state.items.push({
+            x: -size, // Start off screen left
+            y: canvas.height / 2 + (Math.random() * 40 - 20), // Slight y variation on belt
+            w: size,
+            h: size,
+            val: val,
+            isValid: isValid,
+            color: '#c5c6c7',
+            markedForDeath: false
+        });
+    }
+
+    // Input
+    function handleInput(e) {
+        if (!state.active) return;
+        const rect = canvas.getBoundingClientRect();
+        const cx = e.touches ? e.touches[0].clientX : e.clientX;
+        const cy = e.touches ? e.touches[0].clientY : e.clientY;
+
+        // Check if clicked an item
+        for (let i = state.items.length - 1; i >= 0; i--) {
+            let item = state.items[i];
+            if (cx >= item.x && cx <= item.x + item.w && cy >= item.y - 20 && cy <= item.y + item.h + 20) {
+                // Clicked!
+                destroyItem(i, true); // true = player triggered
+                return;
+            }
+        }
+    }
+    window.addEventListener('mousedown', handleInput);
+    window.addEventListener('touchstart', (e) => { e.preventDefault(); handleInput(e); }, {passive: false});
+
+    function destroyItem(index, byPlayer) {
+        let item = state.items[index];
+        state.items.splice(index, 1);
+        
+        // Logic
+        if (byPlayer) {
+            // Player clicked it. 
+            // If item was INVALID (bad rule), this is GOOD.
+            // If item was VALID (good rule), this is BAD.
+            if (!item.isValid) {
+                // Correct action: Destroyed bad item
+                state.score += 50;
+                AudioSys.playZap();
+                createExplosion(item.x + item.w/2, item.y + item.h/2, '#66fcf1');
+                showFeedback(item.x, item.y, "ZAPPED!", "#66fcf1");
+            } else {
+                // Wrong action: Destroyed good item
+                state.health -= 15;
+                AudioSys.playError();
+                createExplosion(item.x + item.w/2, item.y + item.h/2, '#f00');
+                showFeedback(item.x, item.y, "MISTAKE!", "#f00");
+            }
+        } else {
+            // Reached end of belt.
+            // If item was VALID, this is GOOD (Pass).
+            // If item was INVALID, this is BAD (Missed bad product).
+            if (item.isValid) {
+                state.score += 20;
+                AudioSys.playPass();
+                showFeedback(canvas.width - 100, item.y, "APPROVED", "#0f0");
+            } else {
+                state.health -= 20; // Big penalty for letting bad product ship
+                AudioSys.playError();
+                showFeedback(canvas.width - 100, item.y, "DEFECT MISSED!", "#f00");
+            }
+        }
+    }
+
+    function createExplosion(x, y, color) {
+        for(let i=0; i<15; i++) {
+            state.particles.push({
+                x: x, y: y,
+                vx: (Math.random() - 0.5) * 15,
+                vy: (Math.random() - 0.5) * 15,
+                life: 1.0,
+                color: color
+            });
+        }
+    }
+
+    function showFeedback(x, y, text, color) {
+        const el = document.createElement('div');
+        el.className = 'popup';
+        el.innerText = text;
+        el.style.color = color;
+        el.style.left = x + 'px';
+        el.style.top = y + 'px';
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 1000);
+    }
+
+    function update() {
+        if (!state.active) return;
+
+        // Level Up
+        if (state.score > state.level * 600) {
+            state.level++;
+            state.health = Math.min(100, state.health + 20);
+            // Change rule on level up to keep it fresh
+            state.rule = generateRule(state.level);
+            document.getElementById('rule-text').innerText = state.rule.text;
+            // Clear belt slightly
+            state.spawnTimer = -50;
+        }
+
+        // Spawning (Box speed increases with level)
+        state.spawnTimer++;
+        if (state.spawnTimer > 100 - (state.level * 3)) { // Spawn faster
+            spawnItem();
+            state.spawnTimer = 0;
+        }
+
+        // Move Items
+        const beltSpeed = 3 + (state.level * 0.5);
+        for (let i = state.items.length - 1; i >= 0; i--) {
+            let item = state.items[i];
+            item.x += beltSpeed;
+            
+            // Check bounds (End of belt)
+            if (item.x > canvas.width) {
+                destroyItem(i, false); // false = not by player
+            }
+        }
+
+        // Particles
+        for (let i = state.particles.length - 1; i >= 0; i--) {
+            let p = state.particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life -= 0.05;
+            if(p.life <= 0) state.particles.splice(i, 1);
+        }
+
+        // UI
+        document.getElementById('scoreVal').innerText = state.score;
+        document.getElementById('levelVal').innerText = state.level;
+        document.getElementById('integrity-bar').style.width = Math.max(0, state.health) + '%';
+
+        if (state.health <= 0) gameOver();
+
+        draw();
+        requestAnimationFrame(update);
+    }
+
+    function draw() {
+        ctx.fillStyle = '#0b0c10';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Draw Conveyor Belt
+        const beltY = canvas.height / 2 + 60;
+        ctx.fillStyle = '#1f2833';
+        ctx.fillRect(0, beltY, canvas.width, 20);
+        
+        // Belt rollers details
+        ctx.fillStyle = '#45a29e';
+        for(let x = (Date.now() / 2) % 100; x < canvas.width; x += 100) {
+            ctx.beginPath();
+            ctx.arc(x, beltY + 10, 8, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Draw Items
+        state.items.forEach(item => {
+            // Box Body
+            ctx.fillStyle = '#1f2833';
+            ctx.strokeStyle = '#66fcf1';
+            ctx.lineWidth = 3;
+            ctx.fillRect(item.x, item.y, item.w, item.h);
+            ctx.strokeRect(item.x, item.y, item.w, item.h);
+
+            // Glow
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#66fcf1';
+            
+            // Text
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 24px "Roboto Mono"';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.shadowBlur = 0;
+            ctx.fillText(item.val, item.x + item.w/2, item.y + item.h/2);
+            
+            // Inequality hint (Subtle)
+            // No hint! Player must calculate.
+        });
+
+        // Draw Particles
+        state.particles.forEach(p => {
+            ctx.globalAlpha = p.life;
+            ctx.fillStyle = p.color;
+            ctx.fillRect(p.x, p.y, 4, 4);
+            ctx.globalAlpha = 1;
+        });
+
+        // Draw "Zapper" Cursor (Optional visual)
+    }
+
+    function startGame() {
+        AudioSys.init();
+        document.getElementById('start-screen').classList.add('hidden');
+        document.getElementById('game-over-screen').classList.add('hidden');
+        
+        state.score = 0;
+        state.level = 1;
+        state.health = 100;
+        state.items = [];
+        state.particles = [];
+        state.active = true;
+        
+        // Initial Rule
+        state.rule = generateRule(1);
+        document.getElementById('rule-text').innerText = state.rule.text;
+        
+        update();
+    }
+
+    function gameOver() {
+        state.active = false;
+        document.getElementById('finalScore').innerText = state.score;
+        document.getElementById('game-over-screen').classList.remove('hidden');
+    }
+
+</script>
+</body>
+</html>

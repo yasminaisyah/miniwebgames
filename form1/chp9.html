@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poly-Glider: Neon Mission</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@400;700&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #050010;
+            font-family: 'Exo 2', sans-serif;
+            color: white;
+            user-select: none;
+            touch-action: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(to bottom, #0a001a, #000000);
+        }
+
+        canvas {
+            display: block;
+            box-shadow: 0 0 50px rgba(100, 0, 255, 0.2);
+        }
+
+        /* UI Overlay */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #hud-top {
+            margin-top: 20px;
+            text-align: center;
+            width: 100%;
+        }
+
+        #mission-box {
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00ffcc;
+            padding: 15px 40px;
+            border-radius: 30px;
+            display: inline-block;
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.4);
+            backdrop-filter: blur(5px);
+        }
+
+        #mission-label {
+            font-size: 0.9rem;
+            color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        #mission-text {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 0 10px #00ffcc;
+            margin-top: 5px;
+        }
+
+        #stats-bar {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            text-align: right;
+            font-size: 1.2rem;
+        }
+
+        #health-bar-container {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 200px;
+            height: 10px;
+            background: #333;
+            border: 1px solid #555;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        #health-bar {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #f00, #ff0, #0f0);
+            transition: width 0.2s;
+        }
+
+        /* Screens */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(5, 0, 16, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            pointer-events: auto;
+        }
+
+        .hidden { display: none !important; }
+
+        h1 {
+            font-size: 3.5rem;
+            color: #bf00ff;
+            text-shadow: 0 0 20px #bf00ff;
+            margin-bottom: 10px;
+            text-align: center;
+            font-weight: 800;
+        }
+
+        p {
+            color: #ccc;
+            font-size: 1.2rem;
+            max-width: 600px;
+            text-align: center;
+            line-height: 1.6;
+            margin-bottom: 40px;
+        }
+
+        button {
+            padding: 20px 60px;
+            font-size: 1.5rem;
+            font-family: 'Exo 2', sans-serif;
+            background: linear-gradient(45deg, #bf00ff, #00ffcc);
+            color: #000;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 0 20px rgba(191, 0, 255, 0.6);
+            transition: transform 0.2s;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 40px rgba(0, 255, 204, 0.8);
+        }
+        
+        /* Popup feedback */
+        .popup {
+            position: absolute;
+            font-weight: bold;
+            font-size: 1.5rem;
+            pointer-events: none;
+            animation: floatUp 0.8s forwards;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-50px) scale(1.2); }
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        <div id="health-bar-container">
+            <div id="health-bar"></div>
+        </div>
+        
+        <div id="stats-bar">
+            <div>SCORE: <span id="scoreVal" style="color:#00ffcc">0</span></div>
+            <div>LEVEL: <span id="levelVal">1</span></div>
+        </div>
+
+        <div id="hud-top">
+            <div id="mission-box">
+                <div id="mission-label">CURRENT MISSION</div>
+                <div id="mission-text">LOADING...</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="start-screen" class="screen">
+        <h1>POLY-GLIDER</h1>
+        <p>Topic: Basic Polygons (Chapter 9)<br><br>
+        <strong>MISSION:</strong> Collect the correct shapes.<br><br>
+        1. Read the Mission (e.g. "Find Hexagons").<br>
+        2. Steer your ship into the matching shape.<br>
+        3. Dodge the wrong ones!</p>
+        <button onclick="startGame()">LAUNCH</button>
+    </div>
+
+    <div id="game-over-screen" class="screen hidden">
+        <h1 style="color: #ff3333;">CRASHED</h1>
+        <p>Final Score: <span id="finalScore">0</span></p>
+        <button onclick="startGame()">RETRY</button>
+    </div>
+</div>
+
+<script>
+    /**
+     * AUDIO SYSTEM
+     */
+    const AudioSys = {
+        ctx: null,
+        init: function() {
+            if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        },
+        playCollect: function() {
+            if (!this.ctx) return;
+            const t = this.ctx.currentTime;
+            const o = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            o.type = 'sine';
+            o.frequency.setValueAtTime(440, t);
+            o.frequency.exponentialRampToValueAtTime(880, t + 0.1);
+            g.gain.setValueAtTime(0.1, t);
+            g.gain.linearRampToValueAtTime(0, t + 0.2);
+            o.connect(g);
+            g.connect(this.ctx.destination);
+            o.start();
+            o.stop(t + 0.2);
+        },
+        playCrash: function() {
+            if (!this.ctx) return;
+            const t = this.ctx.currentTime;
+            const o = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            o.type = 'sawtooth';
+            o.frequency.setValueAtTime(100, t);
+            o.frequency.linearRampToValueAtTime(50, t + 0.3);
+            g.gain.setValueAtTime(0.2, t);
+            g.gain.linearRampToValueAtTime(0, t + 0.3);
+            o.connect(g);
+            g.connect(this.ctx.destination);
+            o.start();
+            o.stop(t + 0.3);
+        }
+    };
+
+    /**
+     * GAME ENGINE
+     */
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let state = {
+        active: false,
+        score: 0,
+        level: 1,
+        health: 100,
+        playerX: 0,
+        playerY: 0,
+        lanes: [0, 0, 0], // X positions of 3 lanes
+        shapes: [],
+        particles: [],
+        stars: [],
+        spawnTimer: 0,
+        mission: null, // { type: 'sides', val: 5, text: "Pentagon" }
+        missionTimer: 0
+    };
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        state.playerY = canvas.height - 100;
+        
+        // Calculate 3 lanes
+        const w = canvas.width;
+        state.lanes = [w * 0.25, w * 0.5, w * 0.75];
+        state.playerX = state.lanes[1]; // Start middle
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Input Handling (Mouse & Touch)
+    function handleInput(x) {
+        if (!state.active) return;
+        // Simple follow
+        state.playerX = x;
+        // Clamp to screen
+        state.playerX = Math.max(50, Math.min(canvas.width - 50, state.playerX));
+    }
+
+    window.addEventListener('mousemove', e => handleInput(e.clientX));
+    window.addEventListener('touchmove', e => {
+        e.preventDefault();
+        handleInput(e.touches[0].clientX);
+    }, {passive: false});
+
+    // Polygon Logic
+    const POLYGONS = [
+        { name: "Triangle", sides: 3, sum: 180, color: '#ff0055' },
+        { name: "Quadrilateral", sides: 4, sum: 360, color: '#00ccff' },
+        { name: "Pentagon", sides: 5, sum: 540, color: '#ffff00' },
+        { name: "Hexagon", sides: 6, sum: 720, color: '#00ff66' },
+        { name: "Heptagon", sides: 7, sum: 900, color: '#ff6600' },
+        { name: "Octagon", sides: 8, sum: 1080, color: '#cc00ff' }
+    ];
+
+    function generateMission() {
+        const p = POLYGONS[Math.floor(Math.random() * POLYGONS.length)];
+        
+        // 3 Types of Questions: Name, Sides, Angle Sum
+        const mode = Math.floor(Math.random() * 3);
+        let text = "";
+        
+        if (mode === 0) {
+            text = `COLLECT: ${p.name.toUpperCase()}S`;
+        } else if (mode === 1) {
+            text = `COLLECT: ${p.sides} SIDES`;
+        } else {
+            text = `COLLECT: Sum ${p.sum}°`;
+        }
+
+        state.mission = {
+            targetSides: p.sides,
+            text: text
+        };
+        
+        document.getElementById('mission-text').innerText = text;
+        
+        // Animation effect on box
+        const box = document.getElementById('mission-box');
+        box.style.transform = "scale(1.1)";
+        box.style.borderColor = p.color;
+        setTimeout(() => box.style.transform = "scale(1)", 200);
+    }
+
+    function spawnRow() {
+        // Spawn 3 items, one for each lane
+        // Ensure at least one is correct if we want to be nice,
+        // or purely random? Better: Ensure one is correct so player can always score.
+        
+        const correctPoly = POLYGONS.find(p => p.sides === state.mission.targetSides);
+        const laneIndex = Math.floor(Math.random() * 3);
+        
+        for (let i = 0; i < 3; i++) {
+            let poly;
+            if (i === laneIndex) {
+                poly = correctPoly; // The correct answer
+            } else {
+                // Random wrong answer
+                do {
+                    poly = POLYGONS[Math.floor(Math.random() * POLYGONS.length)];
+                } while (poly.sides === state.mission.targetSides);
+            }
+
+            state.shapes.push({
+                x: state.lanes[i],
+                y: -100,
+                sides: poly.sides,
+                color: poly.color,
+                r: 40,
+                spin: 0,
+                speed: 4 + (state.level * 0.5)
+            });
+        }
+    }
+
+    function drawPolygon(ctx, x, y, sides, radius, color, rotation) {
+        ctx.beginPath();
+        for (let i = 0; i < sides; i++) {
+            const angle = rotation + (i * 2 * Math.PI / sides);
+            const px = x + radius * Math.cos(angle);
+            const py = y + radius * Math.sin(angle);
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fillStyle = color + "44"; // Transparent fill
+        ctx.fill();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        
+        // Inner Glow
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = color;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        
+        // Text label (number of sides for easy ID)
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 20px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(sides, x, y);
+    }
+
+    function createExplosion(x, y, color) {
+        for(let i=0; i<15; i++) {
+            state.particles.push({
+                x: x, y: y,
+                vx: (Math.random() - 0.5) * 10,
+                vy: (Math.random() - 0.5) * 10,
+                life: 1.0,
+                color: color
+            });
+        }
+    }
+
+    function showPopup(text, x, y, color) {
+        const el = document.createElement('div');
+        el.className = 'popup';
+        el.innerText = text;
+        el.style.color = color;
+        el.style.left = x + 'px';
+        el.style.top = y + 'px';
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 800);
+    }
+
+    function update() {
+        if (!state.active) return;
+
+        // Background Stars
+        if (state.stars.length < 50) {
+            state.stars.push({
+                x: Math.random() * canvas.width,
+                y: -10,
+                speed: Math.random() * 5 + 2,
+                size: Math.random() * 2
+            });
+        }
+        state.stars.forEach(s => s.y += s.speed);
+        state.stars = state.stars.filter(s => s.y < canvas.height);
+
+        // Level Up
+        if (state.score > state.level * 500) {
+            state.level++;
+            document.getElementById('levelVal').innerText = state.level;
+            // Generate new mission on level up
+            generateMission();
+            // Clear screen
+            state.shapes.forEach(s => createExplosion(s.x, s.y, '#fff'));
+            state.shapes = [];
+        }
+
+        // Spawning
+        state.spawnTimer++;
+        if (state.spawnTimer > 100 - (state.level * 2)) {
+            spawnRow();
+            state.spawnTimer = 0;
+        }
+        
+        // Mission Rotation (Every 15s keep it fresh)
+        state.missionTimer++;
+        if (state.missionTimer > 900) {
+            generateMission();
+            state.missionTimer = 0;
+        }
+
+        // Move Shapes
+        for (let i = state.shapes.length - 1; i >= 0; i--) {
+            let s = state.shapes[i];
+            s.y += s.speed;
+            s.spin += 0.02;
+
+            // Collision
+            // Player hitbox is circle approx 30px
+            const dist = Math.hypot(s.x - state.playerX, s.y - state.playerY);
+            if (dist < s.r + 30) {
+                // Hit!
+                if (s.sides === state.mission.targetSides) {
+                    // Correct
+                    state.score += 100;
+                    AudioSys.playCollect();
+                    createExplosion(s.x, s.y, '#00ffcc');
+                    showPopup("+100", s.x, s.y, '#00ffcc');
+                } else {
+                    // Wrong
+                    state.health -= 20;
+                    AudioSys.playCrash();
+                    createExplosion(s.x, s.y, '#ff0000');
+                    showPopup("-20 HP", s.x, s.y, '#ff0000');
+                }
+                state.shapes.splice(i, 1);
+            }
+            // Remove off screen
+            else if (s.y > canvas.height + 50) {
+                state.shapes.splice(i, 1);
+            }
+        }
+
+        // Particles
+        for (let i = state.particles.length - 1; i >= 0; i--) {
+            let p = state.particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life -= 0.05;
+            if(p.life <= 0) state.particles.splice(i, 1);
+        }
+
+        // UI
+        document.getElementById('scoreVal').innerText = state.score;
+        document.getElementById('health-bar').style.width = Math.max(0, state.health) + "%";
+
+        if (state.health <= 0) gameOver();
+
+        draw();
+        requestAnimationFrame(update);
+    }
+
+    function draw() {
+        ctx.fillStyle = '#0a001a';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Stars
+        ctx.fillStyle = '#fff';
+        state.stars.forEach(s => {
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, s.size, 0, Math.PI*2);
+            ctx.fill();
+        });
+
+        // Player Ship
+        ctx.save();
+        ctx.translate(state.playerX, state.playerY);
+        // Draw a cool triangle ship
+        ctx.beginPath();
+        ctx.moveTo(0, -30);
+        ctx.lineTo(20, 20);
+        ctx.lineTo(0, 10);
+        ctx.lineTo(-20, 20);
+        ctx.closePath();
+        ctx.fillStyle = '#00ffcc';
+        ctx.fill();
+        // Engine flame
+        ctx.beginPath();
+        ctx.moveTo(-10, 20);
+        ctx.lineTo(10, 20);
+        ctx.lineTo(0, 40 + Math.random()*20);
+        ctx.fillStyle = '#ff6600';
+        ctx.fill();
+        ctx.restore();
+
+        // Shapes
+        state.shapes.forEach(s => {
+            drawPolygon(ctx, s.x, s.y, s.sides, s.r, s.color, s.spin);
+        });
+
+        // Particles
+        state.particles.forEach(p => {
+            ctx.globalAlpha = p.life;
+            ctx.fillStyle = p.color;
+            ctx.fillRect(p.x, p.y, 4, 4);
+        });
+        ctx.globalAlpha = 1;
+    }
+
+    function startGame() {
+        AudioSys.init();
+        document.getElementById('start-screen').classList.add('hidden');
+        document.getElementById('game-over-screen').classList.add('hidden');
+        
+        state.active = true;
+        state.score = 0;
+        state.level = 1;
+        state.health = 100;
+        state.shapes = [];
+        state.particles = [];
+        
+        generateMission();
+        update();
+    }
+
+    function gameOver() {
+        state.active = false;
+        document.getElementById('finalScore').innerText = state.score;
+        document.getElementById('game-over-screen').classList.remove('hidden');
+    }
+
+</script>
+</body>
+</html>

@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rational Rush: Chapter 1 Challenge</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;500&display=swap');
+
+        :root {
+            --primary: #00f3ff;
+            --secondary: #ff0055;
+            --bg: #0a0a12;
+            --panel: #141420;
+            --text: #ffffff;
+            --correct: #00ff88;
+            --wrong: #ff2a2a;
+        }
+
+        * { box-sizing: border-box; user-select: none; }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Roboto', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            background-image: 
+                linear-gradient(rgba(0, 243, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 243, 255, 0.03) 1px, transparent 1px);
+            background-size: 30px 30px;
+        }
+
+        #game-container {
+            width: 100%;
+            max-width: 500px;
+            height: 90vh;
+            max-height: 800px;
+            background: var(--panel);
+            border: 2px solid var(--primary);
+            border-radius: 15px;
+            position: relative;
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.2);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* --- Header & HUD --- */
+        .hud {
+            display: flex;
+            justify-content: space-between;
+            padding: 15px;
+            background: rgba(0,0,0,0.3);
+            border-bottom: 1px solid var(--primary);
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .stat-box {
+            text-align: center;
+        }
+
+        .stat-label { font-size: 0.7rem; color: #888; letter-spacing: 1px; }
+        .stat-value { font-size: 1.2rem; color: var(--primary); font-weight: bold; }
+
+        /* --- Timer Bar --- */
+        #timer-container {
+            width: 100%;
+            height: 6px;
+            background: #333;
+        }
+        #timer-bar {
+            width: 100%;
+            height: 100%;
+            background: var(--secondary);
+            transition: width 0.1s linear;
+        }
+
+        /* --- Game Area --- */
+        .game-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            position: relative;
+        }
+
+        .topic-badge {
+            background: rgba(0, 243, 255, 0.1);
+            color: var(--primary);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            margin-bottom: 20px;
+            border: 1px solid var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        #question-box {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 2.5rem;
+            text-align: center;
+            margin-bottom: 40px;
+            text-shadow: 0 0 10px rgba(255,255,255,0.3);
+            width: 100%;
+        }
+
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            width: 100%;
+        }
+
+        .option-btn {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.2);
+            padding: 20px;
+            font-size: 1.3rem;
+            color: white;
+            cursor: pointer;
+            border-radius: 10px;
+            transition: all 0.2s;
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .option-btn:hover {
+            background: rgba(0, 243, 255, 0.1);
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        .option-btn:active {
+            transform: scale(0.98);
+        }
+
+        /* --- Screens --- */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 10, 18, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            backdrop-filter: blur(5px);
+            padding: 20px;
+            text-align: center;
+        }
+
+        .hidden { display: none; }
+
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 2.5rem;
+            color: var(--primary);
+            margin-bottom: 10px;
+            text-shadow: 0 0 15px var(--primary);
+        }
+
+        p { color: #ccc; line-height: 1.5; margin-bottom: 30px; }
+
+        .btn-start {
+            background: var(--primary);
+            color: #000;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 0 15px var(--primary);
+            transition: transform 0.2s;
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .btn-start:hover { transform: scale(1.05); }
+
+        /* --- Animations --- */
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+
+        .shake { animation: shake 0.5s; border-color: var(--wrong) !important; color: var(--wrong) !important; }
+        .glow-green { background: var(--correct) !important; color: #000 !important; box-shadow: 0 0 20px var(--correct); }
+        .glow-red { background: var(--wrong) !important; color: #fff !important; }
+
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="start-screen" class="screen">
+            <h1>RATIONAL RUSH</h1>
+            <p>Master Chapter 1: Rational Numbers<br><br>
+            Integers • Fractions • Decimals<br>
+            Answer correctly to gain time. Don't let the bar run out!</p>
+            <button class="btn-start" onclick="startGame()">INITIATE SYSTEM</button>
+        </div>
+
+        <div id="game-over-screen" class="screen hidden">
+            <h1 style="color: var(--secondary)">SYSTEM FAILURE</h1>
+            <p>Score: <span id="final-score" style="color:white; font-size:1.5rem">0</span><br>
+            High Score: <span id="high-score" style="color:var(--primary)">0</span></p>
+            <button class="btn-start" onclick="startGame()">REBOOT</button>
+        </div>
+
+        <div class="hud">
+            <div class="stat-box">
+                <div class="stat-label">LEVEL</div>
+                <div class="stat-value" id="level-disp">1</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">SCORE</div>
+                <div class="stat-value" id="score-disp">0</div>
+            </div>
+        </div>
+
+        <div id="timer-container"><div id="timer-bar"></div></div>
+
+        <div class="game-area">
+            <div class="topic-badge" id="topic-badge">INTEGERS</div>
+            <div id="question-box">5 + (-3)</div>
+            
+            <div class="options-grid" id="options-container">
+                <button class="option-btn">2</button>
+                <button class="option-btn">-2</button>
+                <button class="option-btn">8</button>
+                <button class="option-btn">-8</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Game Logic ---
+        let score = 0;
+        let level = 1;
+        let timeLeft = 100; // Percentage
+        let gameActive = false;
+        let timerInterval;
+        let currentAnswer = 0;
+        let highScore = localStorage.getItem('rationalRushHighScore') || 0;
+        let difficultyMultiplier = 1;
+
+        const subjects = [
+            "Integers", "Basic Operations", "Fractions", "Decimals", "Rational Mix"
+        ];
+
+        // --- Sound Engine (Synthesized) ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'correct') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, now);
+                osc.frequency.exponentialRampToValueAtTime(1200, now + 0.1);
+                gainNode.gain.setValueAtTime(0.3, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'wrong') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.linearRampToValueAtTime(100, now + 0.3);
+                gainNode.gain.setValueAtTime(0.3, now);
+                gainNode.gain.linearRampToValueAtTime(0.01, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            } else if (type === 'levelup') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.setValueAtTime(600, now + 0.1);
+                osc.frequency.setValueAtTime(800, now + 0.2);
+                gainNode.gain.setValueAtTime(0.1, now);
+                gainNode.gain.linearRampToValueAtTime(0, now + 0.4);
+                osc.start(now);
+                osc.stop(now + 0.4);
+            }
+        }
+
+        // --- Core Functions ---
+
+        function startGame() {
+            score = 0;
+            level = 1;
+            timeLeft = 100;
+            difficultyMultiplier = 1;
+            gameActive = true;
+            
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-over-screen').classList.add('hidden');
+            
+            updateDisplay();
+            generateQuestion();
+            
+            clearInterval(timerInterval);
+            timerInterval = setInterval(gameLoop, 100);
+        }
+
+        function gameLoop() {
+            if (!gameActive) return;
+
+            // Timer decay gets faster as level increases
+            const decay = 0.3 + (level * 0.05); 
+            timeLeft -= decay;
+
+            if (timeLeft <= 0) {
+                gameOver();
+            }
+
+            document.getElementById('timer-bar').style.width = timeLeft + "%";
+            
+            // Color feedback for low time
+            if(timeLeft < 30) {
+                document.getElementById('timer-bar').style.backgroundColor = "var(--wrong)";
+            } else {
+                document.getElementById('timer-bar').style.backgroundColor = "var(--secondary)";
+            }
+        }
+
+        function updateDisplay() {
+            document.getElementById('score-disp').innerText = score;
+            document.getElementById('level-disp').innerText = level;
+        }
+
+        function gameOver() {
+            gameActive = false;
+            clearInterval(timerInterval);
+            playSound('wrong');
+            
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('rationalRushHighScore', highScore);
+            }
+            
+            document.getElementById('final-score').innerText = score;
+            document.getElementById('high-score').innerText = highScore;
+            document.getElementById('game-over-screen').classList.remove('hidden');
+        }
+
+        // --- Math Logic Generators ---
+
+        function rInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function formatDecimal(num) {
+            return Math.round(num * 100) / 100;
+        }
+
+        function generateQuestion() {
+            let qText = "";
+            let answer = 0;
+            let type = "";
+
+            // Determine Topic based on Level
+            // Levels 1-2: Integers
+            // Levels 3-4: Fractions
+            // Levels 5-6: Decimals
+            // Level 7+: Mixed Rational
+
+            let difficulty = level;
+            
+            let mode = 0; // 0=Int, 1=Frac, 2=Dec
+            if (level <= 2) mode = 0;
+            else if (level <= 4) mode = 1;
+            else if (level <= 6) mode = 2;
+            else mode = rInt(0, 2); // Random mix
+
+            if (mode === 0) { 
+                // --- INTEGERS ---
+                document.getElementById('topic-badge').innerText = "INTEGERS";
+                let a = rInt(-10 * difficulty, 10 * difficulty);
+                let b = rInt(-10 * difficulty, 10 * difficulty);
+                
+                // Prevent boring zeroes
+                if (a === 0) a = 5;
+                if (b === 0) b = -3;
+
+                const ops = ['+', '-', '×'];
+                const op = ops[rInt(0, 2)];
+                
+                // For division, ensure clean integer result
+                if (Math.random() > 0.7 && difficulty > 2) {
+                    b = rInt(-9, 9);
+                    if (b === 0) b = 2;
+                    answer = rInt(-10, 10);
+                    a = answer * b;
+                    qText = `${a} ÷ ${b}`;
+                    if(b < 0) qText = `${a} ÷ (${b})`;
+                } else {
+                    if (op === '+') { answer = a + b; qText = `${a} + (${b})`; }
+                    if (op === '-') { answer = a - b; qText = `${a} - (${b})`; }
+                    if (op === '×') { answer = a * b; qText = `${a} × (${b})`; }
+                    
+                    // Clean up formatting (e.g., 5 + (3) -> 5 + 3)
+                    if (b >= 0) qText = qText.replace("(", "").replace(")", "");
+                }
+            } 
+            else if (mode === 1) {
+                // --- FRACTIONS ---
+                document.getElementById('topic-badge').innerText = "FRACTIONS";
+                let num1 = rInt(1, 5);
+                let den1 = rInt(2, 6);
+                let num2 = rInt(1, 5);
+                let den2 = rInt(2, 6);
+                
+                const ops = ['+', '-'];
+                const op = ops[rInt(0, 1)];
+
+                if (op === '+') {
+                    // Calculate real value for comparison
+                    answer = (num1/den1) + (num2/den2);
+                    qText = `${num1}/${den1} + ${num2}/${den2}`;
+                } else {
+                    // Ensure result isn't overly complex negative for display simplicity in game
+                    answer = (num1/den1) - (num2/den2);
+                    qText = `${num1}/${den1} - ${num2}/${den2}`;
+                }
+                
+                // Round for answer checking logic (we use buttons, so we store the float value)
+                answer = formatDecimal(answer);
+            }
+            else {
+                // --- DECIMALS ---
+                document.getElementById('topic-badge').innerText = "DECIMALS";
+                let a = (Math.random() * 20 - 10).toFixed(1); // -10.0 to 10.0
+                let b = (Math.random() * 10).toFixed(1);
+                
+                a = parseFloat(a);
+                b = parseFloat(b);
+
+                const op = Math.random() > 0.5 ? '+' : '-';
+                
+                if (op === '+') answer = a + b;
+                else answer = a - b;
+                
+                qText = `${a} ${op} ${b}`;
+                answer = formatDecimal(answer);
+            }
+
+            currentAnswer = answer;
+            document.getElementById('question-box').innerText = qText;
+            generateOptions(answer, mode);
+        }
+
+        function generateOptions(correctVal, mode) {
+            let options = [correctVal];
+            
+            // Generate 3 distractors
+            while (options.length < 4) {
+                let distractor;
+                if (mode === 0) { // Integers
+                    distractor = correctVal + rInt(-5, 5);
+                    if (distractor === correctVal) distractor = correctVal + 1;
+                    // Common mistake: sign flip
+                    if (Math.random() > 0.7) distractor = -correctVal; 
+                } else if (mode === 1) { // Fractions (results handled as decimals/simplified for buttons)
+                    distractor = correctVal + (rInt(-2, 2) * 0.1); 
+                    distractor = formatDecimal(distractor);
+                } else { // Decimals
+                    distractor = correctVal + (rInt(-10, 10) / 10);
+                    distractor = formatDecimal(distractor);
+                }
+
+                if (!options.includes(distractor) && !isNaN(distractor)) {
+                    options.push(distractor);
+                } else {
+                    // Fallback to ensure loop doesn't stick
+                    options.push(correctVal + options.length + 1);
+                }
+            }
+
+            // Shuffle options
+            options.sort(() => Math.random() - 0.5);
+
+            const container = document.getElementById('options-container');
+            container.innerHTML = ''; // Clear old buttons
+
+            options.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn';
+                
+                // If mode is Fraction, we might want to display answer as decimal for simplicity in this fast game
+                // or approximate. For now, we display the number.
+                btn.innerText = opt;
+                
+                btn.onclick = () => checkAnswer(opt, btn);
+                container.appendChild(btn);
+            });
+        }
+
+        function checkAnswer(selectedVal, btnElement) {
+            if (!gameActive) return;
+
+            // Allow small float tolerance
+            if (Math.abs(selectedVal - currentAnswer) < 0.001) {
+                // Correct
+                playSound('correct');
+                btnElement.classList.add('glow-green');
+                score += 10 * level;
+                
+                // Add time bonus
+                timeLeft = Math.min(100, timeLeft + 15);
+                
+                // Level Up Check
+                if (score > level * 100) { // Level up every 100 points logic scale
+                    level++;
+                    playSound('levelup');
+                    // Create visual flash
+                    document.body.style.background = "#fff";
+                    setTimeout(() => document.body.style.background = "", 50);
+                }
+
+                updateDisplay();
+                setTimeout(generateQuestion, 300); // Slight delay to see the green
+            } else {
+                // Wrong
+                playSound('wrong');
+                btnElement.classList.add('glow-red');
+                btnElement.classList.add('shake');
+                timeLeft -= 15; // Penalty
+            }
+        }
+
+    </script>
+</body>
+</html>

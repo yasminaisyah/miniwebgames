@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Math Defense: Squares & Cubes</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #050505;
+            font-family: 'Orbitron', sans-serif;
+            color: white;
+            user-select: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            display: block;
+            box-shadow: 0 0 50px rgba(0, 255, 255, 0.1);
+        }
+
+        /* UI Overlays */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 10;
+            transition: opacity 0.3s;
+        }
+
+        .hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        h1 {
+            font-size: 3rem;
+            color: #0ff;
+            text-shadow: 0 0 20px #0ff;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        p {
+            font-size: 1.2rem;
+            color: #ddd;
+            max-width: 600px;
+            text-align: center;
+            line-height: 1.6;
+        }
+
+        button {
+            margin-top: 30px;
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            font-family: 'Orbitron', sans-serif;
+            background: transparent;
+            color: #0ff;
+            border: 2px solid #0ff;
+            border-radius: 5px;
+            cursor: pointer;
+            box-shadow: 0 0 15px #0ff;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: #0ff;
+            color: #000;
+            box-shadow: 0 0 30px #0ff;
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 5;
+            pointer-events: none;
+        }
+
+        .hud-item {
+            font-size: 1.2rem;
+            margin-bottom: 5px;
+            text-shadow: 0 0 5px white;
+        }
+
+        #current-question-box {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 255, 255, 0.1);
+            border: 1px solid #0ff;
+            padding: 15px 30px;
+            border-radius: 10px;
+            z-index: 5;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+        }
+
+        #question-text {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 0 10px #f0f;
+        }
+
+        #health-bar-container {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 300px;
+            height: 10px;
+            background: #333;
+            border: 1px solid #555;
+            border-radius: 5px;
+        }
+
+        #health-bar {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #f00, #ff0, #0f0);
+            transition: width 0.2s;
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="hud">
+        <div class="hud-item" style="color: #0ff;">Score: <span id="scoreVal">0</span></div>
+        <div class="hud-item" style="color: #f0f;">Level: <span id="levelVal">1</span></div>
+    </div>
+
+    <div id="current-question-box">
+        <div id="question-text">READY?</div>
+    </div>
+
+    <div id="health-bar-container">
+        <div id="health-bar"></div>
+    </div>
+
+    <div id="start-screen" class="overlay">
+        <h1>POWER DEFENSE</h1>
+        <p>Topic: Squares, Cubes & Roots</p>
+        <p>A math problem will appear at the top.<br>Shoot the asteroid with the <strong>CORRECT ANSWER</strong>.<br>Don't let them hit your base!</p>
+        <p style="font-size: 0.9rem; color: #888;">Controls: Mouse to Aim/Shoot OR Left/Right Arrows + Space</p>
+        <button onclick="startGame()">START MISSION</button>
+    </div>
+
+    <div id="game-over-screen" class="overlay hidden">
+        <h1 style="color: #f00; text-shadow: 0 0 20px #f00;">SYSTEM FAILURE</h1>
+        <p>Final Score: <span id="finalScore">0</span></p>
+        <p>Highest Level: <span id="finalLevel">0</span></p>
+        <button onclick="startGame()">RETRY</button>
+    </div>
+</div>
+
+<script>
+    const AudioSys = {
+        ctx: null,
+        init: function() {
+            if (!this.ctx) {
+                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        },
+        playShoot: function() {
+            if (!this.ctx) return;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(880, this.ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(110, this.ctx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start();
+            osc.stop(this.ctx.currentTime + 0.1);
+        },
+        playExplosion: function() {
+            if (!this.ctx) return;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(100, this.ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
+            gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start();
+            osc.stop(this.ctx.currentTime + 0.3);
+        },
+        playCorrect: function() {
+            if (!this.ctx) return;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(600, this.ctx.currentTime);
+            osc.frequency.setValueAtTime(1200, this.ctx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+            gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.3);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start();
+            osc.stop(this.ctx.currentTime + 0.3);
+        },
+        playWrong: function() {
+            if (!this.ctx) return;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+            osc.frequency.linearRampToValueAtTime(100, this.ctx.currentTime + 0.2);
+            gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+            gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.2);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start();
+            osc.stop(this.ctx.currentTime + 0.2);
+        }
+    };
+
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    let state = {
+        isPlaying: false,
+        score: 0,
+        level: 1,
+        health: 100,
+        currentQuestion: null, 
+        enemies: [],
+        bullets: [],
+        particles: [],
+        lastShotTime: 0,
+        spawnTimer: 0,
+        questionTimer: 0,
+        mouseX: 0
+    };
+
+    let player = { x: 0, y: 0, width: 40, height: 40, color: '#0ff' };
+    
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        player.y = canvas.height - 80;
+        player.x = canvas.width / 2;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    window.addEventListener('mousemove', (e) => {
+        state.mouseX = e.clientX;
+        if(state.isPlaying) player.x = e.clientX;
+    });
+
+    window.addEventListener('click', (e) => {
+        if(state.isPlaying) shoot();
+    });
+
+    window.addEventListener('keydown', (e) => {
+        if(!state.isPlaying) return;
+        if(e.code === 'Space') shoot();
+        if(e.code === 'ArrowLeft') player.x -= 40;
+        if(e.code === 'ArrowRight') player.x += 40;
+    });
+
+    function generateQuestion() {
+        const types = ['square', 'cube', 'sqrt', 'cbrt'];
+        let availableTypes = ['square'];
+        let maxNum = 10 + (state.level * 2);
+
+        if(state.level > 2) availableTypes.push('sqrt');
+        if(state.level > 4) availableTypes.push('cube');
+        if(state.level > 6) availableTypes.push('cbrt');
+
+        const type = availableTypes[Math.floor(Math.random() * availableTypes.length)];
+        let qText = "";
+        let ans = 0;
+
+        if (type === 'square') {
+            const n = Math.floor(Math.random() * maxNum) + 2;
+            qText = `${n}²`;
+            ans = n * n;
+        } else if (type === 'cube') {
+            const limit = Math.min(10, 3 + state.level);
+            const n = Math.floor(Math.random() * limit) + 2;
+            qText = `${n}³`;
+            ans = n * n * n;
+        } else if (type === 'sqrt') {
+            const n = Math.floor(Math.random() * maxNum) + 2;
+            const sq = n * n;
+            qText = `√${sq}`;
+            ans = n;
+        } else if (type === 'cbrt') {
+            const limit = Math.min(10, 3 + state.level);
+            const n = Math.floor(Math.random() * limit) + 2;
+            const cb = n * n * n;
+            qText = `∛${cb}`;
+            ans = n;
+        }
+
+        return { text: qText + " = ?", answer: ans };
+    }
+
+    function spawnEnemies() {
+        if(!state.currentQuestion) return;
+
+        const hasCorrect = state.enemies.some(e => e.val === state.currentQuestion.answer);
+        const laneCount = Math.floor(canvas.width / 80);
+        const lane = Math.floor(Math.random() * laneCount);
+        const xPos = (lane * 80) + 40; 
+
+        let val;
+        if (!hasCorrect && Math.random() < 0.4) {
+            val = state.currentQuestion.answer;
+        } else {
+            const offset = Math.floor(Math.random() * 10) - 5; 
+            val = state.currentQuestion.answer + offset;
+            if (val === state.currentQuestion.answer) val += 1; 
+            if (val < 0) val = 0;
+        }
+
+        state.enemies.push({
+            x: xPos,
+            y: -50,
+            val: val,
+            r: 30,
+            speed: (1.5 + (state.level * 0.2)) * (Math.random() * 0.5 + 0.8), 
+            color: '#ff0055' 
+        });
+    }
+
+    function shoot() {
+        const now = Date.now();
+        if (now - state.lastShotTime < 250) return; 
+        state.lastShotTime = now;
+        AudioSys.playShoot();
+
+        state.bullets.push({
+            x: player.x,
+            y: player.y - 20,
+            speed: 15
+        });
+    }
+
+    function createExplosion(x, y, color) {
+        for(let i=0; i<10; i++) {
+            state.particles.push({
+                x: x, 
+                y: y,
+                vx: (Math.random() - 0.5) * 10,
+                vy: (Math.random() - 0.5) * 10,
+                life: 1.0,
+                color: color
+            });
+        }
+    }
+
+    function nextQuestion() {
+        state.currentQuestion = generateQuestion();
+        document.getElementById('question-text').innerText = state.currentQuestion.text;
+        document.getElementById('question-text').style.animation = 'none';
+        document.getElementById('question-text').offsetHeight; 
+        document.getElementById('question-text').style.animation = 'pulse 0.5s';
+        
+        state.enemies.forEach(e => createExplosion(e.x, e.y, '#fff'));
+        state.enemies = [];
+    }
+
+    function update() {
+        if(!state.isPlaying) return;
+
+        // Schedule next frame FIRST to prevent freeze on error
+        requestAnimationFrame(update);
+        draw(); // Draw immediately
+
+        // Level scaling
+        if (state.score > state.level * 1000) {
+            state.level++;
+            state.health = Math.min(100, state.health + 20); 
+            document.getElementById('levelVal').innerText = state.level;
+            createExplosion(canvas.width/2, canvas.height/2, '#0ff');
+        }
+
+        // Spawner
+        state.spawnTimer++;
+        if (state.spawnTimer > 120 - (state.level * 5)) { 
+            spawnEnemies();
+            state.spawnTimer = 0;
+        }
+
+        // Move Bullets
+        for (let i = state.bullets.length - 1; i >= 0; i--) {
+            let b = state.bullets[i];
+            b.y -= b.speed;
+            if (b.y < 0) state.bullets.splice(i, 1);
+        }
+
+        // Move Enemies & Collisions
+        // IMPORTANT: We use a label "enemyLoop" so we can break out entirely if the level resets
+        enemyLoop: for (let i = state.enemies.length - 1; i >= 0; i--) {
+            let e = state.enemies[i];
+            // Safety check: if e is undefined, break immediately
+            if (!e) break enemyLoop;
+
+            e.y += e.speed;
+
+            if (e.y > canvas.height) {
+                state.health -= 10;
+                AudioSys.playWrong();
+                state.enemies.splice(i, 1);
+                continue;
+            }
+
+            for (let j = state.bullets.length - 1; j >= 0; j--) {
+                let b = state.bullets[j];
+                let dist = Math.hypot(e.x - b.x, e.y - b.y);
+                
+                if (dist < e.r + 5) { 
+                    if (e.val === state.currentQuestion.answer) {
+                        // CORRECT
+                        state.score += 100 + (state.level * 10);
+                        AudioSys.playCorrect();
+                        createExplosion(e.x, e.y, '#0f0');
+                        state.bullets.splice(j, 1);
+                        state.enemies.splice(i, 1);
+                        
+                        // Change question and STOP processing current enemies
+                        nextQuestion(); 
+                        break enemyLoop; 
+                    } else {
+                        // WRONG
+                        state.score -= 50;
+                        state.health -= 5;
+                        AudioSys.playWrong();
+                        createExplosion(e.x, e.y, '#f00');
+                        state.bullets.splice(j, 1);
+                        state.enemies.splice(i, 1);
+                    }
+                    break;
+                }
+            }
+        }
+
+        // Particles
+        for (let i = state.particles.length - 1; i >= 0; i--) {
+            let p = state.particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life -= 0.05;
+            if(p.life <= 0) state.particles.splice(i, 1);
+        }
+
+        // UI Update
+        document.getElementById('scoreVal').innerText = state.score;
+        document.getElementById('health-bar').style.width = state.health + '%';
+
+        if (state.health <= 0) {
+            gameOver();
+        }
+    }
+
+    function draw() {
+        ctx.fillStyle = '#050505'; 
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.fillStyle = '#fff';
+        for(let i=0; i<50; i++) {
+           if(Math.random() > 0.9) ctx.fillRect(Math.random()*canvas.width, Math.random()*canvas.height, 2, 2);
+        }
+
+        ctx.fillStyle = player.color;
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = player.color;
+        ctx.beginPath();
+        ctx.moveTo(player.x, player.y);
+        ctx.lineTo(player.x - 20, player.y + 40);
+        ctx.lineTo(player.x + 20, player.y + 40);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        state.enemies.forEach(e => {
+            if(!e) return;
+            ctx.fillStyle = '#222';
+            ctx.strokeStyle = '#f0f';
+            ctx.lineWidth = 3;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#f0f';
+            
+            ctx.beginPath();
+            ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 20px "Orbitron"';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.shadowBlur = 0;
+            ctx.fillText(e.val, e.x, e.y);
+        });
+
+        ctx.fillStyle = '#0ff';
+        state.bullets.forEach(b => {
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#0ff';
+            ctx.fillRect(b.x - 3, b.y, 6, 15);
+            ctx.shadowBlur = 0;
+        });
+
+        state.particles.forEach(p => {
+            ctx.globalAlpha = p.life;
+            ctx.fillStyle = p.color;
+            ctx.fillRect(p.x, p.y, 4, 4);
+            ctx.globalAlpha = 1;
+        });
+    }
+
+    function startGame() {
+        AudioSys.init();
+        document.getElementById('start-screen').classList.add('hidden');
+        document.getElementById('game-over-screen').classList.add('hidden');
+        
+        state.score = 0;
+        state.level = 1;
+        state.health = 100;
+        state.enemies = [];
+        state.bullets = [];
+        state.particles = [];
+        state.isPlaying = true;
+        
+        nextQuestion();
+        update();
+    }
+
+    function gameOver() {
+        state.isPlaying = false;
+        AudioSys.playExplosion();
+        document.getElementById('game-over-screen').classList.remove('hidden');
+        document.getElementById('finalScore').innerText = state.score;
+        document.getElementById('finalLevel').innerText = state.level;
+    }
+</script>
+</body>
+</html>

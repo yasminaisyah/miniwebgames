@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alchemy Algebra: The Variable Potion</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Lato:wght@400;700&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #1a0b2e;
+            font-family: 'Lato', sans-serif;
+            user-select: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: radial-gradient(circle at bottom, #2d1b4e 0%, #000000 100%);
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* UI Overlay */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #top-bar {
+            width: 90%;
+            margin-top: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 30px;
+            background: rgba(20, 10, 40, 0.8);
+            border: 2px solid #ffd700;
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+            color: #ffd700;
+            font-family: 'Cinzel', serif;
+        }
+
+        .stat-box {
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: #b08dff;
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        #target-display {
+            position: absolute;
+            top: 100px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 2px solid #b08dff;
+            padding: 15px 40px;
+            border-radius: 30px;
+            color: #fff;
+            text-align: center;
+            backdrop-filter: blur(5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            transition: transform 0.3s;
+        }
+
+        #target-title {
+            font-family: 'Cinzel', serif;
+            color: #b08dff;
+            font-size: 1rem;
+            margin-bottom: 5px;
+        }
+
+        #target-expression {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #00ffcc;
+            text-shadow: 0 0 10px #00ffcc;
+        }
+
+        /* Magic Effects */
+        .magical-glow {
+            animation: glowPulse 2s infinite alternate;
+        }
+
+        @keyframes glowPulse {
+            from { box-shadow: 0 0 10px #b08dff; }
+            to { box-shadow: 0 0 25px #ffd700; }
+        }
+
+        /* Menus */
+        .menu-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 5, 20, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            pointer-events: auto;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        h1 {
+            font-family: 'Cinzel', serif;
+            font-size: 3.5rem;
+            color: #ffd700;
+            text-shadow: 0 0 20px #ffd700;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        p {
+            color: #ddd;
+            font-size: 1.2rem;
+            max-width: 600px;
+            text-align: center;
+            line-height: 1.6;
+            margin-bottom: 40px;
+        }
+
+        button {
+            padding: 15px 50px;
+            font-size: 1.5rem;
+            font-family: 'Cinzel', serif;
+            background: linear-gradient(to bottom, #4a2c7a, #2d1b4e);
+            color: #ffd700;
+            border: 2px solid #ffd700;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.8);
+            background: #5d3a9b;
+        }
+
+        #health-container {
+            width: 200px;
+            height: 10px;
+            background: #333;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+
+        #health-bar {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #ff0000, #ff8800);
+            transition: width 0.3s;
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        <div id="top-bar">
+            <div class="stat-box">
+                <div class="stat-label">Score</div>
+                <div class="stat-value" id="scoreVal">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Vitality</div>
+                <div id="health-container">
+                    <div id="health-bar"></div>
+                </div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Level</div>
+                <div class="stat-value" id="levelVal">1</div>
+            </div>
+        </div>
+
+        <div id="target-display" class="magical-glow">
+            <div id="target-title">COLLECT INGREDIENTS EQUAL TO:</div>
+            <div id="target-expression">3x</div>
+        </div>
+    </div>
+
+    <div id="start-screen" class="menu-screen">
+        <h1>ALCHEMY ALGEBRA</h1>
+        <p>Topic: Algebraic Expressions<br>
+        A target expression will appear (like "2a").<br>
+        Catch the ingredients that match its value (like "a + a").<br>
+        Avoid the corrupted ingredients!</p>
+        <button onclick="startGame()">BREW POTION</button>
+    </div>
+
+    <div id="game-over-screen" class="menu-screen hidden">
+        <h1 style="color: #ff5555; text-shadow: 0 0 20px #ff0000;">POTION EXPLODED</h1>
+        <p>Final Score: <span id="finalScore">0</span></p>
+        <button onclick="startGame()">TRY AGAIN</button>
+    </div>
+</div>
+
+<script>
+    /**
+     * AUDIO SYSTEM (Magical Synthesized Sounds)
+     */
+    const AudioSys = {
+        ctx: null,
+        init: function() {
+            if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        },
+        playChime: function() {
+            if (!this.ctx) return;
+            const t = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            // Arpeggio
+            osc.frequency.setValueAtTime(523.25, t); // C5
+            osc.frequency.setValueAtTime(659.25, t + 0.1); // E5
+            osc.frequency.setValueAtTime(783.99, t + 0.2); // G5
+            
+            gain.gain.setValueAtTime(0.1, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
+            
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start();
+            osc.stop(t + 0.6);
+        },
+        playBubble: function() {
+            if (!this.ctx) return;
+            const t = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(400, t);
+            osc.frequency.linearRampToValueAtTime(800, t + 0.1);
+            
+            gain.gain.setValueAtTime(0.1, t);
+            gain.gain.linearRampToValueAtTime(0, t + 0.1);
+            
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start();
+            osc.stop(t + 0.1);
+        },
+        playBad: function() {
+            if (!this.ctx) return;
+            const t = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(150, t);
+            osc.frequency.linearRampToValueAtTime(50, t + 0.3);
+            
+            gain.gain.setValueAtTime(0.1, t);
+            gain.gain.linearRampToValueAtTime(0, t + 0.3);
+            
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start();
+            osc.stop(t + 0.3);
+        }
+    };
+
+    /**
+     * ALGEBRA LOGIC GENERATOR
+     */
+    function generateTarget(level) {
+        // Modes:
+        // 1. Simplify (e.g., Target: 3x. Finds: 2x+x, 4x-x)
+        // 2. Evaluate (e.g., Let a=2. Target: 10. Finds: 5a, 4a+2)
+        
+        const vars = ['x', 'y', 'a', 'b', 'm', 'n'];
+        const v = vars[Math.floor(Math.random() * vars.length)];
+        
+        const mode = (level > 2 && Math.random() > 0.5) ? 'eval' : 'simplify';
+        
+        let targetObj = {};
+
+        if (mode === 'simplify') {
+            const coeff = Math.floor(Math.random() * 8) + 2; // 2 to 9
+            targetObj.display = `${coeff}${v}`; // e.g., "5x"
+            targetObj.mode = 'simplify';
+            targetObj.variable = v;
+            targetObj.coeff = coeff;
+            targetObj.title = "CATCH EXPRESSIONS EQUAL TO:";
+        } else {
+            // Evaluation Mode
+            const val = Math.floor(Math.random() * 5) + 2; // Variable value (2 to 6)
+            const result = Math.floor(Math.random() * 10) + 5; // Target Result (5 to 15)
+            targetObj.display = `${result}`;
+            targetObj.mode = 'eval';
+            targetObj.variable = v;
+            targetObj.varValue = val;
+            targetObj.targetValue = result;
+            targetObj.title = `LET ${v} = ${val}. CATCH VALUES EQUAL TO:`;
+        }
+        return targetObj;
+    }
+
+    function generateDroppingItem(target) {
+        const isCorrect = Math.random() < 0.4; // 40% chance of correct item
+        let text = "";
+        
+        if (target.mode === 'simplify') {
+            const v = target.variable;
+            const c = target.coeff;
+            
+            if (isCorrect) {
+                // Generate equivalent expression
+                const type = Math.floor(Math.random() * 3);
+                if (type === 0) { // Add: (c-k) + k
+                    const k = Math.floor(Math.random() * (c-1)) + 1;
+                    text = (k === 1 ? v : k+v) + " + " + ((c-k) === 1 ? v : (c-k)+v);
+                } else if (type === 1) { // Subtract: (c+k) - k
+                    const k = Math.floor(Math.random() * 3) + 1;
+                    text = ((c+k)+v) + " - " + (k===1?v:k+v);
+                } else { // Multi/Div simple
+                     text = `(${c * 2}${v}) / 2`;
+                }
+            } else {
+                // Generate wrong expression
+                const type = Math.floor(Math.random() * 3);
+                if (type === 0) text = (c+1) + v; // Close number
+                else if (type === 1) text = c + v + "^2"; // Wrong power
+                else text = c; // Missing variable
+            }
+        } else {
+            // Evaluate Mode
+            const v = target.variable;
+            const val = target.varValue;
+            const res = target.targetValue;
+
+            if (isCorrect) {
+                // Need expression that equals res when v = val
+                // e.g. res = 10, val = 2. Exp could be 5a.
+                // Simple logic: coeff * v + constant = res
+                // coeff * val + k = res -> k = res - (coeff * val)
+                
+                // Method 1: Simple coefficient match? 
+                // if res is divisible by val
+                if (res % val === 0 && Math.random() > 0.5) {
+                    text = (res/val) + v;
+                } else {
+                    // Method 2: Addition
+                    const k = Math.floor(Math.random() * (res - 1)) + 1;
+                    // Expression: k + (res-k)
+                    // We need one part to be algebraic. 
+                    // Let's make it simpler: v + (res - val)
+                    const remainder = res - val;
+                    if (remainder > 0) text = `${v} + ${remainder}`;
+                    else if (remainder < 0) text = `${v} - ${Math.abs(remainder)}`;
+                    else text = v;
+                }
+            } else {
+                // Wrong answers
+                const offset = Math.floor(Math.random() * 5) + 1;
+                const wrongRes = Math.random() > 0.5 ? res + offset : res - offset;
+                text = wrongRes.toString(); // Just a number
+                if (Math.random() > 0.5) text = `${v} + ${wrongRes}`; // Confusing algebra
+            }
+        }
+        
+        return {
+            text: text,
+            isCorrect: isCorrect,
+            x: Math.random() * (canvas.width - 60) + 30,
+            y: -50,
+            r: 35,
+            speed: Math.random() * 2 + 2,
+            angle: 0
+        };
+    }
+
+    /**
+     * GAME ENGINE
+     */
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let state = {
+        active: false,
+        score: 0,
+        level: 1,
+        health: 100,
+        target: null,
+        items: [],
+        particles: [],
+        spawnTimer: 0,
+        cauldronX: 0,
+        targetSwitchTimer: 0
+    };
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        state.cauldronX = canvas.width / 2;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Input Handling
+    window.addEventListener('mousemove', (e) => {
+        if(state.active) state.cauldronX = e.clientX;
+    });
+    
+    window.addEventListener('touchmove', (e) => {
+        if(state.active) {
+            e.preventDefault();
+            state.cauldronX = e.touches[0].clientX;
+        }
+    }, {passive: false});
+
+    function createParticle(x, y, color) {
+        for(let i=0; i<8; i++) {
+            state.particles.push({
+                x: x, y: y,
+                vx: (Math.random() - 0.5) * 8,
+                vy: (Math.random() - 0.5) * 8,
+                life: 1.0,
+                color: color
+            });
+        }
+    }
+
+    function update() {
+        if (!state.active) return;
+
+        // Level Up
+        if (state.score > state.level * 500) {
+            state.level++;
+            // Heal slightly
+            state.health = Math.min(100, state.health + 20);
+            // Visual flair?
+        }
+
+        // Spawn Items
+        state.spawnTimer++;
+        if (state.spawnTimer > 100 - (state.level * 5)) { // Spawn faster with levels
+            if (state.items.length < 5) {
+                state.items.push(generateDroppingItem(state.target));
+            }
+            state.spawnTimer = 0;
+        }
+
+        // Switch Target occasionally to keep it fresh
+        state.targetSwitchTimer++;
+        if (state.targetSwitchTimer > 1000) { // Approx 15-20 seconds
+            state.target = generateTarget(state.level);
+            updateUI();
+            state.targetSwitchTimer = 0;
+            // Clear items to avoid confusion
+            state.items.forEach(i => createParticle(i.x, i.y, '#fff'));
+            state.items = [];
+        }
+
+        // Move Items
+        const cauldronY = canvas.height - 100;
+        const catchRadius = 60; // Cauldron width/2 approx
+
+        for (let i = state.items.length - 1; i >= 0; i--) {
+            let item = state.items[i];
+            item.y += item.speed + (state.level * 0.2);
+            item.angle += 0.02;
+
+            // Collision with Cauldron
+            let dist = Math.abs(item.x - state.cauldronX);
+            let heightDiff = Math.abs(item.y - cauldronY);
+
+            if (dist < catchRadius && heightDiff < 40) {
+                // Caught!
+                if (item.isCorrect) {
+                    state.score += 100;
+                    AudioSys.playChime();
+                    createParticle(item.x, item.y, '#00ffcc');
+                } else {
+                    state.health -= 15;
+                    AudioSys.playBad();
+                    createParticle(item.x, item.y, '#ff0055');
+                }
+                state.items.splice(i, 1);
+                continue;
+            }
+
+            // Missed (Bottom of screen)
+            if (item.y > canvas.height) {
+                state.items.splice(i, 1);
+            }
+        }
+
+        // Particles
+        for (let i = state.particles.length - 1; i >= 0; i--) {
+            let p = state.particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life -= 0.05;
+            if(p.life <= 0) state.particles.splice(i, 1);
+        }
+
+        // UI Updates
+        document.getElementById('scoreVal').innerText = state.score;
+        document.getElementById('levelVal').innerText = state.level;
+        document.getElementById('health-bar').style.width = state.health + '%';
+
+        if (state.health <= 0) gameOver();
+
+        draw();
+        requestAnimationFrame(update);
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw Cauldron
+        const cx = state.cauldronX;
+        const cy = canvas.height - 100;
+        
+        // Cauldron Body
+        ctx.fillStyle = '#222';
+        ctx.beginPath();
+        ctx.arc(cx, cy, 60, 0, Math.PI, false); // Bottom half circle
+        ctx.fill();
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = '#555';
+        ctx.stroke();
+        
+        // Cauldron Rim
+        ctx.fillStyle = '#333';
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, 60, 10, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Liquid
+        ctx.fillStyle = '#a000ff';
+        ctx.beginPath();
+        ctx.ellipse(cx, cy + 5, 50, 8, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Bubbles in cauldron
+        if (Math.random() > 0.8) {
+            createParticle(cx + (Math.random()*40 - 20), cy, '#d080ff');
+        }
+
+        // Draw Items
+        state.items.forEach(item => {
+            ctx.save();
+            ctx.translate(item.x, item.y);
+            
+            // Glow
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = item.isCorrect ? 'rgba(0, 255, 204, 0.5)' : 'rgba(255, 0, 85, 0.5)'; // Hint color slightly visible? No, make it subtle
+            // Actually, game design: Don't color code them too strictly or it's too easy.
+            // Let's make them all look like mystical orbs, player must read text.
+            
+            ctx.fillStyle = 'rgba(20, 10, 40, 0.9)';
+            ctx.strokeStyle = '#b08dff';
+            ctx.lineWidth = 2;
+            
+            ctx.beginPath();
+            ctx.arc(0, 0, item.r, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 20px "Lato"';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.shadowBlur = 0;
+            ctx.fillText(item.text, 0, 0);
+            
+            ctx.restore();
+        });
+
+        // Draw Particles
+        state.particles.forEach(p => {
+            ctx.globalAlpha = p.life;
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
+            ctx.fill();
+        });
+        ctx.globalAlpha = 1;
+    }
+
+    function updateUI() {
+        if(!state.target) return;
+        const tDisp = document.getElementById('target-display');
+        const tTitle = document.getElementById('target-title');
+        const tExp = document.getElementById('target-expression');
+        
+        // Simple animation
+        tDisp.style.transform = "scale(0.8)";
+        setTimeout(() => tDisp.style.transform = "scale(1)", 200);
+        
+        tTitle.innerText = state.target.title;
+        tExp.innerText = state.target.display;
+    }
+
+    function startGame() {
+        AudioSys.init();
+        document.getElementById('start-screen').classList.add('hidden');
+        document.getElementById('game-over-screen').classList.add('hidden');
+        
+        state.score = 0;
+        state.level = 1;
+        state.health = 100;
+        state.items = [];
+        state.particles = [];
+        state.active = true;
+        state.target = generateTarget(1);
+        updateUI();
+        
+        update();
+    }
+
+    function gameOver() {
+        state.active = false;
+        document.getElementById('finalScore').innerText = state.score;
+        document.getElementById('game-over-screen').classList.remove('hidden');
+    }
+
+</script>
+</body>
+</html>

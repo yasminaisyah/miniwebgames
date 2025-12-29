@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Data Defender: Cyber Analysis</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+        :root {
+            --neon-blue: #00f3ff;
+            --neon-pink: #ff00ff;
+            --neon-green: #0aff00;
+            --bg-dark: #050a10;
+            --panel-bg: rgba(10, 20, 30, 0.95);
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-dark);
+            color: var(--neon-blue);
+            font-family: 'Share Tech Mono', monospace;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-image: 
+                linear-gradient(rgba(0, 243, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 243, 255, 0.03) 1px, transparent 1px);
+            background-size: 30px 30px;
+        }
+
+        #game-container {
+            width: 95%;
+            max-width: 800px;
+            height: 95vh;
+            display: flex;
+            flex-direction: column;
+            border: 2px solid var(--neon-blue);
+            box-shadow: 0 0 20px var(--neon-blue);
+            background: var(--panel-bg);
+            border-radius: 10px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Scanline effect */
+        #game-container::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+            z-index: 2;
+            background-size: 100% 4px;
+            pointer-events: none;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            padding: 15px;
+            border-bottom: 1px solid var(--neon-blue);
+            background: rgba(0, 243, 255, 0.1);
+            z-index: 3;
+            height: 60px;
+            align-items: center;
+        }
+
+        .stat-box {
+            font-size: 1.2rem;
+            text-shadow: 0 0 5px var(--neon-blue);
+        }
+
+        #timer-bar {
+            width: 100%;
+            height: 6px;
+            background: #333;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 10;
+        }
+
+        #timer-fill {
+            width: 100%;
+            height: 100%;
+            background: var(--neon-green);
+            transition: width 0.1s linear;
+        }
+
+        #main-display {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+            position: relative;
+            z-index: 3;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        #question-text {
+            font-size: 1.2rem;
+            text-align: center;
+            margin-bottom: 10px;
+            color: #fff;
+            text-shadow: 0 0 5px var(--neon-pink);
+            background: rgba(0,0,0,0.5);
+            padding: 8px;
+            border-radius: 5px;
+            border-left: 5px solid var(--neon-pink);
+            width: 95%;
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #canvas-wrapper {
+            flex: 1;
+            width: 100%;
+            position: relative;
+            background: rgba(0,0,0,0.8);
+            border: 1px solid #333;
+            border-radius: 5px;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.9);
+            margin-bottom: 10px;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        #options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            width: 95%;
+            margin-bottom: 15px;
+            z-index: 3;
+            height: 120px;
+        }
+
+        button.option-btn {
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid var(--neon-blue);
+            color: var(--neon-blue);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+            text-transform: uppercase;
+            touch-action: manipulation;
+        }
+
+        button.option-btn:hover {
+            background: var(--neon-blue);
+            color: #000;
+        }
+
+        button.option-btn:active {
+            transform: scale(0.96);
+            background: #fff;
+        }
+
+        /* Menu Screens */
+        #start-screen, #game-over-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(5, 10, 16, 0.98);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            color: var(--neon-pink);
+            text-transform: uppercase;
+            text-shadow: 0 0 10px var(--neon-pink);
+            margin-bottom: 10px;
+            text-align: center;
+            line-height: 1;
+        }
+
+        p {
+            font-size: 1rem;
+            max-width: 600px;
+            text-align: center;
+            line-height: 1.4;
+            margin-bottom: 30px;
+            padding: 0 20px;
+        }
+
+        .cta-btn {
+            background: var(--neon-green);
+            color: #000;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            font-family: 'Share Tech Mono', monospace;
+            cursor: pointer;
+            box-shadow: 0 0 20px var(--neon-green);
+            animation: pulse 1.5s infinite;
+            border-radius: 5px;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 10px var(--neon-green); }
+            50% { box-shadow: 0 0 30px var(--neon-green); }
+            100% { box-shadow: 0 0 10px var(--neon-green); }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .correct { background-color: var(--neon-green) !important; color: black !important; }
+        .wrong { background-color: var(--neon-pink) !important; color: white !important; }
+
+        /* Mobile Adjustment */
+        @media (max-width: 600px) {
+            h1 { font-size: 1.8rem; }
+            #options-grid { height: 100px; }
+            .option-btn { font-size: 0.9rem; padding: 5px; }
+            #question-text { font-size: 1rem; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="timer-bar"><div id="timer-fill"></div></div>
+        
+        <header>
+            <div class="stat-box">LEVEL: <span id="level-display">1</span></div>
+            <div class="stat-box">SCORE: <span id="score-display">0</span></div>
+        </header>
+
+        <div id="main-display">
+            <div id="question-text">SYSTEM STANDBY...</div>
+            <div id="canvas-wrapper">
+                <canvas id="dataCanvas"></canvas>
+            </div>
+        </div>
+
+        <div id="options-grid">
+            <button class="option-btn" onclick="checkAnswer(0)">A</button>
+            <button class="option-btn" onclick="checkAnswer(1)">B</button>
+            <button class="option-btn" onclick="checkAnswer(2)">C</button>
+            <button class="option-btn" onclick="checkAnswer(3)">D</button>
+        </div>
+
+        <div id="start-screen">
+            <h1>Data Defender</h1>
+            <p><strong>MISSION:</strong> Analyze data streams to stop the cyber breach.<br>Read charts, find modes, and calculate ranges.</p>
+            <button class="cta-btn" onclick="initGame()">INITIATE</button>
+        </div>
+
+        <div id="game-over-screen" class="hidden">
+            <h1>BREACH DETECTED</h1>
+            <p>Analysis Failed.</p>
+            <p style="font-size: 1.5rem; color: var(--neon-blue)">SCORE: <span id="final-score">0</span></p>
+            <button class="cta-btn" onclick="initGame()">REBOOT</button>
+        </div>
+    </div>
+
+    <script>
+        // --- Variables ---
+        let audioCtx = null;
+        const canvas = document.getElementById('dataCanvas');
+        const ctx = canvas.getContext('2d');
+        let level = 1;
+        let score = 0;
+        let correctAnswerIndex = 0;
+        let isGameActive = false;
+        let timer = 100;
+        let timerInterval;
+        let currentChartType = 'bar';
+        let currentLabels = [];
+        let currentValues = [];
+        let currentMaxVal = 0;
+
+        // Data Generators
+        const categories = [
+            ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+            ['Jan', 'Feb', 'Mar', 'Apr', 'May'],
+            ['Red', 'Blu', 'Grn', 'Yel', 'Pur'],
+            ['Q1', 'Q2', 'Q3', 'Q4'],
+            ['A', 'B', 'C', 'D', 'E'],
+            ['Net', 'Java', 'Py', 'C++', 'JS']
+        ];
+
+        const questions = [
+            { type: 'max', text: "Which has the HIGHEST value?" },
+            { type: 'min', text: "Which has the LOWEST value?" },
+            { type: 'value', text: "What is the value of [CAT]?" },
+            { type: 'diff', text: "Find the difference: [CAT1] & [CAT2]?" },
+            { type: 'sum', text: "Total of [CAT1] and [CAT2]?" },
+            { type: 'mode', text: "Which value is the Mode (most frequent)?" }
+        ];
+
+        // --- Audio System (Safe Init) ---
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playSound(type) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+
+            if (type === 'correct') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, now);
+                osc.frequency.exponentialRampToValueAtTime(1200, now + 0.1);
+                gainNode.gain.setValueAtTime(0.1, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            } else if (type === 'wrong') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.linearRampToValueAtTime(80, now + 0.3);
+                gainNode.gain.setValueAtTime(0.1, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            } else if (type === 'click') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(800, now);
+                gainNode.gain.setValueAtTime(0.05, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+                osc.start(now);
+                osc.stop(now + 0.05);
+            }
+        }
+
+        // --- Game Functions ---
+        function initGame() {
+            initAudio(); // Initialize audio on user interaction
+            playSound('click');
+            
+            level = 1;
+            score = 0;
+            timer = 100;
+            
+            document.getElementById('score-display').innerText = score;
+            document.getElementById('level-display').innerText = level;
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-over-screen').classList.add('hidden');
+            
+            isGameActive = true;
+            resizeCanvas(); // Ensure canvas is sized right
+            generateLevel();
+            startTimer();
+        }
+
+        function startTimer() {
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if(!isGameActive) return;
+                
+                // Difficulty scaling
+                const drain = 0.2 + (level * 0.03);
+                timer -= drain;
+                
+                document.getElementById('timer-fill').style.width = Math.max(0, timer) + '%';
+                
+                if (timer <= 0) {
+                    gameOver();
+                }
+            }, 50);
+        }
+
+        function gameOver() {
+            isGameActive = false;
+            clearInterval(timerInterval);
+            playSound('wrong');
+            document.getElementById('final-score').innerText = score;
+            document.getElementById('game-over-screen').classList.remove('hidden');
+        }
+
+        function resizeCanvas() {
+            const wrapper = document.getElementById('canvas-wrapper');
+            canvas.width = wrapper.clientWidth;
+            canvas.height = wrapper.clientHeight;
+            // Redraw if game is active to prevent black screen on resize
+            if (isGameActive && currentLabels.length > 0) {
+                drawChart(currentChartType, currentLabels, currentValues, currentMaxVal);
+            }
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+
+        function generateLevel() {
+            // 1. Pick Data
+            currentLabels = categories[Math.floor(Math.random() * categories.length)];
+            const dataLength = currentLabels.length;
+            currentValues = [];
+            
+            // Generate values (multiples of 5 for easier math)
+            const maxCeiling = 30 + (Math.floor(level/2) * 10); 
+            for(let i=0; i<dataLength; i++) {
+                currentValues.push((Math.floor(Math.random() * (maxCeiling/5)) + 1) * 5);
+            }
+            
+            // Ensure we have a mode if needed (duplicate a value)
+            if(Math.random() > 0.7) {
+                const dupVal = currentValues[0];
+                currentValues[dataLength-1] = dupVal;
+            }
+
+            currentMaxVal = Math.max(...currentValues) + 10;
+            currentChartType = Math.random() > 0.5 ? 'bar' : 'line';
+            
+            drawChart(currentChartType, currentLabels, currentValues, currentMaxVal);
+
+            // 2. Question Logic
+            const qObj = questions[Math.floor(Math.random() * questions.length)];
+            let qText = qObj.text;
+            let ans;
+
+            if (qObj.type === 'max') {
+                const max = Math.max(...currentValues);
+                // Find all indices with max value
+                const indices = currentValues.map((v, i) => v === max ? i : -1).filter(i => i !== -1);
+                // Just take the first one for simplicity or answer check handles values
+                ans = currentLabels[indices[0]]; 
+            }
+            else if (qObj.type === 'min') {
+                const min = Math.min(...currentValues);
+                const idx = currentValues.indexOf(min);
+                ans = currentLabels[idx];
+            }
+            else if (qObj.type === 'value') {
+                const idx = Math.floor(Math.random() * dataLength);
+                qText = qText.replace('[CAT]', currentLabels[idx]);
+                ans = currentValues[idx];
+            }
+            else if (qObj.type === 'diff') {
+                const idx1 = Math.floor(Math.random() * dataLength);
+                let idx2 = Math.floor(Math.random() * dataLength);
+                while(idx1 === idx2) idx2 = Math.floor(Math.random() * dataLength);
+                qText = qText.replace('[CAT1]', currentLabels[idx1]).replace('[CAT2]', currentLabels[idx2]);
+                ans = Math.abs(currentValues[idx1] - currentValues[idx2]);
+            }
+            else if (qObj.type === 'sum') {
+                const idx1 = Math.floor(Math.random() * dataLength);
+                let idx2 = Math.floor(Math.random() * dataLength);
+                while(idx1 === idx2) idx2 = Math.floor(Math.random() * dataLength);
+                qText = qText.replace('[CAT1]', currentLabels[idx1]).replace('[CAT2]', currentLabels[idx2]);
+                ans = currentValues[idx1] + currentValues[idx2];
+            }
+            else if (qObj.type === 'mode') {
+                // Find mode
+                const counts = {};
+                currentValues.forEach(v => counts[v] = (counts[v] || 0) + 1);
+                let maxCount = 0;
+                let modeVal = currentValues[0];
+                for(let v in counts) {
+                    if(counts[v] > maxCount) {
+                        maxCount = counts[v];
+                        modeVal = parseInt(v);
+                    }
+                }
+                // If no mode (all 1), just ask for max instead to avoid confusion
+                if (maxCount === 1) {
+                    qText = "Which has the HIGHEST value?";
+                    const max = Math.max(...currentValues);
+                    const idx = currentValues.indexOf(max);
+                    ans = currentLabels[idx];
+                } else {
+                    ans = modeVal;
+                }
+            }
+
+            document.getElementById('question-text').innerText = qText;
+
+            // 3. Generate Options
+            let options = [ans];
+            while(options.length < 4) {
+                let fake;
+                if(typeof ans === 'string') {
+                    fake = currentLabels[Math.floor(Math.random() * dataLength)];
+                } else {
+                    fake = ans + (Math.floor(Math.random() * 6) * 5) - 10; // +/- variations
+                    if (fake < 0) fake = 0;
+                }
+                if(!options.includes(fake) && fake !== ans) {
+                    options.push(fake);
+                }
+            }
+            
+            // Shuffle
+            options.sort(() => Math.random() - 0.5);
+            correctAnswerIndex = options.indexOf(ans);
+
+            const buttons = document.querySelectorAll('.option-btn');
+            buttons.forEach((btn, i) => {
+                btn.innerText = options[i];
+                btn.className = 'option-btn';
+                btn.disabled = false;
+            });
+        }
+
+        function drawChart(type, labels, data, maxVal) {
+            // Clear
+            ctx.fillStyle = '#050a10';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const padding = 40;
+            const w = canvas.width - (padding * 2);
+            const h = canvas.height - (padding * 2);
+            const barW = w / data.length;
+
+            // Grid
+            ctx.beginPath();
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+            // Draw 5 grid lines
+            for(let i=0; i<=5; i++) {
+                const y = (padding + h) - (h/5)*i;
+                ctx.moveTo(padding, y);
+                ctx.lineTo(padding + w, y);
+                
+                // Y Axis text
+                ctx.fillStyle = '#00f3ff';
+                ctx.font = '12px Share Tech Mono';
+                ctx.textAlign = 'right';
+                ctx.fillText(Math.round((maxVal/5)*i), padding - 5, y + 4);
+            }
+            ctx.stroke();
+
+            // Axes
+            ctx.beginPath();
+            ctx.strokeStyle = '#00f3ff';
+            ctx.lineWidth = 2;
+            ctx.moveTo(padding, padding);
+            ctx.lineTo(padding, padding + h);
+            ctx.lineTo(padding + w, padding + h);
+            ctx.stroke();
+
+            // Data
+            if (type === 'bar') {
+                data.forEach((val, i) => {
+                    const barH = (val / maxVal) * h;
+                    const x = padding + (i * barW) + (barW * 0.15);
+                    const y = (padding + h) - barH;
+                    const bw = barW * 0.7;
+
+                    ctx.fillStyle = 'rgba(255, 0, 255, 0.6)';
+                    ctx.fillRect(x, y, bw, barH);
+                    ctx.strokeStyle = '#ff00ff';
+                    ctx.strokeRect(x, y, bw, barH);
+
+                    // X Labels
+                    ctx.fillStyle = '#fff';
+                    ctx.textAlign = 'center';
+                    ctx.font = '14px Share Tech Mono';
+                    ctx.fillText(labels[i], x + bw/2, padding + h + 20);
+                });
+            } 
+            else {
+                // Line
+                ctx.beginPath();
+                ctx.strokeStyle = '#0aff00';
+                ctx.lineWidth = 3;
+                const points = [];
+                data.forEach((val, i) => {
+                    const x = padding + (i * barW) + (barW/2);
+                    const y = (padding + h) - ((val / maxVal) * h);
+                    points.push({x, y, lbl: labels[i]});
+                    if (i===0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                });
+                ctx.stroke();
+                
+                // Dots
+                points.forEach(p => {
+                    ctx.beginPath();
+                    ctx.fillStyle = '#fff';
+                    ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
+                    ctx.fill();
+                    
+                    // Label
+                    ctx.fillStyle = '#fff';
+                    ctx.textAlign = 'center';
+                    ctx.font = '14px Share Tech Mono';
+                    ctx.fillText(p.lbl, p.x, padding + h + 20);
+                });
+            }
+        }
+
+        function checkAnswer(index) {
+            if(!isGameActive) return;
+
+            const buttons = document.querySelectorAll('.option-btn');
+            
+            if(index === correctAnswerIndex) {
+                // Correct
+                playSound('correct');
+                buttons[index].classList.add('correct');
+                score += 100 + (level * 10);
+                level++;
+                timer = Math.min(timer + 15, 100); 
+                
+                // Lock buttons
+                buttons.forEach(b => b.disabled = true);
+                
+                setTimeout(() => {
+                    document.getElementById('score-display').innerText = score;
+                    document.getElementById('level-display').innerText = level;
+                    generateLevel();
+                }, 800);
+            } else {
+                // Wrong
+                playSound('wrong');
+                buttons[index].classList.add('wrong');
+                timer -= 20;
+            }
+        }
+        
+        // Initial setup call (just in case)
+        resizeCanvas();
+    </script>
+</body>
+</html>

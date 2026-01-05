@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Protractor: HARDCORE MODE</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+
+        :root {
+            --neon-blue: #00f3ff;
+            --neon-pink: #ff00ff;
+            --neon-green: #00ff41;
+            --neon-red: #ff3131;
+            --neon-yellow: #ffee00;
+            --bg-color: #050510;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: white;
+            font-family: 'Orbitron', sans-serif;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #game-border {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            background: #000;
+            border: 2px solid var(--neon-blue);
+            box-shadow: 0 0 30px rgba(0, 243, 255, 0.2);
+            border-radius: 15px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* --- TOP HUD --- */
+        #top-panel {
+            height: 140px;
+            background: rgba(10, 10, 25, 0.95);
+            border-bottom: 1px solid var(--neon-blue);
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: center;
+            position: relative;
+            z-index: 10;
+            padding-top: 10px;
+        }
+
+        .stats-row {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 30px;
+            box-sizing: border-box;
+            font-size: 14px;
+            color: #888;
+            margin-bottom: 10px;
+        }
+        
+        .stats-row span { color: var(--neon-green); font-weight: bold; font-size: 18px; }
+        .lives { color: var(--neon-red) !important; letter-spacing: 5px; font-size: 24px !important;}
+
+        .question-box {
+            text-align: center;
+            width: 90%;
+            padding: 5px;
+        }
+
+        .question-label {
+            font-size: 12px;
+            color: var(--neon-yellow);
+            letter-spacing: 2px;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+
+        .question-text {
+            font-size: 24px;
+            color: white;
+            text-shadow: 0 0 10px rgba(255,255,255,0.5);
+            font-weight: bold;
+            line-height: 1.3;
+        }
+
+        /* TIMER BAR */
+        #timer-container {
+            width: 100%;
+            height: 6px;
+            background: #222;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+        }
+        #timer-bar {
+            width: 100%;
+            height: 100%;
+            background: var(--neon-green);
+            transition: width 0.1s linear, background 0.5s;
+            box-shadow: 0 0 10px var(--neon-green);
+        }
+
+        /* --- MIDDLE CANVAS --- */
+        #canvas-container {
+            flex-grow: 1;
+            position: relative;
+            background: radial-gradient(circle at center, #1a1a2e 0%, #000000 100%);
+            width: 100%;
+        }
+
+        canvas { display: block; width: 100%; height: 100%; }
+
+        /* --- BOTTOM CONTROLS --- */
+        #bottom-panel {
+            height: 100px;
+            background: rgba(10, 10, 25, 0.95);
+            border-top: 1px solid var(--neon-blue);
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            padding: 0 20px;
+            z-index: 10;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex-grow: 1;
+        }
+
+        .angle-display {
+            font-size: 24px;
+            color: var(--neon-pink);
+            margin-bottom: 5px;
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 25px;
+            width: 25px;
+            border-radius: 50%;
+            background: var(--neon-pink);
+            cursor: pointer;
+            box-shadow: 0 0 10px var(--neon-pink);
+            margin-top: -10px;
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 5px;
+            background: #333;
+            border-radius: 5px;
+        }
+
+        button#fire-btn {
+            height: 60px;
+            width: 160px;
+            background: transparent;
+            color: var(--neon-green);
+            border: 2px solid var(--neon-green);
+            font-family: 'Orbitron';
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 0 10px var(--neon-green) inset;
+            transition: 0.2s;
+        }
+
+        button#fire-btn:hover {
+            background: var(--neon-green);
+            color: black;
+            box-shadow: 0 0 20px var(--neon-green);
+        }
+
+        /* --- OVERLAYS --- */
+        .overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+        .hidden { display: none !important; }
+
+        h1 { color: var(--neon-blue); font-size: 36px; margin-bottom: 10px; }
+        p { color: #ccc; max-width: 500px; text-align: center; margin-bottom: 30px; line-height: 1.6; }
+        
+        .btn-start {
+            padding: 15px 40px;
+            font-size: 20px;
+            background: var(--neon-red);
+            border: none;
+            color: white;
+            font-family: 'Orbitron';
+            cursor: pointer;
+            box-shadow: 0 0 20px var(--neon-red);
+        }
+
+        /* Dynamic classes */
+        .shake { animation: shake 0.5s; }
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="game-border">
+        
+        <div id="top-panel">
+            <div class="stats-row">
+                <div>SCORE: <span id="scoreVal">0</span></div>
+                <div>LIVES: <span id="livesVal" class="lives">♥♥♥</span></div>
+                <div>LEVEL: <span id="levelVal">1</span></div>
+            </div>
+            <div class="question-box">
+                <div class="question-label" id="mathTypeLabel">INITIATING...</div>
+                <div class="question-text" id="questionText">SYSTEM READY</div>
+            </div>
+            <div id="timer-container"><div id="timer-bar"></div></div>
+        </div>
+
+        <div id="canvas-container">
+            <canvas id="gameCanvas" width="800" height="360"></canvas>
+            <div id="feedback" style="position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); 
+                 font-size: 50px; font-weight: bold; text-shadow: 0 0 20px black; pointer-events: none;">
+            </div>
+        </div>
+
+        <div id="bottom-panel">
+            <div class="control-group">
+                <div class="angle-display"><span id="currentAngleVal">90</span>°</div>
+                <input type="range" id="angleSlider" min="0" max="180" value="90" step="1">
+            </div>
+            <button id="fire-btn">LOCK IN</button>
+        </div>
+
+        <div id="startScreen" class="overlay">
+            <h1 style="color: var(--neon-red)">HARDCORE MODE</h1>
+            <p><strong>Warning: High Difficulty</strong><br>
+            1. <strong>Time Pressure:</strong> The bar drains fast.<br>
+            2. <strong>Precision:</strong> Tolerance decreases every level.<br>
+            3. <strong>Algebra:</strong> Solve for X before you aim.</p>
+            <button class="btn-start" onclick="startGame()">ACCEPT CHALLENGE</button>
+        </div>
+
+        <div id="gameOverScreen" class="overlay hidden">
+            <h1 style="color: var(--neon-red)">MISSION FAILED</h1>
+            <p>Your geometry skills were insufficient.<br>Final Score: <span id="finalScore" style="color:white">0</span></p>
+            <button class="btn-start" onclick="startGame()">RETRY</button>
+        </div>
+    </div>
+
+    <script>
+        // --- AUDIO ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playTone(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+            osc.connect(g);
+            g.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+
+            if (type === 'hover') {
+                osc.frequency.setValueAtTime(300, now);
+                g.gain.setValueAtTime(0.02, now);
+                g.gain.linearRampToValueAtTime(0, now+0.05);
+                osc.start(now); osc.stop(now+0.05);
+            } else if (type === 'win') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.exponentialRampToValueAtTime(800, now+0.1);
+                g.gain.setValueAtTime(0.1, now);
+                g.gain.linearRampToValueAtTime(0, now+0.2);
+                osc.start(now); osc.stop(now+0.2);
+            } else if (type === 'lose') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(100, now);
+                osc.frequency.linearRampToValueAtTime(50, now+0.4);
+                g.gain.setValueAtTime(0.2, now);
+                g.gain.linearRampToValueAtTime(0, now+0.4);
+                osc.start(now); osc.stop(now+0.4);
+            } else if (type === 'tick') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(800, now);
+                g.gain.setValueAtTime(0.05, now);
+                g.gain.linearRampToValueAtTime(0, now+0.05);
+                osc.start(now); osc.stop(now+0.05);
+            }
+        }
+
+        // --- GAME VARIABLES ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const slider = document.getElementById('angleSlider');
+        const valDisplay = document.getElementById('currentAngleVal');
+        const qText = document.getElementById('questionText');
+        const typeLabel = document.getElementById('mathTypeLabel');
+        const feedbackEl = document.getElementById('feedback');
+        const timerBar = document.getElementById('timer-bar');
+        
+        // Dimensions
+        let W = canvas.width;
+        let H = canvas.height;
+        let CX = W / 2;
+        let CY = H - 20; 
+        let R = 180;
+
+        let state = {
+            active: false,
+            level: 1,
+            score: 0,
+            lives: 3,
+            target: 90,
+            current: 90,
+            particles: [],
+            maxTime: 15000, // ms
+            timeLeft: 15000,
+            lastFrame: 0
+        };
+
+        // --- CORE LOGIC ---
+        function startGame() {
+            document.getElementById('startScreen').classList.add('hidden');
+            document.getElementById('gameOverScreen').classList.add('hidden');
+            state.active = true;
+            state.score = 0;
+            state.level = 1;
+            state.lives = 3;
+            state.particles = [];
+            state.lastFrame = performance.now();
+            updateHUD();
+            nextLevel();
+            loop(performance.now());
+        }
+
+        function nextLevel() {
+            // Difficulty Scaling
+            let minAngle = 10; 
+            let maxAngle = 170;
+            state.target = Math.floor(Math.random() * (maxAngle - minAngle)) + minAngle;
+            
+            // Time shrinks as level increases (Minimum 4 seconds)
+            state.maxTime = Math.max(15000 - (state.level * 800), 4000);
+            state.timeLeft = state.maxTime;
+
+            let lvl = state.level;
+            let txt = "";
+            let label = "";
+
+            // --- HARDCORE MATH GENERATOR ---
+            let rng = Math.random();
+
+            if (lvl === 1) {
+                // Tutorial Level
+                label = "CALIBRATION";
+                txt = `Set angle to ${state.target}°`;
+            } 
+            else if (lvl < 4) {
+                // Basic Comp/Supp
+                label = "BASIC GEOMETRY";
+                if (state.target < 90 && rng > 0.5) {
+                    let c = 90 - state.target;
+                    txt = `Find COMPLEMENT of ${c}°`;
+                } else {
+                    let s = 180 - state.target;
+                    txt = `Find SUPPLEMENT of ${s}°`;
+                }
+            } 
+            else if (lvl < 7) {
+                // Algebra Mode
+                label = "ALGEBRAIC SOLVER";
+                // Generate equation: x + offset = target -> aim at x
+                // or 2x = target -> aim at x
+                
+                let type = Math.floor(Math.random() * 2);
+                if (type === 0) {
+                    // x + A = B. Target is x.
+                    let offset = Math.floor(Math.random() * 40) + 10;
+                    let B = state.target + offset;
+                    txt = `Solve for x:  x + ${offset} = ${B}`;
+                } else {
+                    // 2x = B. Target is x. Ensure B is even.
+                    // We need to REVERSE logic here. We want target to be the answer.
+                    // So if target is 45, equation is 2x = 90.
+                    // But target can be anything. Let's force target to be < 90 for this.
+                    if (state.target > 90) state.target = Math.floor(state.target / 2);
+                    let B = state.target * 2;
+                    txt = `Solve for x:  2x = ${B}`;
+                }
+            } 
+            else if (lvl < 10) {
+                // Logic Chains
+                label = "LOGIC CHAIN";
+                // "Supplement of the Complement of X"
+                // Let's work backwards. Target = Answer.
+                // Step 1: Supplement of Target = S. (180 - T)
+                // Step 2: Complement of S? Only works if S < 90.
+                
+                // Simpler Chain: "Aim at Supplement of (x + 10)"
+                let offset = 20;
+                let inner = 180 - state.target; // The value inside the bracket
+                let given = inner - offset;
+                txt = `Aim at Supplement of (${given} + ${offset})°`;
+            } 
+            else {
+                // CHAOS MODE (Ratios & Complex)
+                label = "CHAOS MATH";
+                let type = Math.floor(Math.random() * 2);
+                if (type === 0) {
+                    // Ratio: Angles A and B are supplementary in ratio 2:3. Aim at larger.
+                    // 2x + 3x = 180 -> 5x=180 -> x=36. Angles: 72, 108.
+                    // This is hard to generate procedurally to match specific target.
+                    // Instead, force specific targets for ratio questions.
+                    let x = 180 / 5; // 36
+                    if (rng > 0.5) {
+                        state.target = x * 2; // 72
+                        txt = `Supplementary Angles in ratio 2:3. Aim at SMALLER.`;
+                    } else {
+                        state.target = x * 3; // 108
+                        txt = `Supplementary Angles in ratio 2:3. Aim at LARGER.`;
+                    }
+                } else {
+                    // Vertically opposite algebra
+                    // 3x = target.
+                    // This is getting too complex to verify mentally quickly.
+                    // Fallback to fast reflex algebra:
+                    let scalar = Math.floor(Math.random() * 3) + 2; // 2 to 4
+                    // target * scalar = bigNum
+                    // Aim at target
+                    // constrain target
+                    if (state.target * scalar > 180) state.target = Math.floor(180/scalar);
+                    let bigNum = state.target * scalar;
+                    txt = `Solve: ${scalar}x = ${bigNum}`;
+                }
+            }
+
+            qText.innerText = txt;
+            typeLabel.innerText = label;
+            
+            // Visual reset
+            feedbackEl.innerText = "";
+            state.current = 90;
+            slider.value = 90;
+            valDisplay.innerText = 90;
+        }
+
+        function takeDamage() {
+            playTone('lose');
+            state.lives--;
+            document.getElementById('game-border').classList.add('shake');
+            setTimeout(()=>document.getElementById('game-border').classList.remove('shake'), 500);
+
+            // Update hearts
+            let heartStr = "";
+            for(let i=0; i<state.lives; i++) heartStr += "♥";
+            document.getElementById('livesVal').innerText = heartStr;
+
+            if (state.lives <= 0) {
+                state.active = false;
+                document.getElementById('finalScore').innerText = Math.floor(state.score);
+                document.getElementById('gameOverScreen').classList.remove('hidden');
+            } else {
+                nextLevel();
+            }
+        }
+
+        function check() {
+            if (!state.active) return;
+            
+            let diff = Math.abs(state.current - state.target);
+            
+            // HARDCORE TOLERANCE
+            // Level 1: 8 degrees
+            // Level 10: 2 degrees
+            let tolerance = Math.max(8 - (state.level * 0.6), 2); 
+
+            if (diff <= tolerance) {
+                // Win
+                playTone('win');
+                // Score based on speed and accuracy
+                let timeBonus = Math.floor(state.timeLeft / 100);
+                let accBonus = (tolerance - diff) * 10;
+                state.score += (100 + timeBonus + accBonus);
+                state.level++;
+                
+                feedbackEl.style.color = '#00ff41';
+                feedbackEl.innerText = "LOCKED!";
+                createExplosion(CX + Math.cos(rad(180-state.target))*R, CY - Math.sin(rad(180-state.target))*R, '#00ff41');
+                
+                setTimeout(() => {
+                    nextLevel();
+                    updateHUD();
+                }, 800);
+            } else {
+                // Lose logic is handled by damage now
+                feedbackEl.style.color = '#ff3131';
+                feedbackEl.innerText = `${state.target}°`; // Show correct answer
+                createExplosion(CX + Math.cos(rad(180-state.target))*R, CY - Math.sin(rad(180-state.target))*R, '#ff3131');
+                setTimeout(takeDamage, 1000);
+            }
+            updateHUD();
+        }
+
+        // --- DRAWING & LOOP ---
+        function rad(deg) { return deg * Math.PI / 180; }
+
+        function draw() {
+            // Clear
+            ctx.clearRect(0,0,W,H);
+
+            // Grid
+            ctx.strokeStyle = '#1a1a2e';
+            ctx.lineWidth = 1;
+            for(let x=0; x<W; x+=40) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+
+            // Protractor Body
+            ctx.beginPath();
+            ctx.arc(CX, CY, R, Math.PI, 0);
+            ctx.strokeStyle = '#444';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            
+            // Ticks
+            for(let i=0; i<=180; i+=10) {
+                let r = rad(180-i);
+                let isMajor = (i%90===0);
+                let len = isMajor ? 15 : 8;
+                let x1 = CX + Math.cos(r)*R;
+                let y1 = CY - Math.sin(r)*R;
+                let x2 = CX + Math.cos(r)*(R-len);
+                let y2 = CY - Math.sin(r)*(R-len);
+                ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+
+                if (i%45===0) {
+                    ctx.fillStyle = '#666';
+                    ctx.font = '10px Orbitron';
+                    ctx.fillText(i, x2 + (Math.cos(r)*-15)-5, y2 + (Math.sin(r)*15)+5);
+                }
+            }
+
+            // Player Line
+            let pRad = rad(180-state.current);
+            let px = CX + Math.cos(pRad)*R;
+            let py = CY - Math.sin(pRad)*R;
+
+            ctx.beginPath();
+            ctx.moveTo(CX, CY);
+            ctx.lineTo(px, py);
+            ctx.strokeStyle = '#ff00ff';
+            ctx.lineWidth = 4;
+            ctx.shadowColor = '#ff00ff';
+            ctx.shadowBlur = 15;
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+
+            // Fill Arc
+            ctx.fillStyle = 'rgba(255,0,255,0.1)';
+            ctx.beginPath();
+            ctx.moveTo(CX,CY);
+            ctx.arc(CX, CY, R/2, Math.PI, Math.PI + (Math.PI - pRad), true);
+            ctx.fill();
+
+            // Particles
+            state.particles.forEach((p, i) => {
+                p.x += p.vx; p.y += p.vy; p.life -= 0.02;
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = Math.max(p.life, 0);
+                ctx.fillRect(p.x, p.y, 4, 4);
+                if(p.life <= 0) state.particles.splice(i, 1);
+            });
+            ctx.globalAlpha = 1.0;
+        }
+
+        function createExplosion(x, y, color) {
+            for(let i=0; i<30; i++) {
+                state.particles.push({
+                    x: x, y: y,
+                    vx: (Math.random()-0.5)*10,
+                    vy: (Math.random()-0.5)*10,
+                    life: 1.0, color: color
+                });
+            }
+        }
+
+        function updateHUD() {
+            document.getElementById('scoreVal').innerText = Math.floor(state.score);
+            document.getElementById('levelVal').innerText = state.level;
+        }
+
+        function loop(timestamp) {
+            if(!state.active) {
+                if(state.particles.length > 0) { draw(); requestAnimationFrame(loop); }
+                return;
+            }
+
+            let dt = timestamp - state.lastFrame;
+            state.lastFrame = timestamp;
+
+            // Timer Logic
+            state.timeLeft -= dt;
+            let pct = (state.timeLeft / state.maxTime) * 100;
+            timerBar.style.width = pct + "%";
+            
+            // Color shift on low time
+            if(pct < 20) {
+                timerBar.style.background = "#ff3131"; 
+                if(Math.floor(timestamp / 200) % 2 === 0) playTone('tick'); // Panic sound
+            } else {
+                timerBar.style.background = "#00ff41";
+            }
+
+            if(state.timeLeft <= 0) {
+                takeDamage();
+            }
+
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        // --- EVENTS ---
+        slider.addEventListener('input', (e) => {
+            state.current = parseInt(e.target.value);
+            valDisplay.innerText = state.current;
+            playTone('hover');
+        });
+
+        document.getElementById('fire-btn').addEventListener('click', check);
+        
+        window.addEventListener('keydown', (e) => {
+            if (!state.active) return;
+            if (e.key === 'ArrowLeft') {
+                slider.value = parseInt(slider.value) + 1;
+                state.current = parseInt(slider.value);
+                valDisplay.innerText = state.current;
+            }
+            if (e.key === 'ArrowRight') {
+                slider.value = parseInt(slider.value) - 1;
+                state.current = parseInt(slider.value);
+                valDisplay.innerText = state.current;
+            }
+            if (e.code === 'Space') check();
+        });
+
+        // Initial Draw
+        draw();
+
+    </script>
+</body>
+</html>

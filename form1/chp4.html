@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ratio Racer: Think Mode</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Russo+One&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #020010;
+            font-family: 'Russo One', sans-serif;
+            user-select: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* UI Overlay */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #hud {
+            width: 100%;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            box-sizing: border-box;
+            z-index: 5;
+        }
+
+        .hud-panel {
+            background: rgba(0, 0, 0, 0.5);
+            border: 2px solid #00ffcc;
+            color: #00ffcc;
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 1.5rem;
+            text-shadow: 0 0 10px #00ffcc;
+            transform: skew(-15deg);
+        }
+
+        #question-display {
+            margin-top: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            border: 3px solid #ff00cc;
+            color: #fff;
+            padding: 25px 60px;
+            border-radius: 15px;
+            font-size: 2.8rem;
+            text-shadow: 0 0 15px #ff00cc;
+            box-shadow: 0 0 30px rgba(255, 0, 204, 0.4);
+            z-index: 6;
+            transition: border-color 0.3s;
+        }
+
+        /* Menus */
+        .menu-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(2, 0, 16, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            pointer-events: auto;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        h1 {
+            font-size: 4rem;
+            color: #fff;
+            text-transform: uppercase;
+            letter-spacing: 5px;
+            background: linear-gradient(to bottom, #00ffcc, #0088aa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+            text-shadow: 0 5px 20px rgba(0, 255, 204, 0.5);
+            text-align: center;
+        }
+
+        p {
+            color: #aaa;
+            font-size: 1.2rem;
+            max-width: 600px;
+            text-align: center;
+            line-height: 1.5;
+            margin-bottom: 30px;
+        }
+
+        button {
+            padding: 20px 60px;
+            font-size: 2rem;
+            font-family: 'Russo One', sans-serif;
+            background: linear-gradient(45deg, #ff00cc, #aa0088);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 0 20px #ff00cc;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 40px #ff00cc;
+        }
+
+        #speed-bar-container {
+            position: absolute;
+            right: 20px;
+            bottom: 50px;
+            width: 30px;
+            height: 200px;
+            background: #222;
+            border: 2px solid #555;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        #speed-bar {
+            width: 100%;
+            height: 0%;
+            background: linear-gradient(to top, #0f0, #ff0, #f00);
+            position: absolute;
+            bottom: 0;
+            transition: height 0.5s;
+        }
+
+        .speed-label {
+            position: absolute;
+            right: 60px;
+            bottom: 140px;
+            color: #fff;
+            transform: rotate(-90deg);
+            font-size: 1.2rem;
+            letter-spacing: 3px;
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        <div id="hud">
+            <div class="hud-panel">SCORE: <span id="scoreVal">0</span></div>
+            <div class="hud-panel">LEVEL: <span id="levelVal">1</span></div>
+        </div>
+        <div id="question-display">Loading...</div>
+        
+        <div class="speed-label">VELOCITY</div>
+        <div id="speed-bar-container">
+            <div id="speed-bar"></div>
+        </div>
+    </div>
+
+    <div id="start-screen" class="menu-screen">
+        <h1>RATIO RACER</h1>
+        <p>Topic: Ratios, Rates & Proportions<br><br>
+        <strong>Adjustments Made:</strong><br>
+        1. Question appears 3 seconds BEFORE gates arrive.<br>
+        2. Overall speed is reduced significantly.<br>
+        Steer with Arrows or Click/Touch.</p>
+        <button onclick="startGame()">START ENGINE</button>
+    </div>
+
+    <div id="game-over-screen" class="menu-screen hidden">
+        <h1 style="color: #ff3333; background: none; -webkit-text-fill-color: #ff3333;">CRASHED</h1>
+        <p>Final Score: <span id="finalScore">0</span></p>
+        <button onclick="startGame()">TRY AGAIN</button>
+    </div>
+</div>
+
+<script>
+    /**
+     * AUDIO SYSTEM
+     */
+    const AudioSys = {
+        ctx: null,
+        init: function() {
+            if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        },
+        playTone: function(freq, type, dur, vol = 0.1) {
+            if (!this.ctx) return;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+            gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + dur);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start();
+            osc.stop(this.ctx.currentTime + dur);
+        },
+        playCollect: function() {
+            this.playTone(800, 'sine', 0.1, 0.1);
+            setTimeout(() => this.playTone(1200, 'sine', 0.2, 0.1), 100);
+        },
+        playCrash: function() {
+            this.playTone(100, 'sawtooth', 0.5, 0.2);
+            this.playTone(80, 'square', 0.5, 0.2);
+        }
+    };
+
+    /**
+     * MATH LOGIC
+     */
+    function generateProblem(level) {
+        const types = ['simplify', 'proportion', 'rate', 'percent'];
+        let allowed = ['simplify'];
+        if (level > 1) allowed.push('proportion');
+        if (level > 2) allowed.push('rate');
+        if (level > 4) allowed.push('percent');
+        
+        const type = allowed[Math.floor(Math.random() * allowed.length)];
+        let question, answer, wrong1, wrong2;
+
+        if (type === 'simplify') {
+            const a = Math.floor(Math.random() * 9) + 1;
+            const b = Math.floor(Math.random() * 9) + 1;
+            if(a===b) return generateProblem(level);
+            
+            const factor = Math.floor(Math.random() * 4) + 2; 
+            question = `${a*factor} : ${b*factor}`;
+            answer = `${a}:${b}`;
+            wrong1 = `${a+1}:${b}`;
+            wrong2 = `${a}:${b+1}`;
+            if(Math.random() > 0.5) wrong1 = `${b}:${a}`; 
+        } 
+        else if (type === 'proportion') {
+            const a = Math.floor(Math.random() * 5) + 1;
+            const b = Math.floor(Math.random() * 5) + 1;
+            const factor = Math.floor(Math.random() * 4) + 2;
+            const target = b * factor;
+            question = `${a} : ${b} = ${a*factor} : ?`;
+            answer = target.toString();
+            wrong1 = (target + 2).toString();
+            wrong2 = (target - 1).toString();
+        }
+        else if (type === 'rate') {
+            const unitCost = Math.floor(Math.random() * 5) + 2; 
+            const qty1 = Math.floor(Math.random() * 3) + 2; 
+            const total1 = qty1 * unitCost;
+            
+            const targetQty = Math.floor(Math.random() * 4) + 2; 
+            const targetTotal = targetQty * unitCost;
+
+            question = `${qty1} cost $${total1}. ${targetQty} cost?`;
+            answer = `$${targetTotal}`;
+            wrong1 = `$${targetTotal + unitCost}`;
+            wrong2 = `$${targetTotal - unitCost}`;
+        }
+        else if (type === 'percent') {
+            const pairs = [
+                {q: "1:2", a: "50%"},
+                {q: "1:4", a: "25%"},
+                {q: "3:4", a: "75%"},
+                {q: "1:5", a: "20%"},
+                {q: "1:10", a: "10%"},
+                {q: "1:1", a: "100%"}
+            ];
+            const p = pairs[Math.floor(Math.random() * pairs.length)];
+            question = `Convert ${p.q} to %`;
+            answer = p.a;
+            let num = parseInt(answer);
+            wrong1 = (num + 10) + "%";
+            wrong2 = (num - 5) + "%";
+        }
+
+        return { q: question, a: answer, w1: wrong1, w2: wrong2 };
+    }
+
+    /**
+     * GAME ENGINE
+     */
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let state = {
+        active: false,
+        score: 0,
+        level: 1,
+        speed: 3, // REDUCED BASE SPEED
+        lane: 1, 
+        currentProblem: null,
+        gates: [], 
+        roadOffset: 0,
+        gateTimer: 0,
+        particles: []
+    };
+
+    let lanesX = [0, 0, 0]; 
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        const w = canvas.width;
+        lanesX = [w * 0.25, w * 0.5, w * 0.75]; 
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    window.addEventListener('keydown', (e) => {
+        if (!state.active) return;
+        if (e.key === 'ArrowLeft' && state.lane > 0) state.lane--;
+        if (e.key === 'ArrowRight' && state.lane < 2) state.lane++;
+    });
+
+    window.addEventListener('mousedown', handleInput);
+    window.addEventListener('touchstart', handleInput, {passive: false});
+
+    function handleInput(e) {
+        if (!state.active) return;
+        e.preventDefault(); 
+        const x = e.clientX || e.touches[0].clientX;
+        if (x < canvas.width / 2) {
+            if (state.lane > 0) state.lane--;
+        } else {
+            if (state.lane < 2) state.lane++;
+        }
+    }
+
+    function createParticle(x, y, color) {
+        state.particles.push({
+            x: x, y: y,
+            vx: (Math.random() - 0.5) * 10,
+            vy: (Math.random() - 0.5) * 10,
+            life: 1.0,
+            color: color
+        });
+    }
+
+    function spawnGate() {
+        if (state.gates.length > 0) return;
+
+        state.currentProblem = generateProblem(state.level);
+        document.getElementById('question-display').innerText = state.currentProblem.q;
+        document.getElementById('question-display').style.borderColor = '#ff00cc';
+
+        let answers = [
+            { text: state.currentProblem.a, type: 'correct' },
+            { text: state.currentProblem.w1, type: 'wrong' },
+            { text: state.currentProblem.w2, type: 'wrong' }
+        ];
+        
+        for (let i = answers.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [answers[i], answers[j]] = [answers[j], answers[i]];
+        }
+
+        // --- KEY CHANGE: SPAWN DISTANCE ---
+        // Spawning at -600 Y means the gate starts well above the screen.
+        // This gives the user time to read the question (which updates instantly)
+        // before the answers scroll into view.
+        state.gates.push({
+            y: -600, 
+            items: answers
+        });
+    }
+
+    function update() {
+        if (!state.active) return;
+
+        // --- KEY CHANGE: GENTLE SPEED ---
+        // Speed scales very slowly now (0.2 per level)
+        const currentSpeed = 3 + (state.level * 0.2);
+        
+        document.getElementById('speed-bar').style.height = Math.min(100, currentSpeed * 5) + '%';
+
+        state.roadOffset = (state.roadOffset + currentSpeed) % 40;
+
+        state.gateTimer++;
+        
+        // Timer ensures we don't accidentally double spawn if speed fluctuates
+        if (state.gates.length === 0 && state.gateTimer > 150) {
+            spawnGate();
+            state.gateTimer = 0;
+        }
+
+        for (let i = state.gates.length - 1; i >= 0; i--) {
+            let g = state.gates[i];
+            g.y += currentSpeed;
+
+            const playerY = canvas.height - 150;
+            const playerHitBox = 40; 
+
+            if (g.y > playerY - playerHitBox && g.y < playerY + playerHitBox) {
+                const chosen = g.items[state.lane];
+                
+                if (!g.hit) { 
+                    g.hit = true;
+                    if (chosen.type === 'correct') {
+                        state.score += 100 * state.level;
+                        AudioSys.playCollect();
+                        document.getElementById('question-display').style.borderColor = '#00ff00';
+                        document.getElementById('question-display').innerText = "CORRECT!";
+                        for(let k=0; k<20; k++) createParticle(lanesX[state.lane], playerY, '#0f0');
+                        
+                        if (state.score > state.level * 1000) state.level++;
+                    } else {
+                        AudioSys.playCrash();
+                        gameOver();
+                        return; 
+                    }
+                }
+            }
+
+            if (g.y > canvas.height) {
+                state.gates.splice(i, 1);
+            }
+        }
+
+        for (let i = state.particles.length - 1; i >= 0; i--) {
+            let p = state.particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life -= 0.05;
+            if(p.life <= 0) state.particles.splice(i, 1);
+        }
+
+        document.getElementById('scoreVal').innerText = state.score;
+        document.getElementById('levelVal').innerText = state.level;
+
+        draw();
+        requestAnimationFrame(update);
+    }
+
+    function draw() {
+        ctx.fillStyle = '#020010';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.strokeStyle = '#ff00cc';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        
+        ctx.strokeStyle = 'rgba(0, 255, 204, 0.3)';
+        ctx.setLineDash([40, 40]);
+        ctx.lineDashOffset = -state.roadOffset;
+        
+        const w = canvas.width;
+        ctx.beginPath();
+        ctx.moveTo(w * 0.33, 0);
+        ctx.lineTo(w * 0.33, canvas.height);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(w * 0.66, 0);
+        ctx.lineTo(w * 0.66, canvas.height);
+        ctx.stroke();
+
+        ctx.setLineDash([]); 
+
+        const px = lanesX[state.lane];
+        const py = canvas.height - 150;
+        
+        ctx.fillStyle = '#00ffcc';
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#00ffcc';
+        ctx.beginPath();
+        ctx.moveTo(px, py - 30); 
+        ctx.lineTo(px - 20, py + 30); 
+        ctx.lineTo(px, py + 20); 
+        ctx.lineTo(px + 20, py + 30); 
+        ctx.fill();
+        
+        ctx.fillStyle = `rgba(255, 100, 0, ${Math.random()})`;
+        ctx.beginPath();
+        ctx.moveTo(px - 10, py + 30);
+        ctx.lineTo(px + 10, py + 30);
+        ctx.lineTo(px, py + 50 + (Math.random()*20));
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        state.gates.forEach(g => {
+            // Optimization: Don't draw if waaaaay off screen, but draw if approaching
+            if (g.y < -200) return; 
+
+            const gateH = 80;
+            for(let i=0; i<3; i++) {
+                const cx = lanesX[i];
+                const item = g.items[i];
+                
+                ctx.fillStyle = 'rgba(20, 0, 40, 0.8)';
+                ctx.strokeStyle = '#ff00cc';
+                ctx.lineWidth = 3;
+                
+                const boxW = (canvas.width / 3) - 20;
+                const bx = cx - (boxW/2);
+                
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = '#ff00cc';
+                ctx.fillRect(bx, g.y, boxW, gateH);
+                ctx.strokeRect(bx, g.y, boxW, gateH);
+                ctx.shadowBlur = 0;
+
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 30px "Russo One"';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(item.text, cx, g.y + (gateH/2));
+            }
+        });
+
+        state.particles.forEach(p => {
+            ctx.globalAlpha = p.life;
+            ctx.fillStyle = p.color;
+            ctx.fillRect(p.x, p.y, 5, 5);
+        });
+        ctx.globalAlpha = 1;
+    }
+
+    function startGame() {
+        AudioSys.init();
+        document.getElementById('start-screen').classList.add('hidden');
+        document.getElementById('game-over-screen').classList.add('hidden');
+        
+        state.score = 0;
+        state.level = 1;
+        state.speed = 3; 
+        state.gates = [];
+        state.particles = [];
+        state.lane = 1;
+        state.gateTimer = 150; 
+        state.active = true;
+        
+        update();
+    }
+
+    function gameOver() {
+        state.active = false;
+        document.getElementById('finalScore').innerText = state.score;
+        document.getElementById('game-over-screen').classList.remove('hidden');
+    }
+
+</script>
+</body>
+</html>

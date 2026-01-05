@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Equation Dungeon: No Overlap</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #111;
+            font-family: 'Press Start 2P', cursive;
+            color: white;
+            user-select: none;
+            touch-action: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #050505;
+        }
+
+        canvas {
+            image-rendering: pixelated;
+            box-shadow: 0 0 40px #000;
+            cursor: crosshair;
+        }
+
+        /* UI Overlay */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #fff;
+            text-shadow: 2px 2px #000;
+        }
+
+        .hud-row {
+            margin-bottom: 15px;
+            font-size: 1rem;
+        }
+
+        /* The Equation Display */
+        #equation-panel {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #222;
+            border: 4px solid #fff;
+            padding: 15px 25px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 5px 0 #000;
+        }
+
+        #equation-text {
+            font-size: 1.2rem;
+            color: #ffcc00;
+            margin-bottom: 8px;
+        }
+
+        #instruction-text {
+            font-size: 0.6rem;
+            color: #aaa;
+            text-transform: uppercase;
+        }
+
+        /* Message Popup (Win/Fail) */
+        #message-popup {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2rem;
+            text-shadow: 3px 3px #000;
+            display: none;
+            z-index: 20;
+        }
+
+        /* Screens */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            pointer-events: auto;
+        }
+
+        .hidden { display: none !important; }
+
+        h1 {
+            color: #ffcc00;
+            font-size: 2rem;
+            margin-bottom: 20px;
+            text-align: center;
+            line-height: 1.5;
+            text-shadow: 4px 4px #a00;
+        }
+
+        p {
+            color: #ddd;
+            font-size: 0.8rem;
+            max-width: 500px;
+            text-align: center;
+            line-height: 1.8;
+            margin-bottom: 30px;
+        }
+
+        button {
+            padding: 15px 30px;
+            font-size: 1rem;
+            font-family: 'Press Start 2P', cursive;
+            background: #a00;
+            color: #fff;
+            border: 4px solid #fff;
+            cursor: pointer;
+            box-shadow: 0 6px 0 #500;
+            transition: transform 0.1s;
+        }
+
+        button:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #500;
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        <div id="hud">
+            <div class="hud-row">HP: <span id="hpVal" style="color:#f00">100</span></div>
+            <div class="hud-row">LVL: <span id="lvlVal" style="color:#0f0">1</span></div>
+            <div class="hud-row">KEY: <span id="heldKey" style="color:#888">NONE</span></div>
+        </div>
+
+        <div id="equation-panel">
+            <div id="equation-text">LOCKED</div>
+            <div id="instruction-text">Find X to Open</div>
+        </div>
+        
+        <div id="message-popup"></div>
+    </div>
+
+    <div id="start-screen" class="screen">
+        <h1>EQUATION<br>DUNGEON</h1>
+        <p>Topic: Linear Equations<br><br>
+        1. Click/Tap to move.<br>
+        2. Pick up the KEY that matches 'X'.<br>
+        3. Walk into the DOOR to escape.<br>
+        (Key Overlap Fixed!)</p>
+        <button onclick="startGame()">START GAME</button>
+    </div>
+
+    <div id="game-over-screen" class="screen hidden">
+        <h1 style="color: #f00;">GAME OVER</h1>
+        <p>Max Level: <span id="finalLevel">0</span></p>
+        <button onclick="startGame()">TRY AGAIN</button>
+    </div>
+</div>
+
+<script>
+    const AudioSys = {
+        ctx: null,
+        init: function() {
+            if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            if (this.ctx.state === 'suspended') this.ctx.resume();
+        },
+        playTone: function(freq, type, dur, vol=0.1) {
+            if (!this.ctx) return;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+            gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+            gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + dur);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start();
+            osc.stop(this.ctx.currentTime + dur);
+        },
+        playJump: function() { 
+            this.playTone(400, 'square', 0.1, 0.1);
+            setTimeout(() => this.playTone(600, 'square', 0.1, 0.1), 100);
+        },
+        playDoor: function() { 
+            this.playTone(300, 'sine', 0.1);
+            setTimeout(() => this.playTone(400, 'sine', 0.1), 100);
+            setTimeout(() => this.playTone(500, 'sine', 0.2), 200);
+        },
+        playHurt: function() {
+            this.playTone(150, 'sawtooth', 0.2, 0.2);
+            setTimeout(() => this.playTone(100, 'sawtooth', 0.2, 0.2), 100);
+        }
+    };
+
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const TILE_SIZE = 48;
+    const MAP_W = 15;
+    const MAP_H = 11;
+    
+    let state = {
+        active: false,
+        level: 1,
+        hp: 100,
+        player: { x: 0, y: 0, heldKey: null, invuln: 0, targetX: -1, targetY: -1 },
+        enemies: [],
+        keys: [],
+        particles: [],
+        door: { x: 7, y: 0, problem: null },
+        screenShake: 0,
+        transitioning: false
+    };
+
+    function generateEquation(level) {
+        let a = 1;
+        let b = 0;
+        let x = 0;
+        if (level > 2) a = Math.floor(Math.random() * 5) + 2; 
+        if (level > 5 && Math.random()>0.5) a = -a; 
+
+        x = Math.floor(Math.random() * 9) + 2; 
+        b = Math.floor(Math.random() * 20) + 1; 
+        if (level > 5 && Math.random() > 0.5) b = -b;
+
+        let c = (a * x) + b;
+        let eqText = "";
+        let term1 = (a === 1) ? "x" : (a === -1 ? "-x" : `${a}x`);
+        let term2 = (b >= 0) ? `+ ${b}` : `- ${Math.abs(b)}`;
+        
+        if (Math.random() > 0.3) eqText = `${term1} ${term2} = ${c}`;
+        else eqText = `${c} = ${term1} ${term2}`;
+
+        return { text: eqText, answer: x };
+    }
+
+    function initLevel() {
+        canvas.width = MAP_W * TILE_SIZE;
+        canvas.height = MAP_H * TILE_SIZE;
+
+        state.player.x = 7 * TILE_SIZE;
+        state.player.y = 9 * TILE_SIZE;
+        state.player.targetX = state.player.x;
+        state.player.targetY = state.player.y;
+        state.player.heldKey = null;
+        state.transitioning = false;
+        
+        document.getElementById('heldKey').innerText = "NONE";
+        document.getElementById('heldKey').style.color = "#888";
+
+        state.door.problem = generateEquation(state.level);
+        document.getElementById('equation-text').innerText = state.door.problem.text;
+
+        state.keys = [];
+        let correctVal = state.door.problem.answer;
+        let keyVals = [correctVal];
+        while(keyVals.length < 4) {
+            let fake = correctVal + (Math.floor(Math.random() * 10) - 5);
+            if (fake !== correctVal && fake > 0 && !keyVals.includes(fake)) {
+                keyVals.push(fake);
+            }
+        }
+        
+        // --- FIXED KEY GENERATION LOGIC ---
+        keyVals.forEach(val => {
+            let kx, ky;
+            let validPosition = false;
+            
+            // Loop until we find a spot that doesn't overlap player OR other keys
+            while (!validPosition) {
+                kx = Math.floor(Math.random() * (MAP_W - 2)) + 1;
+                ky = Math.floor(Math.random() * (MAP_H - 3)) + 2; 
+                
+                // 1. Check distance to Player
+                let distToPlayer = Math.hypot(kx*TILE_SIZE - state.player.x, ky*TILE_SIZE - state.player.y);
+                
+                // 2. Check distance to ALL existing Keys
+                let tooCloseToKey = false;
+                for(let existingKey of state.keys) {
+                    let d = Math.hypot(kx*TILE_SIZE - existingKey.x, ky*TILE_SIZE - existingKey.y);
+                    if (d < TILE_SIZE * 2) { // Ensure at least 2 tiles apart
+                        tooCloseToKey = true;
+                        break;
+                    }
+                }
+
+                if (distToPlayer > 150 && !tooCloseToKey) {
+                    validPosition = true;
+                }
+            }
+            
+            state.keys.push({
+                x: kx * TILE_SIZE,
+                y: ky * TILE_SIZE,
+                val: val,
+                floatOffset: Math.random() * Math.PI * 2
+            });
+        });
+
+        state.enemies = [];
+        let enemyCount = 1 + Math.floor(state.level / 2);
+        if(enemyCount > 6) enemyCount = 6;
+
+        for(let i=0; i<enemyCount; i++) {
+            let ex, ey;
+            do {
+                ex = Math.floor(Math.random() * MAP_W);
+                ey = Math.floor(Math.random() * MAP_H);
+            } while (Math.hypot(ex*TILE_SIZE - state.player.x, ey*TILE_SIZE - state.player.y) < 200);
+
+            state.enemies.push({
+                x: ex * TILE_SIZE,
+                y: ey * TILE_SIZE,
+                speed: 1.5 + (state.level * 0.2),
+                type: Math.random() > 0.5 ? 'chaser' : 'pacer',
+                dirX: 1, dirY: 0
+            });
+        }
+    }
+
+    // Input Handling
+    let keysDown = {};
+    window.addEventListener('keydown', e => { keysDown[e.key] = true; state.player.targetX = -1; });
+    window.addEventListener('keyup', e => keysDown[e.key] = false);
+
+    function handlePointer(e) {
+        if(!state.active) return;
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+
+        state.player.targetX = (clientX - rect.left) * scaleX - (TILE_SIZE/2);
+        state.player.targetY = (clientY - rect.top) * scaleY - (TILE_SIZE/2);
+    }
+    window.addEventListener('mousedown', handlePointer);
+    window.addEventListener('touchstart', (e) => { e.preventDefault(); handlePointer(e); }, {passive: false});
+    window.addEventListener('touchmove', (e) => { e.preventDefault(); handlePointer(e); }, {passive: false});
+
+    function showMessage(msg, color) {
+        const p = document.getElementById('message-popup');
+        p.innerText = msg;
+        p.style.color = color;
+        p.style.display = 'block';
+        setTimeout(() => p.style.display = 'none', 1500);
+    }
+
+    function createParticle(x, y, color) {
+        for(let i=0; i<8; i++) {
+            state.particles.push({
+                x: x, y: y,
+                vx: (Math.random() - 0.5) * 8,
+                vy: (Math.random() - 0.5) * 8,
+                life: 1.0,
+                color: color
+            });
+        }
+    }
+
+    function update() {
+        if (!state.active) return;
+        requestAnimationFrame(update);
+
+        if(state.transitioning) return; 
+
+        // Movement Logic
+        let speed = 4;
+        let moveX = 0;
+        let moveY = 0;
+
+        if (keysDown['ArrowUp'] || keysDown['w']) moveY = -speed;
+        if (keysDown['ArrowDown'] || keysDown['s']) moveY = speed;
+        if (keysDown['ArrowLeft'] || keysDown['a']) moveX = -speed;
+        if (keysDown['ArrowRight'] || keysDown['d']) moveX = speed;
+
+        if (state.player.targetX !== -1) {
+            let dx = state.player.targetX - state.player.x;
+            let dy = state.player.targetY - state.player.y;
+            let dist = Math.hypot(dx, dy);
+            
+            if (dist > speed) {
+                moveX = (dx / dist) * speed;
+                moveY = (dy / dist) * speed;
+            } else {
+                state.player.x = state.player.targetX;
+                state.player.y = state.player.targetY;
+                state.player.targetX = -1;
+            }
+        }
+
+        let nextX = state.player.x + moveX;
+        let nextY = state.player.y + moveY;
+        
+        if (nextX >= 0 && nextX <= canvas.width - TILE_SIZE) state.player.x = nextX;
+        if (nextY >= 0 && nextY <= canvas.height - TILE_SIZE) state.player.y = nextY;
+
+        // Key Pickup
+        for (let i = state.keys.length - 1; i >= 0; i--) {
+            let k = state.keys[i];
+            k.floatOffset += 0.1;
+
+            if (Math.hypot((state.player.x + 24) - (k.x + 24), (state.player.y + 24) - (k.y + 24)) < 30) {
+                AudioSys.playJump();
+                state.player.heldKey = k.val;
+                document.getElementById('heldKey').innerText = k.val;
+                document.getElementById('heldKey').style.color = "#ffcc00";
+                createParticle(k.x + 24, k.y + 24, '#ffcc00');
+            }
+        }
+
+        // Door Interaction
+        let doorX = state.door.x * TILE_SIZE;
+        let doorY = 0;
+        
+        let playerRight = state.player.x + TILE_SIZE;
+        let playerBottom = state.player.y + TILE_SIZE;
+        let doorRight = doorX + TILE_SIZE;
+        let doorBottom = doorY + TILE_SIZE;
+
+        let overlap = !(playerRight < doorX || 
+                       state.player.x > doorRight || 
+                       playerBottom < doorY || 
+                       state.player.y > doorBottom);
+
+        if (overlap) {
+            if (state.player.heldKey === state.door.problem.answer) {
+                // WIN
+                AudioSys.playDoor();
+                state.transitioning = true;
+                showMessage("LEVEL COMPLETE!", "#0f0");
+                setTimeout(() => {
+                    state.level++;
+                    document.getElementById('lvlVal').innerText = state.level;
+                    state.hp = Math.min(100, state.hp + 20);
+                    document.getElementById('hpVal').innerText = state.hp;
+                    initLevel(); 
+                }, 1500);
+            } else if (state.player.heldKey !== null) {
+                // FAIL
+                state.player.y += 40; // Hard bounce
+                state.player.targetY = state.player.y;
+                state.screenShake = 10;
+                AudioSys.playHurt();
+                showMessage("WRONG KEY!", "#f00");
+                document.getElementById('heldKey').innerText = "WRONG";
+                document.getElementById('heldKey').style.color = "#f00";
+                state.player.heldKey = null;
+            }
+        }
+
+        // Enemy Logic
+        state.enemies.forEach(e => {
+            if (e.type === 'chaser') {
+                let dx = state.player.x - e.x;
+                let dy = state.player.y - e.y;
+                let d = Math.hypot(dx, dy);
+                if (d > 0) {
+                    e.x += (dx / d) * e.speed;
+                    e.y += (dy / d) * e.speed;
+                }
+            } else {
+                e.x += e.dirX * e.speed;
+                if (e.x < 0 || e.x > canvas.width - TILE_SIZE) e.dirX *= -1;
+            }
+
+            if (state.player.invuln <= 0) {
+                if (Math.hypot((state.player.x+24) - (e.x+24), (state.player.y+24) - (e.y+24)) < 30) {
+                    state.hp -= 20;
+                    document.getElementById('hpVal').innerText = state.hp;
+                    AudioSys.playHurt();
+                    state.screenShake = 10;
+                    state.player.invuln = 60;
+                    createParticle(state.player.x+24, state.player.y+24, '#f00');
+                    if (state.hp <= 0) gameOver();
+                }
+            }
+        });
+
+        if (state.player.invuln > 0) state.player.invuln--;
+        if (state.screenShake > 0) state.screenShake *= 0.9;
+
+        // Particles
+        for (let i = state.particles.length - 1; i >= 0; i--) {
+            let p = state.particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life -= 0.1;
+            if(p.life <= 0) state.particles.splice(i, 1);
+        }
+
+        draw();
+    }
+
+    function draw() {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.fillStyle = '#111';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        if (state.screenShake > 0.5) {
+            let dx = (Math.random() - 0.5) * state.screenShake;
+            let dy = (Math.random() - 0.5) * state.screenShake;
+            ctx.translate(dx, dy);
+        }
+
+        ctx.strokeStyle = '#222';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for(let x=0; x<=canvas.width; x+=TILE_SIZE) { ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); }
+        for(let y=0; y<=canvas.height; y+=TILE_SIZE) { ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); }
+        ctx.stroke();
+
+        let dx = state.door.x * TILE_SIZE;
+        ctx.fillStyle = '#444';
+        ctx.fillRect(dx, 0, TILE_SIZE, TILE_SIZE);
+        ctx.fillStyle = '#000';
+        ctx.fillRect(dx + 18, 20, 12, 18);
+        if (state.player.heldKey === state.door.problem.answer) {
+            ctx.strokeStyle = '#0f0';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(dx, 0, TILE_SIZE, TILE_SIZE);
+        }
+
+        state.keys.forEach(k => {
+            let bob = Math.sin(k.floatOffset) * 5;
+            ctx.fillStyle = '#ffcc00';
+            ctx.beginPath();
+            let kx = k.x + 24;
+            let ky = k.y + 24 + bob;
+            ctx.arc(kx, ky - 5, 8, 0, Math.PI*2);
+            ctx.fillRect(kx - 2, ky, 4, 15);
+            ctx.fillRect(kx + 2, ky + 10, 4, 3);
+            ctx.fill();
+            
+            ctx.fillStyle = '#fff';
+            ctx.font = '10px "Press Start 2P"';
+            ctx.textAlign = 'center';
+            ctx.fillText(k.val, kx, ky - 15);
+        });
+
+        state.enemies.forEach(e => {
+            ctx.fillStyle = '#f0f';
+            let w = TILE_SIZE - 10 + (Math.random()*6-3);
+            let h = TILE_SIZE - 10 + (Math.random()*6-3);
+            ctx.fillRect(e.x+5, e.y+5, w, h);
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(e.x+10, e.y+15, 8, 8);
+            ctx.fillRect(e.x+26, e.y+15, 8, 8);
+        });
+
+        if (state.player.invuln % 4 < 2) {
+            ctx.fillStyle = '#0ff';
+            ctx.fillRect(state.player.x+5, state.player.y+5, TILE_SIZE-10, TILE_SIZE-10);
+            ctx.fillStyle = '#000';
+            ctx.fillRect(state.player.x+12, state.player.y+15, 6, 6);
+            ctx.fillRect(state.player.x+30, state.player.y+15, 6, 6);
+        }
+
+        state.particles.forEach(p => {
+            ctx.fillStyle = p.color;
+            ctx.fillRect(p.x, p.y, 4, 4);
+        });
+    }
+
+    function startGame() {
+        AudioSys.init();
+        document.getElementById('start-screen').classList.add('hidden');
+        document.getElementById('game-over-screen').classList.add('hidden');
+        
+        state.active = true;
+        state.level = 1;
+        state.hp = 100;
+        state.screenShake = 0;
+        document.getElementById('lvlVal').innerText = 1;
+        document.getElementById('hpVal').innerText = 100;
+        
+        initLevel();
+        update();
+    }
+
+    function gameOver() {
+        state.active = false;
+        document.getElementById('finalLevel').innerText = state.level;
+        document.getElementById('game-over-screen').classList.remove('hidden');
+    }
+</script>
+</body>
+</html>

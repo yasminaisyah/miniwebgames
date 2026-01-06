@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Trig Climber: Precision Edition</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&display=swap');
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #0d0d15;
+            font-family: 'Rajdhani', sans-serif;
+            color: white;
+            user-select: none;
+            touch-action: none;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        canvas { display: block; }
+
+        /* --- HUD --- */
+        .hud-panel {
+            position: absolute;
+            background: rgba(16, 20, 30, 0.9);
+            border: 2px solid #00d9ff;
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 0 15px rgba(0, 217, 255, 0.2);
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        #data-deck {
+            top: 10px;
+            right: 10px;
+            text-align: right;
+            min-width: 180px;
+        }
+
+        .data-row { margin-bottom: 2px; font-size: 1rem; }
+        .data-val { color: #fff; font-weight: bold; font-size: 1.1rem; }
+        
+        #score-box {
+            top: 10px;
+            left: 10px;
+            font-size: 1.5rem;
+            color: #00d9ff;
+            font-weight: bold;
+            padding: 10px 20px;
+        }
+
+        /* --- CONTROLS --- */
+        #control-deck {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 600px;
+            background: rgba(0,0,0,0.85);
+            border: 1px solid #444;
+            padding: 15px;
+            border-radius: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            pointer-events: auto;
+            z-index: 20;
+        }
+
+        #slider-container {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 65%;
+            height: 10px;
+            background: #333;
+            border-radius: 5px;
+            outline: none;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 30px;
+            height: 30px;
+            background: #00d9ff;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 15px #00d9ff;
+            margin-top: -10px;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            height: 10px;
+            background: #333;
+            border-radius: 5px;
+        }
+
+        #input-display {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #00d9ff;
+            width: 120px;
+            text-align: right;
+            font-family: monospace; /* Monospace for alignment */
+        }
+
+        #fire-btn {
+            width: 100%;
+            padding: 15px 0;
+            font-size: 1.5rem;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: bold;
+            background: linear-gradient(45deg, #00d9ff, #0055ff);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            box-shadow: 0 5px 20px rgba(0, 85, 255, 0.4);
+            transition: transform 0.1s;
+        }
+        #fire-btn:active { transform: scale(0.98); }
+
+        /* --- OVERLAYS --- */
+        .screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(13, 13, 20, 0.98);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+        .hidden { display: none !important; }
+
+        h1 { font-size: 3.5rem; color: #00d9ff; text-transform: uppercase; margin-bottom: 10px; text-shadow: 0 0 30px #00d9ff; text-align: center; }
+        p { color: #ccc; max-width: 500px; text-align: center; font-size: 1.1rem; line-height: 1.5; margin-bottom: 20px; padding: 0 20px;}
+
+        .start-btn {
+            background: transparent;
+            color: #00d9ff;
+            border: 2px solid #00d9ff;
+            padding: 15px 50px;
+            font-size: 1.5rem;
+            font-family: 'Rajdhani';
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .start-btn:hover { background: #00d9ff; color: #000; }
+
+        #feedback-msg {
+            position: absolute;
+            top: 40%; left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 3rem;
+            font-weight: bold;
+            text-shadow: 0 0 20px black;
+            pointer-events: none;
+            display: none;
+            z-index: 50;
+            white-space: nowrap;
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="score-box" class="hud-panel">FLOOR: <span id="floor-val">1</span></div>
+
+    <div id="data-deck" class="hud-panel">
+        <div style="color:#88aaff; font-size:0.8rem; margin-bottom:5px;">TRIG DATA</div>
+        <div class="data-row" id="trig-val-1">sin 30 = 0.500</div>
+        <div class="data-row" id="trig-val-2">cos 30 = 0.866</div>
+        <div class="data-row" id="trig-val-3">tan 30 = 0.577</div>
+    </div>
+
+    <div id="feedback-msg">SECURED!</div>
+
+    <div id="control-deck">
+        <div id="slider-container">
+            <span style="font-size:1.2rem; color:#88aaff;">SET x:</span>
+            <input type="range" id="input-slider" min="0" max="10000" value="0">
+            <div id="input-display">0.000</div>
+        </div>
+        <button id="fire-btn" onclick="fireHook()">GRAPPLE</button>
+    </div>
+
+    <div id="start-screen" class="screen">
+        <h1>TRIG CLIMBER</h1>
+        <p><strong>Chapter 5: Trigonometric Ratios</strong></p>
+        <p>1. Look at the <strong>Holographic Formula</strong> on the wall.<br>
+        2. Find the Trig Value (top right).<br>
+        3. Calculate <strong>x</strong> to 3 decimal places.</p>
+        <button class="start-btn" onclick="startGame()">START CLIMB</button>
+    </div>
+
+    <div id="game-over-screen" class="screen hidden">
+        <h1 style="color:#ff3366">FALLEN</h1>
+        <p>Calculation Error.</p>
+        <p>Highest Floor: <span id="final-floor">1</span></p>
+        <button class="start-btn" onclick="startGame()">RETRY</button>
+    </div>
+</div>
+
+<script>
+    // --- AUDIO SYSTEM ---
+    const AudioSys = {
+        ctx: null,
+        init: function() {
+            if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        },
+        playTone: function(freq, type, dur) {
+            if(!this.ctx) return;
+            const osc = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+            g.gain.setValueAtTime(0.1, this.ctx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + dur);
+            osc.connect(g);
+            g.connect(this.ctx.destination);
+            osc.start();
+            osc.stop(this.ctx.currentTime + dur);
+        },
+        playZip: function() { 
+            this.playTone(400, 'sawtooth', 0.1); 
+            setTimeout(()=>this.playTone(800, 'sawtooth', 0.2), 50);
+        },
+        playHit: function() { 
+            this.playTone(200, 'square', 0.1); 
+            setTimeout(()=>this.playTone(100, 'square', 0.2), 100);
+        },
+        playFall: function() { 
+            this.playTone(300, 'sawtooth', 0.5); 
+            setTimeout(()=>this.playTone(100, 'sawtooth', 0.5), 100);
+        }
+    };
+
+    // --- GAME ENGINE ---
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const slider = document.getElementById('input-slider');
+    const valDisplay = document.getElementById('input-display');
+
+    let state = {
+        active: false,
+        floor: 1,
+        
+        // Player Position
+        playerX: 100,
+        playerY: 0, 
+        
+        // Target Ledge
+        ledgeX: 0,
+        ledgeY: 0, 
+        
+        // Math Problem
+        type: 'tan', 
+        angle: 30,
+        knownSide: 'adj',
+        knownValue: 0,
+        targetValue: 0,
+        formulaText: "",
+        
+        // Animation
+        hookActive: false,
+        hookX: 0,
+        hookY: 0,
+        hookTargetX: 0,
+        hookTargetY: 0,
+        animT: 0, 
+        camY: 0, 
+        camTargetY: 0, // NEW: For smooth scrolling
+        
+        displayVal: 0
+    };
+
+    // Visual Scaling
+    const METER_SCALE = 4; // 4 pixels per meter
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // --- LOGIC ---
+
+    function startGame() {
+        AudioSys.init();
+        state.active = true;
+        state.floor = 1;
+        state.playerX = 100;
+        state.playerY = 0;
+        state.camY = -canvas.height/2; // Center player initially
+        state.camTargetY = -canvas.height/2;
+        state.hookActive = false;
+        
+        document.getElementById('start-screen').classList.add('hidden');
+        document.getElementById('game-over-screen').classList.add('hidden');
+        document.getElementById('floor-val').innerText = 1;
+        
+        generateLevel();
+        loop();
+    }
+
+    function generateLevel() {
+        const types = ['find_opp', 'find_hyp'];
+        const mission = types[Math.floor(Math.random() * types.length)];
+        
+        const angles = [30, 45, 60];
+        const angle = angles[Math.floor(Math.random() * angles.length)];
+        
+        let dist = 0; // Adjacent
+        let height = 0; // Opposite
+        
+        let tanVal = Math.tan(angle * Math.PI / 180);
+        let cosVal = Math.cos(angle * Math.PI / 180);
+        let sinVal = Math.sin(angle * Math.PI / 180);
+
+        updateCheatSheet(angle, sinVal, cosVal, tanVal);
+
+        if (mission === 'find_opp') {
+            // Find Height (Opp) using Adj (Distance)
+            dist = Math.floor(Math.random() * 40) + 40; 
+            let rawH = dist * tanVal;
+            height = parseFloat(rawH.toFixed(3)); // 3 Decimals precision
+            
+            state.type = 'tan';
+            state.knownSide = 'adj';
+            state.knownValue = dist;
+            state.targetValue = height;
+            state.angle = angle;
+            
+            state.formulaText = `x = ${dist} × tan(${angle})`;
+            
+            // Slider range setup
+            let maxVal = Math.ceil(height * 2.0);
+            slider.max = maxVal * 1000; // Multiply by 1000 for 3 decimal precision
+            slider.value = 0;
+        } 
+        else {
+            // Find Rope (Hyp) using Adj (Distance)
+            dist = Math.floor(Math.random() * 40) + 40;
+            let rawHyp = dist / cosVal;
+            let hyp = parseFloat(rawHyp.toFixed(3));
+            height = dist * tanVal; // For visual placement
+
+            state.type = 'cos';
+            state.knownSide = 'adj';
+            state.knownValue = dist;
+            state.targetValue = hyp;
+            state.angle = angle;
+
+            state.formulaText = `x = ${dist} ÷ cos(${angle})`;
+            
+            let maxVal = Math.ceil(hyp * 2.0);
+            slider.max = maxVal * 1000; 
+            slider.value = 0;
+        }
+
+        // Set World Coordinates
+        state.ledgeX = state.playerX + (dist * METER_SCALE); 
+        state.ledgeY = state.playerY + (height * METER_SCALE);
+        
+        // Reset Inputs
+        state.displayVal = 0;
+        valDisplay.innerText = "0.000";
+    }
+
+    function updateCheatSheet(ang, s, c, t) {
+        document.getElementById('trig-val-1').innerText = `sin ${ang}° = ${s.toFixed(3)}`;
+        document.getElementById('trig-val-2').innerText = `cos ${ang}° = ${c.toFixed(3)}`;
+        document.getElementById('trig-val-3').innerText = `tan ${ang}° = ${t.toFixed(3)}`;
+    }
+
+    slider.addEventListener('input', (e) => {
+        // Slider value is integer (0 - 100000 etc), divide by 1000 to get decimal
+        let val = parseInt(e.target.value) / 1000;
+        state.displayVal = val;
+        valDisplay.innerText = val.toFixed(3);
+    });
+
+    function fireHook() {
+        if (state.hookActive) return;
+        AudioSys.playZip();
+        
+        state.hookActive = true;
+        state.animT = 0;
+        state.hookX = state.playerX;
+        state.hookY = state.playerY; 
+        
+        let aimedX, aimedY;
+        let input = parseFloat(state.displayVal);
+        let scale = METER_SCALE; 
+
+        if (state.type === 'tan') {
+            // Finding Height (Opposite) -> X is fixed (Adj), Y is input
+            aimedX = state.playerX + (state.knownValue * scale);
+            aimedY = state.playerY + (input * scale);
+        } else {
+            // Finding Rope (Hypotenuse) -> Length is input, Angle is fixed
+            let rad = state.angle * Math.PI / 180;
+            let dx = (input * Math.cos(rad));
+            let dy = (input * Math.sin(rad));
+            aimedX = state.playerX + (dx * scale);
+            aimedY = state.playerY + (dy * scale);
+        }
+
+        state.hookTargetX = aimedX;
+        state.hookTargetY = aimedY;
+    }
+
+    function update() {
+        if (!state.active) return;
+
+        // Camera Logic: Keep both Player and Target in view if possible
+        // Or simply center between them?
+        // Let's Center the camera on the midpoint of the current problem
+        let midY = (state.playerY + state.ledgeY) / 2;
+        // Offset so player isn't at very bottom
+        state.camTargetY = midY - (canvas.height * 0.4); 
+        
+        state.camY += (state.camTargetY - state.camY) * 0.1;
+
+        if (state.hookActive) {
+            state.animT += 0.05;
+            state.hookX = state.playerX + (state.hookTargetX - state.playerX) * state.animT;
+            state.hookY = state.playerY + (state.hookTargetY - state.playerY) * state.animT;
+
+            if (state.animT >= 1) {
+                checkHit();
+            }
+        }
+    }
+
+    function checkHit() {
+        let dx = state.hookX - state.ledgeX;
+        let dy = state.hookY - state.ledgeY;
+        let dist = Math.hypot(dx, dy);
+        
+        // Hitbox tolerance (Approx 20 pixels)
+        // Since we ask for 3 decimal precision, calculation should be very close.
+        // Visual tolerance is generous, but math must be close.
+        // Let's use math difference for logic
+        let mathDiff = Math.abs(state.displayVal - state.targetValue);
+        
+        if (mathDiff < 0.5) { // Within 0.5 units of answer
+            state.hookActive = false;
+            state.playerX = state.ledgeX;
+            state.playerY = state.ledgeY;
+            state.floor++;
+            document.getElementById('floor-val').innerText = state.floor;
+            showFeedback("SECURED!", "#00d9ff");
+            AudioSys.playHit();
+            generateLevel();
+        } else {
+            AudioSys.playFall();
+            showFeedback("MISSED!", "#ff3366");
+            state.active = false;
+            document.getElementById('final-floor').innerText = state.floor;
+            setTimeout(() => {
+                document.getElementById('game-over-screen').classList.remove('hidden');
+            }, 1000);
+        }
+    }
+
+    function showFeedback(text, col) {
+        const el = document.getElementById('feedback-msg');
+        el.innerText = text;
+        el.style.color = col;
+        el.style.display = 'block';
+        setTimeout(() => el.style.display = 'none', 1500);
+    }
+
+    // --- DRAWING ---
+    function draw() {
+        // Clear
+        ctx.fillStyle = '#0d0d15';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.save();
+        
+        // World to Screen Coords
+        // Canvas Y is down. Logic Y is Up.
+        const worldToScreen = (wx, wy) => {
+            return {
+                x: wx,
+                y: canvas.height - (wy - state.camY) // Simplified transform
+            };
+        };
+
+        let pPos = worldToScreen(state.playerX, state.playerY);
+        let lPos = worldToScreen(state.ledgeX, state.ledgeY);
+        
+        // 1. Draw Platforms
+        // Player Platform
+        ctx.fillStyle = '#222';
+        ctx.fillRect(pPos.x - 50, pPos.y, 100, canvas.height); // Downwards
+        ctx.fillStyle = '#00d9ff';
+        ctx.fillRect(pPos.x - 50, pPos.y, 100, 10); 
+
+        // Target Wall
+        ctx.fillStyle = '#1a1a20';
+        ctx.fillRect(lPos.x, lPos.y, 200, canvas.height); 
+        ctx.fillStyle = '#ff0055'; // Target Ledge
+        ctx.fillRect(lPos.x, lPos.y, 50, 10); 
+
+        // 2. Draw Math Overlay
+        if (!state.hookActive) {
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(0, 217, 255, 0.4)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            
+            // Triangle Lines
+            ctx.moveTo(pPos.x, pPos.y); 
+            ctx.lineTo(lPos.x, pPos.y); 
+            ctx.lineTo(lPos.x, lPos.y); 
+            ctx.lineTo(pPos.x, pPos.y); 
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Labels
+            ctx.font = "bold 16px Rajdhani";
+            ctx.fillStyle = "#fff";
+            
+            // Angle
+            ctx.fillText(state.angle + "°", pPos.x + 60, pPos.y - 10);
+
+            // Known Values
+            if (state.knownSide === 'adj') {
+                ctx.fillText(state.knownValue + "m", (pPos.x + lPos.x)/2, pPos.y + 25);
+            }
+            
+            // Unknown X
+            ctx.fillStyle = "#ffcc00";
+            ctx.font = "bold 24px Rajdhani";
+            if (state.type === 'tan') {
+                ctx.fillText("x", lPos.x + 20, (pPos.y + lPos.y)/2);
+            } else {
+                ctx.fillText("x", (pPos.x + lPos.x)/2, (pPos.y + lPos.y)/2 - 20);
+            }
+            
+            // HOLOGRAPHIC FORMULA ON CANVAS
+            ctx.font = "bold 22px Rajdhani";
+            ctx.fillStyle = "#00d9ff";
+            ctx.shadowColor = "rgba(0, 217, 255, 0.8)";
+            ctx.shadowBlur = 15;
+            // Draw slightly above player
+            ctx.fillText(state.formulaText, pPos.x - 20, pPos.y - 80);
+            ctx.shadowBlur = 0;
+        }
+
+        // 3. Draw Player
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(pPos.x, pPos.y - 15, 10, 0, Math.PI*2);
+        ctx.fill();
+        ctx.fillRect(pPos.x - 5, pPos.y - 15, 10, 25);
+
+        // 4. Draw Hook
+        if (state.hookActive) {
+            let hPos = worldToScreen(state.hookX, state.hookY);
+            
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(pPos.x, pPos.y - 10);
+            ctx.lineTo(hPos.x, hPos.y);
+            ctx.stroke();
+
+            ctx.fillStyle = '#ffcc00';
+            ctx.beginPath();
+            ctx.arc(hPos.x, hPos.y, 5, 0, Math.PI*2);
+            ctx.fill();
+        }
+
+        ctx.restore();
+    }
+
+    function loop() {
+        if(state.active) {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+    }
+
+</script>
+</body>
+</html>

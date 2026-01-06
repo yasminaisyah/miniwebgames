@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Locus Hunter V3: Infinite Generator</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;700&display=swap');
+
+        :root {
+            --bg-color: #0f0f1a;
+            --accent-purple: #b957ce;
+            --accent-cyan: #00f3ff;
+            --correct-green: #00ff6a;
+            --wrong-red: #ff2a2a;
+            --glass: rgba(20, 20, 35, 0.9);
+            --text-main: #ffffff;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Roboto', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            user-select: none;
+        }
+
+        /* UI LAYOUT */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+            box-sizing: border-box;
+            z-index: 10;
+        }
+
+        .hud-panel {
+            background: var(--glass);
+            border-left: 4px solid var(--accent-cyan);
+            padding: 25px;
+            border-radius: 0 15px 15px 0;
+            pointer-events: auto;
+            max-width: 650px;
+            box-shadow: 0 5px 30px rgba(0,0,0,0.6);
+            backdrop-filter: blur(5px);
+            margin-top: 20px;
+        }
+
+        h2 { 
+            margin: 0 0 10px 0; 
+            color: var(--accent-purple); 
+            font-family: 'Orbitron', sans-serif; 
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px rgba(185, 87, 206, 0.4);
+        }
+        
+        #question-text { 
+            font-size: 1.4rem; 
+            line-height: 1.4; 
+            font-weight: bold;
+        }
+
+        #sub-text {
+            font-size: 0.9rem;
+            color: #aaa;
+            margin-top: 5px;
+            font-style: italic;
+        }
+        
+        /* EXPLANATION POPUP */
+        #explanation-overlay {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            pointer-events: auto;
+        }
+
+        #explanation-box {
+            background: #1a1a2e;
+            border: 2px solid var(--correct-green);
+            padding: 40px;
+            text-align: center;
+            border-radius: 20px;
+            max-width: 500px;
+            box-shadow: 0 0 60px rgba(0, 255, 106, 0.2);
+            position: relative;
+        }
+        
+        #explanation-title { 
+            font-family: 'Orbitron'; 
+            font-size: 2rem; 
+            margin-bottom: 15px; 
+        }
+        
+        #explanation-text { 
+            font-size: 1.2rem; 
+            margin-bottom: 30px; 
+            line-height: 1.6;
+        }
+        
+        .next-btn {
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-purple));
+            color: #fff;
+            border: none;
+            padding: 15px 40px;
+            font-weight: bold;
+            font-size: 1.2rem;
+            cursor: pointer;
+            border-radius: 50px;
+            font-family: 'Orbitron';
+            transition: transform 0.2s;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .next-btn:hover { transform: scale(1.05); }
+
+        canvas {
+            position: absolute;
+            top: 0; left: 0;
+            z-index: 1;
+            background: radial-gradient(circle at center, #1a1a2e 0%, #000000 100%);
+        }
+
+        /* Status Bar */
+        #status-bar {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-family: 'Orbitron';
+            font-size: 1.2rem;
+            color: #fff;
+            text-align: right;
+            z-index: 15;
+        }
+
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="status-bar">
+        LEVEL: <span id="level-count" style="color:var(--accent-cyan)">1</span><br>
+        SCORE: <span id="score-count" style="color:var(--accent-purple)">0</span>
+    </div>
+
+    <div id="ui-layer">
+        <div class="hud-panel">
+            <h2>LOCUS MISSION</h2>
+            <div id="question-text">Initializing Generator...</div>
+            <div id="sub-text">Read the mission and select the correct path geometry.</div>
+        </div>
+    </div>
+
+    <div id="explanation-overlay">
+        <div id="explanation-box">
+            <div id="explanation-title">SUCCESS</div>
+            <div id="explanation-text">Explanation goes here.</div>
+            <button class="next-btn" onclick="nextLevel()">NEXT MISSION >></button>
+        </div>
+    </div>
+
+<script>
+/** * AUDIO SYSTEM 
+ */
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function playSound(type) {
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    
+    const now = audioCtx.currentTime;
+    
+    if(type === 'win') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(523.25, now); // C
+        osc.frequency.setValueAtTime(659.25, now + 0.1); // E
+        osc.frequency.setValueAtTime(783.99, now + 0.2); // G
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+        osc.start(now);
+        osc.stop(now + 0.6);
+    } else if(type === 'lose') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(150, now);
+        osc.frequency.linearRampToValueAtTime(50, now + 0.4);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.linearRampToValueAtTime(0.001, now + 0.4);
+        osc.start(now);
+        osc.stop(now + 0.4);
+    }
+}
+
+/**
+ * INFINITE TEXT GENERATOR
+ * This replaces the hardcoded list with a random sentence builder.
+ */
+const VOCAB = {
+    actors: ["A robot", "A drone", "A hungry goat", "A satellite", "A ninja", "A ship", "A secure signal"],
+    actions: ["moves", "hovers", "patrols", "is located", "travels"],
+    p1: ["Point A", "the Red Flag", "Base Alpha", "the Fire Station", "the center"],
+    p2: ["Point B", "the Blue Flag", "Base Beta", "the Police Station", "the target"],
+    line: ["the highway", "the straight wall", "the river bank", "the fence", "Line L"],
+    line2: ["the railroad", "the old road", "Line M", "the boundary"],
+    dist: ["5 meters", "10 steps", "3 km", "exactly 2 units", "a constant distance"]
+};
+
+function getRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+function generateMissionText(type) {
+    // 0: Circle, 1: Bisector, 2: Parallel, 3: Cross
+    let text = "";
+    const act = getRandom(VOCAB.actors);
+    const verb = getRandom(VOCAB.actions);
+    const d = getRandom(VOCAB.dist);
+    
+    if (type === 0) { // Fixed Point -> Circle
+        const point = getRandom(VOCAB.p1);
+        const templates = [
+            `${act} ${verb} keeping ${d} from ${point}.`,
+            `Find the locus of a point that is always ${d} away from ${point}.`,
+            `${act} rotates around ${point} at a distance of ${d}.`
+        ];
+        text = getRandom(templates);
+    } 
+    else if (type === 1) { // 2 Points -> Bisector
+        const a = getRandom(VOCAB.p1);
+        const b = getRandom(VOCAB.p2);
+        const templates = [
+            `${act} ${verb} so it is equidistant from ${a} and ${b}.`,
+            `Find the path that stays exactly in the middle of ${a} and ${b}.`,
+            `A boundary line is drawn between ${a} and ${b}.`
+        ];
+        text = getRandom(templates);
+    }
+    else if (type === 2) { // Line -> Parallel
+        const l = getRandom(VOCAB.line);
+        const templates = [
+            `${act} ${verb} maintaining ${d} from ${l}.`,
+            `Find the locus of points at a constant distance of ${d} from ${l}.`,
+            `${act} follows a path parallel to ${l}.`
+        ];
+        text = getRandom(templates);
+    }
+    else if (type === 3) { // Intersect -> Angle Bisector
+        const l1 = getRandom(VOCAB.line);
+        const l2 = getRandom(VOCAB.line2);
+        const templates = [
+            `${act} ${verb} equidistant from the intersection of ${l1} and ${l2}.`,
+            `Find the locus of a point equidistant from two intersecting lines.`,
+            `A path cuts exactly between the crossing of ${l1} and ${l2}.`
+        ];
+        text = getRandom(templates);
+    }
+    return text;
+}
+
+/**
+ * GAME ENGINE
+ */
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const questionEl = document.getElementById('question-text');
+const overlay = document.getElementById('explanation-overlay');
+const explBox = document.getElementById('explanation-box');
+const explTitle = document.getElementById('explanation-title');
+const explText = document.getElementById('explanation-text');
+
+let w, h;
+let gameState = 'PLAYING';
+let currentLevel = null;
+let options = [];
+let mouseX = 0, mouseY = 0;
+let levelCount = 1;
+let score = 0;
+
+function resize() {
+    w = canvas.width = window.innerWidth;
+    h = canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+function startLevel() {
+    gameState = 'PLAYING';
+    overlay.style.display = 'none';
+    
+    // Pick Random Type (0-3)
+    // To ensure no repeats of TYPE, we can check history, but randomness is usually enough.
+    // Let's force a different type if it's the same as last time to make it feel fresh.
+    let newType = Math.floor(Math.random() * 4);
+    if (currentLevel && currentLevel.type === newType) {
+        newType = (newType + 1) % 4; // Shift to next type if repeat
+    }
+    
+    const text = generateMissionText(newType);
+    
+    currentLevel = {
+        type: newType,
+        text: text,
+        cx: w/2,
+        cy: h * 0.4
+    };
+    
+    // UI Update
+    questionEl.innerText = text;
+    document.getElementById('level-count').innerText = levelCount;
+    document.getElementById('score-count').innerText = score;
+
+    // Generate Visual Options
+    options = [];
+    
+    // The Correct Answer Icon ID
+    // 0: Circle, 1: VertLine, 2: ParallelLines, 3: Cross
+    const correctId = newType; 
+    
+    // Create 3 Buttons
+    const btnY = h * 0.8;
+    const btnX = [w/2 - 200, w/2, w/2 + 200];
+    if(w < 800) { // Mobile adjustment
+        btnX[0] = w*0.2; btnX[1] = w*0.5; btnX[2] = w*0.8;
+    }
+
+    // IDs of icons to show
+    let icons = [0, 1, 2, 3];
+    // Remove correct one first
+    icons.splice(correctId, 1);
+    // Shuffle remaining and pick 2 wrong ones
+    icons.sort(() => Math.random() - 0.5);
+    let choices = [correctId, icons[0], icons[1]];
+    // Shuffle positions
+    choices.sort(() => Math.random() - 0.5);
+
+    choices.forEach((id, index) => {
+        options.push({
+            x: btnX[index],
+            y: btnY,
+            r: 50,
+            iconId: id,
+            isCorrect: (id === correctId)
+        });
+    });
+}
+
+function handleInput() {
+    if(gameState !== 'PLAYING') return;
+
+    options.forEach(opt => {
+        const d = Math.hypot(mouseX - opt.x, mouseY - opt.y);
+        if(d < opt.r) {
+            // Clicked
+            if(opt.isCorrect) {
+                // WIN
+                score += 100;
+                playSound('win');
+                showExplanation(true);
+            } else {
+                // LOSE
+                score = Math.max(0, score - 50);
+                playSound('lose');
+                showExplanation(false);
+            }
+        }
+    });
+}
+
+function showExplanation(isWin) {
+    gameState = 'EXPLAINING';
+    overlay.style.display = 'flex';
+    
+    if(isWin) {
+        explTitle.innerText = "CORRECT ANALYSIS";
+        explTitle.style.color = "var(--correct-green)";
+        explBox.style.borderColor = "var(--correct-green)";
+    } else {
+        explTitle.innerText = "INCORRECT";
+        explTitle.style.color = "var(--wrong-red)";
+        explBox.style.borderColor = "var(--wrong-red)";
+    }
+    
+    // Explanation Text based on Type
+    const explanations = [
+        "A constant distance from a fixed point always creates a <b>CIRCLE</b>.",
+        "Equidistant from two fixed points creates a <b>PERPENDICULAR BISECTOR</b> (a line down the middle).",
+        "A constant distance from a straight line creates <b>PARALLEL LINES</b>.",
+        "Equidistant from intersecting lines creates an <b>ANGLE BISECTOR</b> (The 'X' cut)."
+    ];
+    
+    explText.innerHTML = explanations[currentLevel.type];
+}
+
+function nextLevel() {
+    levelCount++;
+    startLevel();
+}
+
+/**
+ * RENDER LOOP
+ */
+function drawIcon(ctx, id, x, y, scale=1) {
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 3 * scale;
+    
+    if(id === 0) { // Circle
+        ctx.beginPath(); ctx.arc(x, y, 25*scale, 0, Math.PI*2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(x, y, 3*scale, 0, Math.PI*2); ctx.fill(); // center dot
+    }
+    else if(id === 1) { // Bisector (Line between 2 dots)
+        // Two dots
+        ctx.fillStyle='#666';
+        ctx.beginPath(); ctx.arc(x-20*scale, y, 4*scale, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x+20*scale, y, 4*scale, 0, Math.PI*2); ctx.fill();
+        // The line
+        ctx.strokeStyle='#fff';
+        ctx.beginPath(); ctx.moveTo(x, y-25*scale); ctx.lineTo(x, y+25*scale); ctx.stroke();
+    }
+    else if(id === 2) { // Parallel
+        ctx.beginPath();
+        ctx.moveTo(x-20*scale, y-15*scale); ctx.lineTo(x+20*scale, y-15*scale);
+        ctx.moveTo(x-20*scale, y+15*scale); ctx.lineTo(x+20*scale, y+15*scale);
+        ctx.stroke();
+    }
+    else if(id === 3) { // Cross
+        ctx.beginPath();
+        ctx.moveTo(x-20*scale, y-20*scale); ctx.lineTo(x+20*scale, y+20*scale);
+        ctx.moveTo(x+20*scale, y-20*scale); ctx.lineTo(x-20*scale, y+20*scale);
+        ctx.stroke();
+    }
+}
+
+function drawProblem(ctx) {
+    // We draw the abstract geometry of the problem at the top
+    const cx = currentLevel.cx;
+    const cy = currentLevel.cy;
+    
+    ctx.strokeStyle = '#fff';
+    ctx.fillStyle = '#fff';
+    ctx.lineWidth = 2;
+    
+    if(currentLevel.type === 0) { // Point
+        ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI*2); ctx.fill();
+        ctx.fillText("P", cx+10, cy-10);
+        // Hint circle (faint)
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+        ctx.beginPath(); ctx.arc(cx, cy, 80, 0, Math.PI*2); ctx.stroke();
+    }
+    else if(currentLevel.type === 1) { // 2 Points
+        ctx.beginPath(); ctx.arc(cx-80, cy, 5, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx+80, cy, 5, 0, Math.PI*2); ctx.fill();
+    }
+    else if(currentLevel.type === 2) { // Line
+        ctx.beginPath(); ctx.moveTo(cx-100, cy); ctx.lineTo(cx+100, cy); ctx.stroke();
+    }
+    else if(currentLevel.type === 3) { // X
+        ctx.beginPath(); 
+        ctx.moveTo(cx-60, cy-60); ctx.lineTo(cx+60, cy+60); 
+        ctx.moveTo(cx+60, cy-60); ctx.lineTo(cx-60, cy+60); 
+        ctx.stroke();
+    }
+
+    // If Explanation mode, draw the ANSWER in GREEN
+    if(gameState === 'EXPLAINING') {
+        const time = Date.now()/100;
+        ctx.strokeStyle = '#00ff6a';
+        ctx.lineWidth = 4;
+        ctx.setLineDash([10, 10]);
+        ctx.lineDashOffset = -time;
+        
+        if(currentLevel.type === 0) {
+            ctx.beginPath(); ctx.arc(cx, cy, 80, 0, Math.PI*2); ctx.stroke();
+        } else if(currentLevel.type === 1) {
+            ctx.beginPath(); ctx.moveTo(cx, cy-100); ctx.lineTo(cx, cy+100); ctx.stroke();
+        } else if(currentLevel.type === 2) {
+            ctx.beginPath(); 
+            ctx.moveTo(cx-100, cy-40); ctx.lineTo(cx+100, cy-40); 
+            ctx.moveTo(cx-100, cy+40); ctx.lineTo(cx+100, cy+40); 
+            ctx.stroke();
+        } else if(currentLevel.type === 3) {
+            ctx.beginPath(); ctx.moveTo(cx, cy-80); ctx.lineTo(cx, cy+80); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(cx-80, cy); ctx.lineTo(cx+80, cy); ctx.stroke();
+        }
+        ctx.setLineDash([]);
+    }
+}
+
+function loop() {
+    ctx.clearRect(0, 0, w, h);
+    
+    // Background Grid
+    ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+    ctx.lineWidth = 1;
+    for(let i=0; i<w; i+=50) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,h); ctx.stroke(); }
+    
+    if(currentLevel) {
+        drawProblem(ctx);
+        
+        if(gameState === 'PLAYING') {
+            options.forEach(opt => {
+                // Hover
+                const d = Math.hypot(mouseX - opt.x, mouseY - opt.y);
+                const isHover = (d < opt.r);
+                
+                // Button Body
+                ctx.beginPath();
+                ctx.arc(opt.x, opt.y, opt.r, 0, Math.PI*2);
+                ctx.fillStyle = isHover ? 'rgba(0, 243, 255, 0.3)' : 'rgba(0, 0, 0, 0.5)';
+                ctx.fill();
+                ctx.strokeStyle = isHover ? '#fff' : 'var(--accent-cyan)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                // Icon
+                drawIcon(ctx, opt.iconId, opt.x, opt.y);
+                
+                // Glow if hover
+                if(isHover) {
+                    ctx.shadowColor = '#00f3ff';
+                    ctx.shadowBlur = 20;
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+                }
+            });
+        }
+    }
+    requestAnimationFrame(loop);
+}
+
+canvas.addEventListener('mousemove', e => { mouseX=e.clientX; mouseY=e.clientY; });
+canvas.addEventListener('click', handleInput);
+
+startLevel();
+loop();
+
+</script>
+</body>
+</html>

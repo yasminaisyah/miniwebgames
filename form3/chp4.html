@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bridge Constructor: Fixed View</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Roboto+Mono:wght@500&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #2c3e50;
+            font-family: 'Black Ops One', cursive;
+            user-select: none;
+            touch-action: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: linear-gradient(to bottom, #2980b9, #2c3e50);
+        }
+
+        canvas { display: block; }
+
+        /* --- UI ELEMENTS --- */
+        .panel {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #f39c12;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            pointer-events: none;
+        }
+
+        #blueprint-hud {
+            top: 20px;
+            left: 20px;
+            font-family: 'Roboto Mono', monospace;
+            transform: rotate(-1deg);
+            z-index: 10;
+        }
+
+        .label { color: #aaa; font-size: 0.8rem; display: block; }
+        .val { font-size: 1.5rem; font-weight: bold; color: #f1c40f; }
+
+        #score-hud {
+            top: 20px;
+            right: 20px;
+            font-size: 1.5rem;
+            color: #2ecc71;
+            z-index: 10;
+        }
+
+        /* --- METER READOUT (Moved to Top Center) --- */
+        #meter-container {
+            position: absolute;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        #meter-readout {
+            background: #000;
+            color: #e74c3c; /* LED Red */
+            font-family: 'Roboto Mono', monospace;
+            font-size: 3rem;
+            padding: 10px 40px;
+            border: 4px solid #555;
+            text-shadow: 0 0 10px #e74c3c;
+            min-width: 200px;
+            text-align: center;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.6);
+        }
+        
+        .glitch { animation: flicker 0.2s infinite; opacity: 0.5; }
+        .offline { color: #330000 !important; text-shadow: none !important; border-color: #330000 !important; }
+
+        @keyframes flicker {
+            0% { opacity: 1; }
+            50% { opacity: 0.2; }
+            100% { opacity: 1; }
+        }
+
+        /* --- CONTROLS (Bottom Center) --- */
+        #controls-area {
+            position: absolute;
+            bottom: 40px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            pointer-events: none; /* Only button is clickable */
+        }
+
+        #build-btn {
+            pointer-events: auto;
+            background: #e67e22;
+            color: white;
+            border: none;
+            padding: 25px 80px;
+            font-size: 2rem;
+            font-family: 'Black Ops One', cursive;
+            border-radius: 10px;
+            cursor: pointer;
+            box-shadow: 0 10px 0 #d35400;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transition: transform 0.1s;
+        }
+        
+        #build-btn:active {
+            transform: translateY(5px);
+            box-shadow: 0 5px 0 #d35400;
+            background: #d35400;
+        }
+
+        /* --- SCREENS --- */
+        .screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            color: white;
+        }
+        .hidden { display: none !important; }
+
+        h1 { font-size: 4rem; color: #f39c12; text-shadow: 0 0 20px #f39c12; margin-bottom: 10px; text-align: center; }
+        p { font-family: 'Roboto Mono'; font-size: 1.2rem; color: #bdc3c7; max-width: 600px; text-align: center; line-height: 1.6; }
+
+        .btn-start {
+            margin-top: 30px;
+            background: #27ae60; color: white; border: none;
+            padding: 15px 50px; font-size: 1.5rem; font-family: 'Black Ops One';
+            cursor: pointer; border-radius: 5px; box-shadow: 0 0 20px #27ae60;
+        }
+        .btn-start:hover { transform: scale(1.05); background: #2ecc71; }
+
+        /* Floating Text */
+        .float-text {
+            position: absolute;
+            font-family: 'Black Ops One';
+            font-size: 2rem;
+            color: #fff;
+            text-shadow: 2px 2px 0 #000;
+            animation: floatUp 1s forwards;
+            pointer-events: none;
+            z-index: 50;
+        }
+        @keyframes floatUp {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-50px); opacity: 0; }
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="blueprint-hud" class="panel">
+        <span class="label">BLUEPRINT LENGTH</span>
+        <div class="val" id="bp-len">0 cm</div>
+        <div style="height:10px"></div>
+        <span class="label">SCALE RATIO</span>
+        <div class="val" id="bp-scale">1 : 100</div>
+    </div>
+
+    <div id="score-hud" class="panel">LEVEL <span id="level-display">1</span></div>
+
+    <div id="meter-container">
+        <div id="meter-readout">0.00m</div>
+    </div>
+
+    <div id="controls-area">
+        <button id="build-btn" onmousedown="startBuild()" onmouseup="stopBuild()" ontouchstart="startBuild()" ontouchend="stopBuild()">HOLD</button>
+    </div>
+
+    <div id="start-screen" class="screen">
+        <h1>HARDCORE ENGINEERING</h1>
+        <p><strong>Chapter 4: Scale Drawings</strong></p>
+        <p>Calculate the <strong>Actual Length</strong> in Meters.<br>
+        <span style="color:#f39c12">Formula: Drawing (cm) × Scale ÷ 100</span></p>
+        <p style="color:#e74c3c">WARNING: Measurement systems may fail at higher levels.</p>
+        <button class="btn-start" onclick="startGame()">INITIATE</button>
+    </div>
+
+    <div id="game-over-screen" class="screen hidden">
+        <h1 style="color:#c0392b">CATASTROPHIC FAILURE</h1>
+        <p id="fail-msg">Bridge collapse.</p>
+        <button class="btn-start" onclick="startGame()">RETRY</button>
+    </div>
+</div>
+
+<script>
+    // --- AUDIO SYSTEM (Synthesized) ---
+    const AudioSys = {
+        ctx: null,
+        osc: null,
+        gain: null,
+        
+        init: function() {
+            if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        },
+
+        startDrill: function() {
+            if (!this.ctx) return;
+            this.osc = this.ctx.createOscillator();
+            this.gain = this.ctx.createGain();
+            this.osc.type = 'sawtooth';
+            this.osc.frequency.setValueAtTime(100, this.ctx.currentTime);
+            this.osc.frequency.linearRampToValueAtTime(150, this.ctx.currentTime + 0.1);
+            this.gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+            this.osc.connect(this.gain);
+            this.gain.connect(this.ctx.destination);
+            this.osc.start();
+        },
+
+        stopDrill: function() {
+            if (this.osc) {
+                this.gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.1);
+                this.osc.stop(this.ctx.currentTime + 0.1);
+                this.osc = null;
+            }
+        },
+
+        playCrash: function() {
+            if (!this.ctx) return;
+            const osc = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(100, this.ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(10, this.ctx.currentTime + 0.5);
+            g.gain.setValueAtTime(0.3, this.ctx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.5);
+            osc.connect(g);
+            g.connect(this.ctx.destination);
+            osc.start();
+            osc.stop(this.ctx.currentTime + 0.5);
+        },
+
+        playSuccess: function() {
+            if (!this.ctx) return;
+            const osc = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(400, this.ctx.currentTime);
+            osc.frequency.setValueAtTime(600, this.ctx.currentTime + 0.1);
+            g.gain.setValueAtTime(0.1, this.ctx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
+            osc.connect(g);
+            g.connect(this.ctx.destination);
+            osc.start();
+            osc.stop(this.ctx.currentTime + 0.3);
+        }
+    };
+
+    // --- GAME ENGINE ---
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const readout = document.getElementById('meter-readout');
+
+    let state = {
+        active: false,
+        level: 1,
+        phase: 'idle', // idle, building, driving, falling
+        
+        targetM: 0,
+        mapCm: 0,
+        scale: 0,
+
+        cliffLeft: 100,
+        cliffRight: 0,
+        bridgeLen: 0,
+        
+        truckX: 0,
+        truckY: 0,
+        truckAngle: 0,
+
+        buildSpeed: 0.1,
+        buildAccel: 0.005, 
+        currentBuildRate: 0.1,
+        
+        displayState: 'on'
+    };
+
+    const PPM = 30; // Pixels Per Meter
+    const GROUND_Y = 350; // Raised the ground level slightly to keep action centered
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // --- GAME LOGIC ---
+
+    function startGame() {
+        AudioSys.init();
+        state.active = true;
+        state.level = 1;
+        document.getElementById('start-screen').classList.add('hidden');
+        document.getElementById('game-over-screen').classList.add('hidden');
+        nextLevel();
+        loop();
+    }
+
+    function nextLevel() {
+        state.phase = 'idle';
+        state.bridgeLen = 0;
+        state.truckX = 50;
+        state.truckY = GROUND_Y - 40;
+        state.truckAngle = 0;
+        state.currentBuildRate = 0.1 + (state.level * 0.02); 
+        
+        readout.innerText = "0.00m";
+        readout.className = "";
+        document.getElementById('level-display').innerText = state.level;
+        document.getElementById('build-btn').innerText = "HOLD";
+        document.getElementById('build-btn').style.background = "#e67e22";
+
+        // Generate Math
+        let useDecimal = state.level > 2;
+        let minM = 5 + state.level;
+        let maxM = 10 + (state.level * 2);
+        state.targetM = Math.floor(Math.random() * (maxM - minM)) + minM;
+        if (useDecimal) state.targetM += 0.5;
+
+        const scales = [20, 50, 100, 200];
+        state.scale = scales[Math.floor(Math.random() * scales.length)];
+
+        // Calculate Map
+        let goodMath = false;
+        while (!goodMath) {
+            let s = scales[Math.floor(Math.random() * scales.length)];
+            let m = (Math.floor(Math.random() * 20) + 5) / 2; 
+            let realM = (m * s) / 100;
+            
+            if (realM >= 5 && realM <= 25) { 
+                state.scale = s;
+                state.mapCm = m;
+                state.targetM = realM;
+                goodMath = true;
+            }
+        }
+
+        // Setup Cliffs
+        state.cliffLeft = 150;
+        state.cliffRight = state.cliffLeft + (state.targetM * PPM);
+
+        document.getElementById('bp-len').innerText = state.mapCm + " cm";
+        document.getElementById('bp-scale').innerText = "1 : " + state.scale;
+    }
+
+    // --- CONTROLS ---
+
+    window.startBuild = function() {
+        if (state.phase !== 'idle') return;
+        state.phase = 'building';
+        AudioSys.startDrill();
+    };
+
+    window.stopBuild = function() {
+        if (state.phase !== 'building') return;
+        state.phase = 'driving';
+        AudioSys.stopDrill();
+        
+        document.getElementById('build-btn').innerText = "TESTING";
+        document.getElementById('build-btn').style.background = "#7f8c8d";
+        
+        readout.className = "";
+        readout.innerText = state.bridgeLen.toFixed(2) + "m";
+    };
+
+    // --- MAIN LOOP ---
+
+    function update() {
+        if (!state.active) return;
+
+        if (state.phase === 'building') {
+            state.currentBuildRate += 0.002; 
+            state.bridgeLen += state.currentBuildRate;
+
+            if (state.level >= 2) {
+                if (Math.random() > 0.9) readout.classList.add('glitch');
+                else readout.classList.remove('glitch');
+            }
+            
+            if (state.level >= 4) {
+                if (state.bridgeLen > 3) {
+                    readout.className = 'offline';
+                    readout.innerText = "NO SIGNAL";
+                }
+            }
+
+            if (readout.className !== 'offline') {
+                readout.innerText = state.bridgeLen.toFixed(2) + "m";
+            }
+        }
+
+        if (state.phase === 'driving') {
+            state.truckX += 8;
+
+            let bridgePx = state.bridgeLen * PPM;
+            let gapPx = state.cliffRight - state.cliffLeft;
+            
+            let toleranceM = Math.max(0.2, 1.0 - (state.level * 0.1));
+            let tolerancePx = toleranceM * PPM;
+
+            if (state.truckX > state.cliffLeft + 20) { 
+                if (bridgePx < gapPx - tolerancePx) {
+                    if (state.truckX > state.cliffLeft + bridgePx) {
+                        state.phase = 'falling';
+                        state.failMsg = `TOO SHORT! Needed ${state.targetM}m.`;
+                    }
+                } 
+                else if (bridgePx > gapPx + tolerancePx) {
+                     state.phase = 'falling';
+                     state.failMsg = `TOO LONG! Structural Integrity Failed.`;
+                     AudioSys.playCrash();
+                }
+            }
+
+            if (state.truckX > state.cliffRight + 100) {
+                state.level++;
+                AudioSys.playSuccess();
+                showFloatText("SUCCESS", window.innerWidth/2, window.innerHeight/2, "#2ecc71");
+                nextLevel();
+            }
+        }
+
+        if (state.phase === 'falling') {
+            state.truckX += 3;
+            state.truckY += 12;
+            state.truckAngle += 0.05;
+
+            if (state.truckY > canvas.height + 100) {
+                gameOver(state.failMsg || "Mission Failed.");
+            }
+        }
+    }
+
+    function gameOver(msg) {
+        state.active = false;
+        AudioSys.playCrash();
+        document.getElementById('fail-msg').innerText = msg;
+        document.getElementById('game-over-screen').classList.remove('hidden');
+    }
+
+    function showFloatText(text, x, y, color) {
+        const el = document.createElement('div');
+        el.className = 'float-text';
+        el.innerText = text;
+        el.style.left = x + 'px';
+        el.style.top = y + 'px';
+        el.style.color = color;
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 1000);
+    }
+
+    function draw() {
+        ctx.fillStyle = '#2c3e50';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Grid
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < canvas.width; i += PPM) {
+            ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
+        }
+
+        // Cliffs
+        ctx.fillStyle = '#27ae60';
+        ctx.fillRect(0, GROUND_Y, state.cliffLeft, canvas.height);
+        ctx.fillRect(state.cliffRight, GROUND_Y, canvas.width, canvas.height);
+        
+        ctx.fillStyle = '#7f8c8d'; 
+        ctx.fillRect(state.cliffLeft - 20, GROUND_Y + 20, 20, canvas.height);
+        ctx.fillRect(state.cliffRight, GROUND_Y + 20, 20, canvas.height);
+
+        // Bridge
+        if (state.bridgeLen > 0) {
+            let lenPx = state.bridgeLen * PPM;
+            ctx.fillStyle = state.phase === 'falling' ? '#e74c3c' : '#f1c40f'; 
+            ctx.fillRect(state.cliffLeft, GROUND_Y, lenPx, 10);
+            
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            for(let i=0; i<lenPx; i+=20) {
+                ctx.moveTo(state.cliffLeft + i, GROUND_Y);
+                ctx.lineTo(state.cliffLeft + i + 10, GROUND_Y + 20);
+                ctx.lineTo(state.cliffLeft + i + 20, GROUND_Y);
+            }
+            ctx.stroke();
+        }
+
+        // Target Ghost Line (Tutorial Hint - Level 1 Only)
+        if (state.level === 1) {
+            ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(state.cliffRight, GROUND_Y - 50);
+            ctx.lineTo(state.cliffRight, GROUND_Y + 50);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // Truck
+        ctx.save();
+        ctx.translate(state.truckX, state.truckY);
+        ctx.rotate(state.truckAngle);
+        
+        ctx.fillStyle = '#3498db';
+        ctx.fillRect(-30, -30, 60, 25);
+        ctx.fillStyle = '#2980b9';
+        ctx.fillRect(-30, -30, 15, 25); 
+        
+        ctx.fillStyle = '#000';
+        ctx.beginPath(); ctx.arc(-20, -5, 8, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(20, -5, 8, 0, Math.PI*2); ctx.fill();
+        
+        ctx.restore();
+    }
+
+    function loop() {
+        if(!state.active) return;
+        update();
+        draw();
+        requestAnimationFrame(loop);
+    }
+
+</script>
+</body>
+</html>

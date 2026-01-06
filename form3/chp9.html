@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter 9: Laser Intercept V2</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Black+Ops+One&display=swap');
+
+        :root {
+            --bg-color: #050510;
+            --grid-color: rgba(0, 255, 255, 0.1);
+            --axis-color: rgba(0, 255, 255, 0.5);
+            --line-color: #ff0055;
+            --text-color: #00ffaa;
+            --hud-bg: rgba(0, 15, 10, 0.95);
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Share Tech Mono', monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            user-select: none;
+        }
+
+        /* HUD LAYOUT - RESTRUCTURED FOR VISIBILITY */
+        #game-ui {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            z-index: 10;
+        }
+
+        .top-bar {
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            background: linear-gradient(180deg, rgba(0,0,0,0.9), transparent);
+            pointer-events: auto;
+        }
+
+        .score-box {
+            font-size: 1.2rem;
+            text-shadow: 0 0 10px var(--text-color);
+        }
+
+        /* NEW COMPACT BOTTOM PANEL */
+        .mission-panel {
+            pointer-events: auto;
+            background: var(--hud-bg);
+            border-top: 2px solid var(--text-color);
+            padding: 15px;
+            text-align: center;
+            width: 100%;
+            box-shadow: 0 -5px 30px rgba(0, 255, 170, 0.2);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            backdrop-filter: blur(5px);
+        }
+
+        h2 { 
+            margin: 0; 
+            font-family: 'Black Ops One', cursive; 
+            color: #fff; 
+            font-size: 1.2rem; /* Smaller Title */
+            letter-spacing: 2px; 
+        }
+        
+        #question-display {
+            font-size: 1.1rem; /* Smaller Text */
+            margin: 5px 0 10px 0;
+            color: #bdfffa;
+        }
+
+        /* BUTTONS - 3 COLUMNS */
+        .options-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr); /* Force 3 columns */
+            gap: 15px;
+            width: 100%;
+            max-width: 500px;
+        }
+
+        button {
+            background: rgba(0, 50, 50, 0.6);
+            border: 1px solid var(--text-color);
+            color: #fff;
+            padding: 10px; /* Reduced padding */
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: 0.2s;
+            text-transform: uppercase;
+            border-radius: 4px;
+        }
+
+        button:hover {
+            background: var(--text-color);
+            color: #000;
+            box-shadow: 0 0 15px var(--text-color);
+        }
+
+        button:active { transform: scale(0.95); }
+
+        /* CANVAS */
+        canvas {
+            position: absolute;
+            top: 0; left: 0;
+            z-index: 1;
+        }
+
+        /* FEEDBACK OVERLAY */
+        #feedback {
+            position: absolute;
+            top: 40%; left: 50%; /* Moved up slightly */
+            transform: translate(-50%, -50%);
+            font-size: 3rem;
+            font-family: 'Black Ops One';
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            text-shadow: 0 0 20px white;
+            z-index: 20;
+            white-space: nowrap;
+        }
+
+    </style>
+</head>
+<body>
+
+    <canvas id="gridCanvas"></canvas>
+
+    <div id="game-ui">
+        <div class="top-bar">
+            <div class="score-box">STATUS: <span id="status-text" style="color:#0f0">ACTIVE</span></div>
+            <div class="score-box">SCORE: <span id="score">0</span></div>
+        </div>
+
+        <div id="feedback">LOCKED ON</div>
+
+        <div class="mission-panel">
+            <div>
+                <h2>TARGET DETECTED</h2>
+                <div id="question-display">Calculating...</div>
+            </div>
+            <div class="options-grid" id="buttons-container">
+                </div>
+        </div>
+    </div>
+
+<script>
+/* ================= AUDIO SYSTEM ================= */
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playSound(type) {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    const now = audioCtx.currentTime;
+
+    if (type === 'laser') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(800, now);
+        osc.frequency.exponentialRampToValueAtTime(100, now + 0.3);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+        osc.start(now);
+        osc.stop(now + 0.3);
+    } else if (type === 'error') {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(150, now);
+        osc.frequency.linearRampToValueAtTime(100, now + 0.3);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.linearRampToValueAtTime(0, now + 0.3);
+        osc.start(now);
+        osc.stop(now + 0.3);
+    }
+}
+
+/* ================= GAME ENGINE ================= */
+const canvas = document.getElementById('gridCanvas');
+const ctx = canvas.getContext('2d');
+let w, h, originX, originY;
+const scale = 40; 
+
+// Game State
+let currentLevel = {};
+let score = 0;
+let laserBeam = null;
+
+function resize() {
+    w = canvas.width = window.innerWidth;
+    h = canvas.height = window.innerHeight;
+    originX = w / 2;
+    originY = h * 0.45; // Moved grid CENTER up slightly so bottom UI doesn't cover it
+}
+window.addEventListener('resize', resize);
+resize();
+
+function toScreen(x, y) {
+    return {
+        x: originX + (x * scale),
+        y: originY - (y * scale) 
+    };
+}
+
+class LevelGenerator {
+    constructor() {
+        this.slopes = [1, -1, 2, -2, 3, -3, 0.5, -0.5]; 
+        this.intercepts = [-3, -2, -1, 0, 1, 2, 3];
+    }
+
+    generate() {
+        const m = this.slopes[Math.floor(Math.random() * this.slopes.length)];
+        const c = this.intercepts[Math.floor(Math.random() * this.intercepts.length)];
+        
+        const mode = Math.floor(Math.random() * 3); // 0: m, 1: c, 2: eq
+        
+        let question = "";
+        let correctAnswer = "";
+        let wrongAnswers = [];
+
+        if (mode === 0) {
+            question = "Identify the GRADIENT (m)";
+            correctAnswer = m;
+            wrongAnswers = [-m, (m === 0.5 ? 2 : m+1), 0];
+        } else if (mode === 1) {
+            question = "Identify the INTERCEPT (c)";
+            correctAnswer = c;
+            wrongAnswers = [-c, c+2, c-2];
+            if(c===0) wrongAnswers = [1, -1, 2];
+        } else {
+            question = "Match the EQUATION";
+            const mStr = (m === 1) ? "x" : (m === -1 ? "-x" : `${m}x`);
+            const cStr = (c >= 0) ? `+ ${c}` : `- ${Math.abs(c)}`;
+            const eqStr = (c === 0) ? `y = ${mStr}` : `y = ${mStr} ${cStr}`;
+            correctAnswer = eqStr;
+            
+            const mW1 = (m === 1) ? "-x" : (m === -1 ? "x" : `${-m}x`);
+            wrongAnswers.push(`y = ${mW1} ${cStr}`);
+            const cW2 = (c >= 0) ? `- ${c}` : `+ ${Math.abs(c)}`;
+            wrongAnswers.push(`y = ${mStr} ${cW2}`);
+            wrongAnswers.push(`y = 5x + 5`);
+        }
+
+        // --- LIMIT TO 3 CHOICES LOGIC ---
+        let choices = new Set([correctAnswer]);
+        // Add wrongs until we hit 3
+        for (let w of wrongAnswers) {
+            if (choices.size < 3) choices.add(w);
+        }
+        // Fallback if duplicates reduced size
+        while(choices.size < 3) choices.add(Math.floor(Math.random()*99));
+
+        return {
+            m: m,
+            c: c,
+            q: question,
+            ans: correctAnswer,
+            choices: Array.from(choices).sort(() => Math.random() - 0.5)
+        };
+    }
+}
+
+/* ================= RENDERING ================= */
+
+function drawGrid() {
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(0, 255, 255, 0.05)';
+    
+    // Draw grid
+    for(let x = 0; x < w; x += scale) {
+        // Vertical lines relative to origin
+        const offsetX = (originX % scale); 
+        ctx.beginPath(); ctx.moveTo(x + offsetX, 0); ctx.lineTo(x + offsetX, h); ctx.stroke();
+    }
+    for(let y = 0; y < h; y += scale) {
+        // Horizontal lines relative to origin
+        const offsetY = (originY % scale);
+        ctx.beginPath(); ctx.moveTo(0, y + offsetY); ctx.lineTo(w, y + offsetY); ctx.stroke();
+    }
+
+    // Axes
+    ctx.strokeStyle = 'rgba(0, 255, 170, 0.6)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0, originY); ctx.lineTo(w, originY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(originX, 0); ctx.lineTo(originX, h); ctx.stroke();
+    
+    // Numbers
+    ctx.fillStyle = '#00ffaa';
+    ctx.font = '10px monospace';
+    // Draw numbers only near the center to avoid clutter
+    for(let i = -8; i <= 8; i++) {
+        if(i === 0) continue;
+        const pos = toScreen(i, 0);
+        ctx.fillText(i, pos.x - 3, pos.y + 15);
+        const posY = toScreen(0, i);
+        ctx.fillText(i, posY.x + 8, posY.y + 3);
+    }
+}
+
+function drawTargetLine(m, c, isCorrectMode) {
+    const x1 = -20; const y1 = m * x1 + c; const p1 = toScreen(x1, y1);
+    const x2 = 20; const y2 = m * x2 + c; const p2 = toScreen(x2, y2);
+
+    ctx.strokeStyle = isCorrectMode ? '#00ff00' : '#ff0055';
+    ctx.lineWidth = isCorrectMode ? 5 : 3;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = ctx.strokeStyle;
+    
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Hints
+    if(!isCorrectMode) {
+        const interceptPos = toScreen(0, c);
+        ctx.fillStyle = '#ffff00';
+        ctx.beginPath(); ctx.arc(interceptPos.x, interceptPos.y, 5, 0, Math.PI*2); ctx.fill();
+        
+        // Slope Triangle
+        if(Math.abs(m) <= 4) {
+            const pStart = toScreen(0, c);
+            const pRun = toScreen(1, c);
+            const pRise = toScreen(1, c + m);
+
+            ctx.strokeStyle = '#ffff00';
+            ctx.setLineDash([4, 4]);
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(pStart.x, pStart.y); ctx.lineTo(pRun.x, pRun.y); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(pRun.x, pRun.y); ctx.lineTo(pRise.x, pRise.y); ctx.stroke();
+            ctx.setLineDash([]);
+        }
+    }
+}
+
+/* ================= LOGIC LOOP ================= */
+const gen = new LevelGenerator();
+
+function initLevel() {
+    currentLevel = gen.generate();
+    
+    document.getElementById('question-display').innerText = currentLevel.q;
+    const btnContainer = document.getElementById('buttons-container');
+    btnContainer.innerHTML = '';
+    
+    currentLevel.choices.forEach(choice => {
+        const btn = document.createElement('button');
+        btn.innerText = choice;
+        btn.onclick = () => checkAnswer(choice, btn);
+        btnContainer.appendChild(btn);
+    });
+    
+    laserBeam = null;
+}
+
+function checkAnswer(val, btn) {
+    if (val === currentLevel.ans) {
+        score += 100;
+        document.getElementById('score').innerText = score;
+        document.getElementById('status-text').innerText = "HIT";
+        document.getElementById('status-text').style.color = "#00ff00";
+        playSound('laser');
+        triggerFeedback("DESTROYED", "#0f0");
+        
+        laserBeam = { startTime: Date.now() };
+        
+        const btns = document.querySelectorAll('button');
+        btns.forEach(b => b.disabled = true);
+        btn.style.background = '#00ff00';
+        btn.style.color = '#000';
+
+        setTimeout(initLevel, 1500);
+    } else {
+        score -= 20;
+        document.getElementById('score').innerText = score;
+        document.getElementById('status-text').innerText = "MISS";
+        document.getElementById('status-text').style.color = "#ff0000";
+        playSound('error');
+        btn.style.background = '#ff0000';
+        btn.disabled = true;
+        triggerFeedback("MISSED", "#f00");
+    }
+}
+
+function triggerFeedback(text, color) {
+    const fb = document.getElementById('feedback');
+    fb.innerText = text;
+    fb.style.color = color;
+    fb.style.opacity = 1;
+    setTimeout(() => fb.style.opacity = 0, 800);
+}
+
+function loop() {
+    ctx.clearRect(0, 0, w, h);
+    drawGrid();
+
+    if (currentLevel) {
+        const isHit = laserBeam !== null;
+        drawTargetLine(currentLevel.m, currentLevel.c, isHit);
+        
+        if (isHit) {
+            const age = Date.now() - laserBeam.startTime;
+            if(age < 400) {
+                ctx.strokeStyle = `rgba(0, 255, 0, ${1 - age/400})`;
+                ctx.lineWidth = 10;
+                const x1 = -20; const y1 = currentLevel.m * x1 + currentLevel.c;
+                const p1 = toScreen(x1, y1);
+                const x2 = 20; const y2 = currentLevel.m * x2 + currentLevel.c;
+                const p2 = toScreen(x2, y2);
+                ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+            }
+        }
+    }
+    requestAnimationFrame(loop);
+}
+
+initLevel();
+loop();
+
+</script>
+</body>
+</html>

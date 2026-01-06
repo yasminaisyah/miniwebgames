@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Index Core: Tracking Mode</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@400;700;900&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #0b0f19;
+            font-family: 'Exo 2', sans-serif;
+            color: white;
+            user-select: none;
+            touch-action: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: radial-gradient(circle at center, #1a2236 0%, #050505 100%);
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* UI Overlay */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #hud {
+            width: 100%;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            box-sizing: border-box;
+        }
+
+        .hud-box {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+
+        #hint-box {
+            margin-top: 10px;
+            font-size: 1.2rem;
+            color: #4db8ff;
+            text-shadow: 0 0 10px #4db8ff;
+            text-align: center;
+            opacity: 0.9;
+        }
+
+        /* Menus */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(11, 15, 25, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            pointer-events: auto;
+        }
+
+        .hidden { display: none !important; }
+
+        h1 {
+            font-size: 3.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(to right, #4db8ff, #00ffcc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        p {
+            color: #a0aab5;
+            font-size: 1.1rem;
+            max-width: 500px;
+            text-align: center;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+
+        button {
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            font-family: 'Exo 2', sans-serif;
+            font-weight: bold;
+            background: #4db8ff;
+            color: #0b0f19;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(77, 184, 255, 0.4);
+            transition: transform 0.2s, background 0.2s;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            background: #fff;
+        }
+
+        /* Lane Click Areas */
+        .lane-touch {
+            position: absolute;
+            bottom: 0;
+            height: 60%;
+            width: 33.33%;
+            pointer-events: auto;
+        }
+        #touch-l { left: 0; }
+        #touch-m { left: 33.33%; }
+        #touch-r { left: 66.66%; }
+
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        <div id="hud">
+            <div class="hud-box" style="color:#00ffcc">SCORE: <span id="scoreVal">0</span></div>
+            <div class="hud-box" style="color:#ffcc00">HP: <span id="hpVal">100</span>%</div>
+        </div>
+        <div id="hint-box">INITIALIZING...</div>
+
+        <div id="touch-l" class="lane-touch" onclick="movePlayer(0)"></div>
+        <div id="touch-m" class="lane-touch" onclick="movePlayer(1)"></div>
+        <div id="touch-r" class="lane-touch" onclick="movePlayer(2)"></div>
+    </div>
+
+    <div id="start-screen" class="screen">
+        <h1>INDEX CORE</h1>
+        <p><strong>Chapter 1: Indices</strong><br><br>
+        The equation will <strong>FOLLOW</strong> your collector.<br>
+        Guide the correct simplified equation into the slot.<br><br>
+        Controls: Left/Right Arrows or Click Lanes.</p>
+        <button onclick="startGame()">ACTIVATE</button>
+    </div>
+
+    <div id="game-over-screen" class="screen hidden">
+        <h1 style="color:#ff3333">SYSTEM FAILURE</h1>
+        <p>Your core integrity reached 0%.<br>Final Score: <span id="finalScore">0</span></p>
+        <button onclick="startGame()">REBOOT</button>
+    </div>
+</div>
+
+<script>
+    /**
+     * AUDIO SYSTEM
+     */
+    const AudioSys = {
+        ctx: null,
+        init: function() {
+            if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        },
+        playTone: function(freq, type, dur, vol = 0.1) {
+            if (!this.ctx) return;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+            gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+            gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + dur);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start();
+            osc.stop(this.ctx.currentTime + dur);
+        },
+        playMove: function() { this.playTone(300, 'triangle', 0.05, 0.05); },
+        playCatch: function() { 
+            this.playTone(600, 'sine', 0.1, 0.1); 
+            setTimeout(()=>this.playTone(900, 'sine', 0.2, 0.1), 100);
+        },
+        playError: function() { 
+            this.playTone(150, 'sawtooth', 0.3, 0.2); 
+            setTimeout(()=>this.playTone(100, 'sawtooth', 0.3, 0.2), 150);
+        }
+    };
+
+    /**
+     * MATH LOGIC GENERATOR
+     */
+    function generateProblem(level) {
+        const difficulty = Math.min(level, 6);
+        let types = [];
+        
+        if (difficulty === 1) types = ['expand'];
+        else if (difficulty === 2) types = ['expand', 'mult'];
+        else if (difficulty === 3) types = ['mult', 'div'];
+        else if (difficulty >= 4) types = ['mult', 'div', 'power'];
+        
+        const type = types[Math.floor(Math.random() * types.length)];
+        const bases = ['a', 'm', 'x', 'y', 'n', '2', '3', '5'];
+        const base = bases[Math.floor(Math.random() * bases.length)];
+
+        let qObj = { base: base, qTop: "", qExp: "", ansExp: 0 };
+        let hint = "";
+
+        if (type === 'expand') {
+            const count = Math.floor(Math.random() * 3) + 2; 
+            let str = base;
+            for(let i=1; i<count; i++) str += ` × ${base}`;
+            qObj.qTop = str;
+            qObj.ansExp = count;
+            hint = "Count the bases";
+        }
+        else if (type === 'mult') {
+            const p1 = Math.floor(Math.random() * 5) + 1;
+            const p2 = Math.floor(Math.random() * 5) + 1;
+            qObj.qTop = `${base}`; 
+            qObj.qExp = `${p1}`; 
+            qObj.qTop2 = ` × ${base}`;
+            qObj.qExp2 = `${p2}`;
+            qObj.ansExp = p1 + p2;
+            hint = "Multiplication: Add Indices";
+        }
+        else if (type === 'div') {
+            const p2 = Math.floor(Math.random() * 4) + 1;
+            const ans = Math.floor(Math.random() * 5) + 1; 
+            const p1 = p2 + ans;
+            qObj.qTop = `${base}`; 
+            qObj.qExp = `${p1}`; 
+            qObj.qTop2 = ` ÷ ${base}`;
+            qObj.qExp2 = `${p2}`;
+            qObj.ansExp = ans;
+            hint = "Division: Subtract Indices";
+        }
+        else if (type === 'power') {
+            const p1 = Math.floor(Math.random() * 3) + 2;
+            const p2 = Math.floor(Math.random() * 3) + 2;
+            qObj.isPower = true;
+            qObj.base = base;
+            qObj.innerExp = p1;
+            qObj.outerExp = p2;
+            qObj.ansExp = p1 * p2;
+            hint = "Power of Power: Multiply Indices";
+        }
+
+        let correctExp = qObj.ansExp;
+        let decoys = new Set();
+        while(decoys.size < 2) {
+            let d = correctExp + (Math.floor(Math.random() * 7) - 3); 
+            if (d !== correctExp && d >= 0) decoys.add(d);
+        }
+        let decoyArr = Array.from(decoys);
+        
+        return {
+            problem: qObj,
+            hint: hint,
+            answers: [
+                { exp: correctExp, correct: true },
+                { exp: decoyArr[0], correct: false },
+                { exp: decoyArr[1], correct: false }
+            ]
+        };
+    }
+
+    /**
+     * GAME ENGINE
+     */
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const hintBox = document.getElementById('hint-box');
+
+    let state = {
+        active: false,
+        score: 0,
+        hp: 100,
+        level: 1,
+        playerLane: 1, 
+        dropY: -100,
+        dropX: 0, // NEW: Tracks the X position of falling equation
+        currentProblem: null,
+        lanesX: [],
+        laneWidth: 0,
+        shuffledAnswers: [],
+        particles: [],
+        dropSpeed: 2
+    };
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        state.laneWidth = canvas.width / 3;
+        state.lanesX = [
+            state.laneWidth * 0.5,
+            state.laneWidth * 1.5,
+            state.laneWidth * 2.5
+        ];
+        // Reset dropX if resizing
+        if(state.active) state.dropX = state.lanesX[state.playerLane];
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    function movePlayer(laneIdx) {
+        if (!state.active) return;
+        if (laneIdx < 0 || laneIdx > 2) return;
+        state.playerLane = laneIdx;
+        AudioSys.playMove();
+    }
+
+    window.addEventListener('keydown', (e) => {
+        if (!state.active) return;
+        if (e.key === 'ArrowLeft') movePlayer(state.playerLane - 1);
+        if (e.key === 'ArrowRight') movePlayer(state.playerLane + 1);
+    });
+
+    function spawnProblem() {
+        const data = generateProblem(state.level);
+        state.currentProblem = data.problem;
+        hintBox.innerText = data.hint;
+        
+        state.shuffledAnswers = data.answers;
+        for (let i = state.shuffledAnswers.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [state.shuffledAnswers[i], state.shuffledAnswers[j]] = [state.shuffledAnswers[j], state.shuffledAnswers[i]];
+        }
+
+        state.dropY = -150;
+        // Start X at the current player lane so it feels connected immediately
+        state.dropX = state.lanesX[state.playerLane]; 
+        
+        state.dropSpeed = 2 + (state.level * 0.3);
+        if(state.dropSpeed > 7) state.dropSpeed = 7;
+    }
+
+    function createParticles(x, y, color) {
+        for(let i=0; i<15; i++) {
+            state.particles.push({
+                x: x, y: y,
+                vx: (Math.random()-0.5)*10,
+                vy: (Math.random()-0.5)*10,
+                life: 1.0, color: color
+            });
+        }
+    }
+
+    function drawMath(ctx, obj, x, y, size=40) {
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = `bold ${size}px "Exo 2"`;
+        const smallSize = size * 0.6;
+        const supOffset = size * -0.4;
+
+        if (obj.isPower) {
+            let fullStr = `(${obj.base} )`;
+            let w = ctx.measureText(fullStr).width;
+            ctx.fillStyle = '#fff';
+            ctx.fillText("(", x - w/3, y);
+            ctx.fillStyle = '#4db8ff'; 
+            ctx.fillText(obj.base, x - w/6, y);
+            ctx.font = `bold ${smallSize}px "Exo 2"`;
+            ctx.fillStyle = '#ffcc00'; 
+            ctx.fillText(obj.innerExp, x, y + supOffset);
+            ctx.font = `bold ${size}px "Exo 2"`;
+            ctx.fillStyle = '#fff';
+            ctx.fillText(")", x + w/6, y);
+            ctx.font = `bold ${smallSize}px "Exo 2"`;
+            ctx.fillStyle = '#ffcc00';
+            ctx.fillText(obj.outerExp, x + w/3 + 10, y + supOffset);
+        } else if (obj.qTop2) {
+            ctx.fillStyle = '#4db8ff'; 
+            ctx.fillText(obj.qTop, x - 40, y);
+            ctx.font = `bold ${smallSize}px "Exo 2"`;
+            ctx.fillStyle = '#ffcc00'; 
+            ctx.fillText(obj.qExp, x - 20, y + supOffset);
+            ctx.font = `bold ${size}px "Exo 2"`;
+            ctx.fillStyle = '#fff'; 
+            ctx.fillText(obj.qTop2, x + 20, y);
+            ctx.font = `bold ${smallSize}px "Exo 2"`;
+            ctx.fillStyle = '#ffcc00'; 
+            ctx.fillText(obj.qExp2, x + 60, y + supOffset);
+        } else {
+            ctx.fillStyle = '#fff';
+            ctx.fillText(obj.qTop, x, y);
+        }
+    }
+
+    function drawAnswer(ctx, base, exp, x, y) {
+        const size = 30;
+        const smallSize = 18;
+        const offset = -12;
+        ctx.font = `bold ${size}px "Exo 2"`;
+        ctx.fillStyle = '#0b0f19'; 
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(base, x - 10, y + 5);
+        ctx.font = `bold ${smallSize}px "Exo 2"`;
+        ctx.fillText(exp, x + 15, y + 5 + offset);
+    }
+
+    function update() {
+        if (!state.active) return;
+
+        // Move Drop Y
+        state.dropY += state.dropSpeed;
+
+        // Move Drop X (Follow Player)
+        // Linear Interpolation (Lerp) for smooth movement
+        let targetX = state.lanesX[state.playerLane];
+        state.dropX += (targetX - state.dropX) * 0.15; // 0.15 is smoothness factor
+
+        // Collision Check
+        const playerY = canvas.height - 100;
+        if (state.dropY > playerY - 30) {
+            const chosenAns = state.shuffledAnswers[state.playerLane];
+            
+            if (chosenAns.correct) {
+                state.score += 100 + (state.level * 10);
+                if (state.score > state.level * 500) state.level++;
+                createParticles(state.lanesX[state.playerLane], playerY, '#00ffcc');
+                AudioSys.playCatch();
+            } else {
+                state.hp -= 20;
+                createParticles(state.lanesX[state.playerLane], playerY, '#ff3333');
+                AudioSys.playError();
+            }
+
+            if (state.hp <= 0) {
+                state.active = false;
+                document.getElementById('finalScore').innerText = state.score;
+                document.getElementById('game-over-screen').classList.remove('hidden');
+            } else {
+                spawnProblem();
+            }
+        }
+
+        // Particles
+        for(let i=state.particles.length-1; i>=0; i--) {
+            let p = state.particles[i];
+            p.x += p.vx; p.y += p.vy; p.life -= 0.05;
+            if(p.life<=0) state.particles.splice(i,1);
+        }
+
+        document.getElementById('scoreVal').innerText = state.score;
+        document.getElementById('hpVal').innerText = state.hp;
+        document.getElementById('hpVal').style.color = state.hp < 40 ? '#ff3333' : '#ffcc00';
+
+        draw();
+        requestAnimationFrame(update);
+    }
+
+    function draw() {
+        ctx.fillStyle = '#0b0f19';
+        ctx.fillRect(0,0,canvas.width, canvas.height);
+
+        // Grid Lines
+        ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for(let i=1; i<3; i++) {
+            ctx.moveTo(state.laneWidth * i, 0);
+            ctx.lineTo(state.laneWidth * i, canvas.height);
+        }
+        ctx.stroke();
+
+        const px = state.lanesX[state.playerLane];
+        const py = canvas.height - 100;
+
+        // Draw Player Catcher
+        ctx.fillStyle = 'rgba(77, 184, 255, 0.2)';
+        ctx.fillRect(px - state.laneWidth/2 + 10, 0, state.laneWidth - 20, canvas.height);
+
+        ctx.fillStyle = '#4db8ff';
+        ctx.shadowColor = '#4db8ff';
+        ctx.shadowBlur = 20;
+        ctx.beginPath();
+        ctx.arc(px, py, 30, 0, Math.PI*2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(px, py, 40, 0, Math.PI*2);
+        ctx.stroke();
+
+        // Draw Falling Problem (Using state.dropX now)
+        if (state.currentProblem) {
+            // Visual Tether
+            ctx.strokeStyle = 'rgba(77, 184, 255, 0.4)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([10, 10]);
+            ctx.beginPath();
+            ctx.moveTo(state.dropX, state.dropY + 30);
+            ctx.lineTo(px, py - 40);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // The Math
+            drawMath(ctx, state.currentProblem, state.dropX, state.dropY);
+        }
+
+        // Draw Answers at Bottom
+        const ansY = canvas.height - 100;
+        for(let i=0; i<3; i++) {
+            const ax = state.lanesX[i];
+            const ans = state.shuffledAnswers[i];
+            
+            ctx.fillStyle = (i === state.playerLane) ? '#fff' : '#1a2236';
+            ctx.strokeStyle = '#4db8ff';
+            ctx.lineWidth = 2;
+            
+            const btnW = 100;
+            const btnH = 60;
+            
+            ctx.beginPath();
+            ctx.roundRect(ax - btnW/2, ansY - btnH/2, btnW, btnH, 10);
+            ctx.fill();
+            ctx.stroke();
+
+            if(state.currentProblem) {
+                drawAnswer(ctx, state.currentProblem.base, ans.exp, ax, ansY);
+            }
+        }
+
+        state.particles.forEach(p => {
+            ctx.globalAlpha = p.life;
+            ctx.fillStyle = p.color;
+            ctx.fillRect(p.x, p.y, 4, 4);
+        });
+        ctx.globalAlpha = 1.0;
+    }
+
+    function startGame() {
+        AudioSys.init();
+        document.getElementById('start-screen').classList.add('hidden');
+        document.getElementById('game-over-screen').classList.add('hidden');
+        
+        state.score = 0;
+        state.hp = 100;
+        state.level = 1;
+        state.playerLane = 1;
+        state.active = true;
+        state.particles = [];
+        state.dropX = state.lanesX[1];
+        
+        spawnProblem();
+        update();
+    }
+</script>
+</body>
+</html>

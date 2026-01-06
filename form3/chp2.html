@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cosmic Standard: Warp Drive</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Rajdhani', sans-serif;
+            user-select: none;
+            touch-action: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* HUD */
+        #ui-layer {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #hud-top {
+            display: flex;
+            justify-content: space-between;
+            width: 90%;
+            margin-top: 20px;
+            text-shadow: 0 0 10px #0ff;
+        }
+
+        .hud-panel {
+            background: rgba(0, 20, 40, 0.7);
+            border: 1px solid #0ff;
+            color: #0ff;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            transform: skew(-10deg);
+        }
+
+        /* Menus */
+        .screen {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            pointer-events: auto;
+        }
+        .hidden { display: none !important; }
+
+        h1 {
+            font-size: 4rem;
+            color: #fff;
+            text-transform: uppercase;
+            letter-spacing: 5px;
+            margin: 0;
+            background: linear-gradient(to bottom, #fff, #0ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px #0ff;
+        }
+
+        p {
+            color: #aaa;
+            font-size: 1.2rem;
+            max-width: 600px;
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        button {
+            padding: 15px 50px;
+            font-size: 1.5rem;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: bold;
+            background: #0ff;
+            color: #000;
+            border: none;
+            border-radius: 2px;
+            cursor: pointer;
+            box-shadow: 0 0 15px #0ff;
+            transition: 0.2s;
+        }
+        button:hover {
+            background: #fff;
+            box-shadow: 0 0 30px #fff;
+            transform: scale(1.1);
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        <div id="hud-top">
+            <div class="hud-panel">SHIELD: <span id="hpVal">100</span>%</div>
+            <div class="hud-panel">SCORE: <span id="scoreVal">0</span></div>
+        </div>
+    </div>
+
+    <div id="start-screen" class="screen">
+        <h1>WARP DRIVE</h1>
+        <p><strong>Chapter 2: Standard Form & Sig Figs</strong><br><br>
+        Your ship is carrying a <strong>Number</strong>.<br>
+        Pilot into the <strong>Gate</strong> that matches its converted form.<br>
+        (e.g., Ship: 500 &rightarrow; Gate: 5 x 10²)</p>
+        <button onclick="startGame()">ENGAGE</button>
+    </div>
+
+    <div id="game-over-screen" class="screen hidden">
+        <h1 style="color: #f33; text-shadow: 0 0 20px #f00;">HULL BREACH</h1>
+        <p>Mission Failed.<br>Final Score: <span id="finalScore">0</span></p>
+        <button onclick="startGame()">RESTART</button>
+    </div>
+</div>
+
+<script>
+    /**
+     * AUDIO SYSTEM
+     */
+    const AudioSys = {
+        ctx: null,
+        init: function() {
+            if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        },
+        playTone: function(freq, type, dur, vol=0.1) {
+            if (!this.ctx) return;
+            const osc = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+            g.gain.setValueAtTime(vol, this.ctx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + dur);
+            osc.connect(g);
+            g.connect(this.ctx.destination);
+            osc.start();
+            osc.stop(this.ctx.currentTime + dur);
+        },
+        playWarp: function() {
+            // Rising sci-fi sweep
+            if (!this.ctx) return;
+            const osc = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            osc.frequency.setValueAtTime(200, this.ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(1000, this.ctx.currentTime + 0.5);
+            g.gain.setValueAtTime(0.1, this.ctx.currentTime);
+            g.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.5);
+            osc.connect(g);
+            g.connect(this.ctx.destination);
+            osc.start();
+            osc.stop(this.ctx.currentTime + 0.5);
+        },
+        playCrash: function() {
+            this.playTone(100, 'sawtooth', 0.4, 0.2);
+            this.playTone(80, 'square', 0.4, 0.2);
+        }
+    };
+
+    /**
+     * MATH LOGIC: Standard Form & Sig Figs
+     */
+    function generateProblem(level) {
+        // Progression:
+        // 1-2: Large Int -> Std Form
+        // 3-4: Small Dec -> Std Form
+        // 5-6: Sig Figs
+        // 7+: Mix
+
+        const modeRoll = Math.random();
+        // Determine Mode based on level
+        let mode = 'large_std';
+        if (level > 2) mode = Math.random() > 0.5 ? 'small_std' : 'large_std';
+        if (level > 4) {
+            let r = Math.random();
+            if(r < 0.4) mode = 'sigfig';
+            else if(r < 0.7) mode = 'large_std';
+            else mode = 'small_std';
+        }
+
+        let questionText = "";
+        let correctHtml = ""; // HTML/Canvas safe string representation
+        let decoys = [];
+
+        if (mode === 'large_std') {
+            // e.g., 4500 -> 4.5 x 10^3
+            let power = Math.floor(Math.random() * 4) + 2; // 2 to 5
+            let mantissa = (Math.floor(Math.random() * 90) + 10) / 10; // 1.0 to 9.9
+            // Fix float issues
+            mantissa = Math.round(mantissa * 10) / 10;
+            
+            let num = mantissa * Math.pow(10, power);
+            
+            // Format number (remove scientific notation if JS auto-converts)
+            questionText = num.toString();
+            if (num >= 10000) questionText = num.toLocaleString().replace(/,/g, ''); // 10000 -> 10000
+
+            correctHtml = { base: mantissa, exp: power };
+
+            // Decoys
+            decoys.push({ base: mantissa * 10, exp: power - 1 }); // Wrong normalization (45 x 10^2)
+            decoys.push({ base: mantissa, exp: power + 1 });      // Wrong power
+            if (Math.random() > 0.5) decoys.push({ base: mantissa, exp: power - 1 });
+            else decoys.push({ base: (mantissa+1), exp: power }); // Wrong mantissa
+        }
+        else if (mode === 'small_std') {
+            // e.g., 0.0045 -> 4.5 x 10^-3
+            let power = Math.floor(Math.random() * 4) + 1; // 1 to 4
+            let mantissa = (Math.floor(Math.random() * 90) + 10) / 10; 
+            mantissa = Math.round(mantissa * 10) / 10;
+
+            // Create decimal string manually to avoid JS float precision mess
+            let zeros = "0.";
+            for(let i=0; i<power-1; i++) zeros += "0";
+            // Remove dot from mantissa for string concat
+            let mStr = mantissa.toString().replace('.', '');
+            questionText = zeros + mStr;
+
+            correctHtml = { base: mantissa, exp: -power };
+
+            decoys.push({ base: mantissa, exp: -(power+1) });
+            decoys.push({ base: mantissa, exp: -(power-1) });
+            decoys.push({ base: (mantissa/10), exp: -power });
+        }
+        else if (mode === 'sigfig') {
+            // Rounding
+            let sf = Math.floor(Math.random() * 2) + 1; // 1 or 2 or 3 s.f.
+            if(sf === 1) sf = 2; // Bias towards 2 and 3 sf
+            if(Math.random() > 0.5) sf = 3;
+
+            // Generate a messy number
+            let n = (Math.random() * 100).toFixed(4); // 45.2341
+            questionText = `${n}\n(${sf} s.f.)`;
+
+            // Calculate correct
+            let num = parseFloat(n);
+            let ans = Number(num.toPrecision(sf));
+            
+            correctHtml = { text: ans.toString() };
+
+            // Decoys (Truncation vs Rounding vs Wrong SF)
+            // Truncation simulation
+            let wrong1 = Number(num.toPrecision(sf+1));
+            let wrong2 = Number(num.toPrecision(sf-1));
+            if(isNaN(wrong2)) wrong2 = ans + 1;
+
+            decoys.push({ text: wrong1.toString() });
+            decoys.push({ text: wrong2.toString() });
+        }
+
+        return {
+            q: questionText,
+            correct: correctHtml,
+            decoys: decoys,
+            isStd: (mode !== 'sigfig')
+        };
+    }
+
+    /**
+     * GAME ENGINE
+     */
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let state = {
+        active: false,
+        score: 0,
+        hp: 100,
+        level: 1,
+        shipX: 0,
+        shipTargetX: 0,
+        shipSpeed: 0, // visual tilt
+        stars: [],
+        gates: [],
+        currentProblem: null,
+        problemTimer: 0,
+        warpFactor: 1, // Speed multiplier
+        baseSpeed: 3
+    };
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        if(!state.active) state.shipX = canvas.width / 2;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Input
+    function handleInput(x) {
+        if (!state.active) return;
+        state.shipTargetX = x;
+        // Clamp
+        if(state.shipTargetX < 50) state.shipTargetX = 50;
+        if(state.shipTargetX > canvas.width - 50) state.shipTargetX = canvas.width - 50;
+    }
+
+    window.addEventListener('mousemove', e => handleInput(e.clientX));
+    window.addEventListener('touchmove', e => { e.preventDefault(); handleInput(e.touches[0].clientX); }, {passive: false});
+    window.addEventListener('keydown', e => {
+        if (!state.active) return;
+        if (e.key === 'ArrowLeft') state.shipTargetX -= 100;
+        if (e.key === 'ArrowRight') state.shipTargetX += 100;
+        handleInput(state.shipTargetX);
+    });
+
+    // --- GAMEPLAY FUNCTIONS ---
+
+    function initStars() {
+        state.stars = [];
+        for(let i=0; i<150; i++) {
+            state.stars.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                z: Math.random() * 2 + 0.5 // Speed/Depth
+            });
+        }
+    }
+
+    function spawnGate() {
+        const problem = generateProblem(state.level);
+        state.currentProblem = problem.q; // Put text on ship
+        
+        // Gate Positions (3 Lanes roughly)
+        const laneW = canvas.width / 3;
+        const positions = [laneW * 0.5, laneW * 1.5, laneW * 2.5];
+        
+        // Shuffle Answers
+        let answers = [
+            { val: problem.correct, type: 'correct', isStd: problem.isStd },
+            { val: problem.decoys[0], type: 'wrong', isStd: problem.isStd },
+            { val: problem.decoys[1] || problem.decoys[0], type: 'wrong', isStd: problem.isStd }
+        ];
+
+        // Fisher-Yates shuffle
+        for (let i = answers.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [answers[i], answers[j]] = [answers[j], answers[i]];
+        }
+
+        // Create Gate Object
+        state.gates.push({
+            y: -150,
+            slots: [
+                { x: positions[0], item: answers[0] },
+                { x: positions[1], item: answers[1] },
+                { x: positions[2], item: answers[2] }
+            ]
+        });
+    }
+
+    function update() {
+        if (!state.active) return;
+
+        // Smooth Ship Movement
+        const dx = state.shipTargetX - state.shipX;
+        state.shipX += dx * 0.1;
+        state.shipSpeed = dx * 0.1; // For tilt effect
+
+        // Starfield (Warp Effect)
+        let speed = state.baseSpeed * state.warpFactor;
+        // Warp factor decay
+        if (state.warpFactor > 1) state.warpFactor *= 0.95;
+
+        state.stars.forEach(s => {
+            s.y += s.z * speed;
+            if (s.y > canvas.height) {
+                s.y = 0;
+                s.x = Math.random() * canvas.width;
+            }
+        });
+
+        // Gates Logic
+        state.problemTimer++;
+        if (state.gates.length === 0 && state.problemTimer > 100) {
+            spawnGate();
+            state.problemTimer = 0;
+        }
+
+        for (let i = state.gates.length - 1; i >= 0; i--) {
+            let g = state.gates[i];
+            g.y += speed;
+
+            // Collision Check
+            const playerY = canvas.height - 150;
+            // Hitbox height
+            if (g.y > playerY - 40 && g.y < playerY + 40) {
+                // Find closest slot
+                let hitSlot = null;
+                let minDist = 999;
+                
+                g.slots.forEach(slot => {
+                    let d = Math.abs(state.shipX - slot.x);
+                    if (d < (canvas.width / 6)) { // Hitbox width
+                        hitSlot = slot;
+                    }
+                });
+
+                if (hitSlot && !g.hit) {
+                    g.hit = true; // One hit per gate
+                    if (hitSlot.item.type === 'correct') {
+                        // Success
+                        AudioSys.playWarp();
+                        state.score += 100 * state.level;
+                        state.warpFactor = 8; // WARP BOOST!
+                        if (state.score > state.level * 800) state.level++;
+                    } else {
+                        // Fail
+                        AudioSys.playCrash();
+                        state.hp -= 25;
+                        state.warpFactor = 0.5; // Slow down
+                    }
+                }
+            }
+
+            if (g.y > canvas.height) state.gates.splice(i, 1);
+        }
+
+        // Game Over
+        if (state.hp <= 0) {
+            state.active = false;
+            document.getElementById('finalScore').innerText = state.score;
+            document.getElementById('game-over-screen').classList.remove('hidden');
+        }
+
+        // UI Update
+        document.getElementById('scoreVal').innerText = state.score;
+        document.getElementById('hpVal').innerText = state.hp;
+        document.getElementById('hpVal').style.color = state.hp < 40 ? '#f33' : '#0ff';
+
+        draw();
+        requestAnimationFrame(update);
+    }
+
+    // --- DRAWING FUNCTIONS ---
+
+    function drawStdForm(ctx, item, x, y) {
+        ctx.fillStyle = '#fff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        if (item.isStd) {
+            // Render 4.5 x 10^3
+            ctx.font = 'bold 30px "Rajdhani"';
+            let baseW = ctx.measureText(item.val.base).width;
+            let xStr = " × 10";
+            let xW = ctx.measureText(xStr).width;
+            
+            let totalW = baseW + xW + 15; // +15 for superscript approx
+
+            // Draw Base
+            ctx.fillText(item.val.base + xStr, x - 5, y);
+            
+            // Draw Exponent
+            ctx.font = 'bold 20px "Rajdhani"';
+            ctx.fillText(item.val.exp, x + (totalW/2) - 5, y - 15);
+        } else {
+            // Render Simple Text (Sig Figs)
+            ctx.font = 'bold 30px "Rajdhani"';
+            ctx.fillText(item.val.text, x, y);
+        }
+    }
+
+    function draw() {
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Stars
+        ctx.fillStyle = '#fff';
+        state.stars.forEach(s => {
+            let len = s.z * state.warpFactor * 2;
+            ctx.globalAlpha = Math.random() * 0.8 + 0.2;
+            ctx.fillRect(s.x, s.y, 2, Math.max(2, len));
+        });
+        ctx.globalAlpha = 1;
+
+        // Gates
+        state.gates.forEach(g => {
+            const gateH = 100;
+            const gateW = (canvas.width / 3) - 20;
+
+            g.slots.forEach(slot => {
+                const cx = slot.x;
+                const cy = g.y;
+                
+                // Glow
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = '#0ff';
+                
+                // Gate Frame
+                ctx.strokeStyle = '#0ff';
+                ctx.lineWidth = 3;
+                
+                // If hit, change color
+                if (g.hit && Math.abs(state.shipX - slot.x) < gateW/2) {
+                   // visual feedback logic handled by particle or simple flash here?
+                   // Simple: if this was the correct slot, flash green, else red
+                }
+
+                ctx.strokeRect(cx - gateW/2, cy - gateH/2, gateW, gateH);
+                
+                // Text Background
+                ctx.fillStyle = 'rgba(0, 20, 40, 0.8)';
+                ctx.fillRect(cx - gateW/2, cy - gateH/2, gateW, gateH);
+                
+                ctx.shadowBlur = 0;
+
+                // Answer Text
+                drawStdForm(ctx, slot.item, cx, cy);
+            });
+        });
+
+        // Player Ship
+        const shipX = state.shipX;
+        const shipY = canvas.height - 150;
+        
+        ctx.save();
+        ctx.translate(shipX, shipY);
+        // Tilt
+        ctx.rotate(state.shipSpeed * 0.05 * Math.PI / 180);
+        
+        // Ship Body
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#0ff';
+        ctx.fillStyle = '#000';
+        ctx.beginPath();
+        ctx.moveTo(0, -40);
+        ctx.lineTo(30, 40);
+        ctx.lineTo(0, 30);
+        ctx.lineTo(-30, 40);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#0ff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Engine Trail
+        ctx.fillStyle = '#0ff';
+        ctx.globalAlpha = 0.6;
+        let flicker = Math.random() * 20;
+        ctx.beginPath();
+        ctx.moveTo(-10, 35);
+        ctx.lineTo(0, 60 + flicker + (state.warpFactor*10));
+        ctx.lineTo(10, 35);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+
+        // The Question Text on Hull
+        if (state.currentProblem) {
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 18px "Rajdhani"';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.shadowBlur = 0;
+            
+            // Handle multiline for Sig Figs
+            let lines = state.currentProblem.split('\n');
+            if (lines.length > 1) {
+                ctx.fillText(lines[0], 0, -50);
+                ctx.fillStyle = '#ff0';
+                ctx.font = '14px "Rajdhani"';
+                ctx.fillText(lines[1], 0, -30);
+            } else {
+                ctx.fillText(state.currentProblem, 0, -50);
+            }
+        }
+
+        ctx.restore();
+    }
+
+    function startGame() {
+        AudioSys.init();
+        document.getElementById('start-screen').classList.add('hidden');
+        document.getElementById('game-over-screen').classList.add('hidden');
+        
+        state.score = 0;
+        state.hp = 100;
+        state.level = 1;
+        state.shipX = canvas.width / 2;
+        state.shipTargetX = state.shipX;
+        state.active = true;
+        state.gates = [];
+        state.warpFactor = 1;
+        
+        initStars();
+        spawnGate();
+        update();
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GEO-DEFENSE: PROTOCOL 6 </title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap');
+
+        :root {
+            --bg: #0a0a0a;
+            --hud: #00ffcc;
+            --danger: #ff0055;
+            --accent: #ffd700;
+            --panel: rgba(10, 20, 20, 0.95);
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: var(--bg);
+            color: var(--hud);
+            font-family: 'Share Tech Mono', monospace;
+            user-select: none;
+        }
+
+        /* --- UI LAYER --- */
+        #game-ui {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            display: grid;
+            grid-template-rows: 80px 1fr 120px;
+            transition: opacity 0.5s;
+        }
+
+        .hud-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 30px;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+            pointer-events: auto;
+        }
+
+        .stat-box {
+            text-align: center;
+            text-shadow: 0 0 10px var(--hud);
+        }
+        .stat-label { font-size: 0.8rem; opacity: 0.7; }
+        .stat-val { font-size: 2rem; font-family: 'Black Ops One', cursive; }
+
+        .health-bar {
+            display: flex;
+            gap: 5px;
+        }
+        .heart {
+            width: 30px; height: 10px;
+            background: var(--danger);
+            box-shadow: 0 0 10px var(--danger);
+            transform: skewX(-20deg);
+        }
+        .heart.lost { background: #333; box-shadow: none; }
+
+        /* --- CENTER AREA --- */
+        #center-stage {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #question-display {
+            position: absolute;
+            top: 20px;
+            background: var(--panel);
+            border: 1px solid var(--hud);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 1.2rem;
+            text-shadow: 0 0 5px var(--hud);
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.2);
+            z-index: 10;
+        }
+
+        /* --- CONTROLS --- */
+        .controls {
+            pointer-events: auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            padding-bottom: 30px;
+        }
+
+        button.opt-btn {
+            background: rgba(0, 0, 0, 0.6);
+            border: 2px solid var(--hud);
+            color: var(--hud);
+            font-family: 'Black Ops One', cursive;
+            font-size: 2rem;
+            padding: 15px 40px;
+            cursor: pointer;
+            transition: 0.2s;
+            clip-path: polygon(10% 0, 100% 0, 100% 70%, 90% 100%, 0 100%, 0 30%);
+            min-width: 120px;
+        }
+
+        button.opt-btn:hover {
+            background: var(--hud);
+            color: #000;
+            transform: translateY(-5px);
+            box-shadow: 0 0 30px var(--hud);
+        }
+
+        button.opt-btn:active { transform: scale(0.95); }
+
+        /* --- SCREENS (Start / Game Over) --- */
+        .overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.95); /* Much darker background */
+            backdrop-filter: blur(10px);      /* Blur effect */
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+        
+        .hidden { display: none !important; }
+
+        h1 { font-family: 'Black Ops One'; font-size: 4rem; margin: 0; color: var(--accent); text-shadow: 0 0 20px var(--danger); }
+        h2 { font-size: 2rem; color: var(--danger); margin-bottom: 20px; }
+        p { max-width: 600px; line-height: 1.6; color: #ccc; margin-bottom: 30px; font-size: 1.2rem; }
+
+        .start-btn {
+            background: var(--danger);
+            color: white;
+            border: none;
+            padding: 20px 60px;
+            font-size: 1.5rem;
+            font-family: 'Black Ops One';
+            cursor: pointer;
+            box-shadow: 0 0 30px var(--danger);
+            animation: pulse 1.5s infinite;
+            border-radius: 5px;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        /* --- FEEDBACK --- */
+        #feedback-overlay {
+            position: absolute;
+            top: 40%;
+            width: 100%;
+            text-align: center;
+            font-family: 'Black Ops One';
+            font-size: 5rem;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 50;
+            text-shadow: 4px 4px 0 #000;
+        }
+
+        .shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-4px, 0, 0); }
+            20%, 80% { transform: translate3d(8px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-16px, 0, 0); }
+            40%, 60% { transform: translate3d(16px, 0, 0); }
+        }
+
+    </style>
+</head>
+<body>
+
+    <canvas id="bg-canvas" style="position:absolute; top:0; left:0; z-index:-1;"></canvas>
+    <canvas id="game-canvas" style="position:absolute; top:0; left:0; z-index:0;"></canvas>
+
+    <div id="game-ui">
+        <div class="hud-top">
+            <div class="stat-box">
+                <div class="stat-label">DEFENSE LEVEL</div>
+                <div class="stat-val" id="level-disp">1</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">INTEGRITY</div>
+                <div class="health-bar" id="health-container">
+                    <div class="heart"></div><div class="heart"></div><div class="heart"></div>
+                </div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">SCORE</div>
+                <div class="stat-val" id="score-disp">0</div>
+            </div>
+        </div>
+
+        <div id="center-stage">
+            <div id="question-display">CALCULATE <span style="color:var(--danger)">X</span></div>
+            <div id="feedback-overlay">WRONG!</div>
+        </div>
+
+        <div class="controls" id="btn-container">
+            </div>
+    </div>
+
+    <div id="start-screen" class="overlay">
+        <h1>GEO-DEFENSE</h1>
+        <p>Mathematical precision required.<br>
+           Solve geometry problems to charge the defense grid.</p>
+        <button class="start-btn" onclick="initGame()">ENGAGE</button>
+    </div>
+
+    <div id="game-over-screen" class="overlay hidden">
+        <h1 style="color: var(--danger)">CRITICAL FAILURE</h1>
+        <h2 id="final-score">Score: 0</h2>
+        <p id="death-reason" style="font-size: 1.5rem; color: var(--hud);">Hull integrity compromised.</p>
+        <button class="start-btn" onclick="initGame()">REBOOT SYSTEM</button>
+    </div>
+
+    <script>
+        const M = {
+            rad: (deg) => deg * Math.PI / 180,
+            deg: (rad) => rad * 180 / Math.PI,
+            rand: (min, max) => Math.random() * (max - min) + min,
+            randInt: (min, max) => Math.floor(Math.random() * (max - min + 1)) + min,
+            
+            getPoint: (cx, cy, r, angleDeg) => ({
+                x: cx + r * Math.cos(M.rad(angleDeg)),
+                y: cy + r * Math.sin(M.rad(angleDeg))
+            }),
+
+            calcAngle: (A, B, C) => {
+                const BA = { x: A.x - B.x, y: A.y - B.y };
+                const BC = { x: C.x - B.x, y: C.y - B.y };
+                const dot = BA.x * BC.x + BA.y * BC.y;
+                const magBA = Math.sqrt(BA.x**2 + BA.y**2);
+                const magBC = Math.sqrt(BC.x**2 + BC.y**2);
+                let cosTheta = dot / (magBA * magBC);
+                cosTheta = Math.max(-1, Math.min(1, cosTheta));
+                return M.deg(Math.acos(cosTheta));
+            }
+        };
+
+        let cvs, ctx, bgCvs, bgCtx;
+        let width, height, cx, cy, radius;
+        let state = {
+            level: 1,
+            score: 0,
+            lives: 3,
+            currentQ: null,
+            timer: 100,
+            animFrame: null
+        };
+
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playSfx(type) {
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+
+            if(type === 'correct') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(440, now);
+                osc.frequency.exponentialRampToValueAtTime(880, now + 0.1);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            } else if (type === 'wrong') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.linearRampToValueAtTime(50, now + 0.4);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.4);
+                osc.start(now);
+                osc.stop(now + 0.4);
+            }
+        }
+
+        window.onload = () => {
+            cvs = document.getElementById('game-canvas');
+            ctx = cvs.getContext('2d');
+            bgCvs = document.getElementById('bg-canvas');
+            bgCtx = bgCvs.getContext('2d');
+            resize();
+            drawBackground();
+        };
+
+        window.addEventListener('resize', () => { resize(); drawBackground(); if(state.currentQ) drawProblem(state.currentQ); });
+
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            cvs.width = width; cvs.height = height;
+            bgCvs.width = width; bgCvs.height = height;
+            cx = width/2; cy = height/2 - 50; 
+            radius = Math.min(width, height) * 0.25;
+        }
+
+        function drawBackground() {
+            bgCtx.fillStyle = '#0a0a0a';
+            bgCtx.fillRect(0,0,width,height);
+            bgCtx.strokeStyle = '#1a1a1a';
+            bgCtx.lineWidth = 1;
+            for(let i=0; i<width; i+=40) { bgCtx.beginPath(); bgCtx.moveTo(i,0); bgCtx.lineTo(i,height); bgCtx.stroke(); }
+            for(let i=0; i<height; i+=40) { bgCtx.beginPath(); bgCtx.moveTo(0,i); bgCtx.lineTo(width,i); bgCtx.stroke(); }
+        }
+
+        function initGame() {
+            state.level = 1;
+            state.score = 0;
+            state.lives = 3;
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-over-screen').classList.add('hidden');
+            
+            // Show Game UI again
+            document.getElementById('game-ui').classList.remove('hidden');
+            
+            updateHUD();
+            nextLevel();
+            animLoop();
+        }
+
+        function nextLevel() {
+            let type;
+            if (state.level <= 3) type = 'center_circum';
+            else if (state.level <= 6) type = 'cyclic_quad';
+            else type = 'tangent';
+            
+            if(state.level > 6 && Math.random() > 0.6) type = Math.random()>0.5 ? 'cyclic_quad' : 'center_circum';
+
+            state.currentQ = generateGeometry(type);
+            drawProblem(state.currentQ);
+            generateButtons(state.currentQ.correct);
+            state.timer = 100;
+        }
+
+        function generateGeometry(type) {
+            let q = { type: type, points: [], labels: [], lines: [], arcs: [], correct: 0 };
+
+            if (type === 'center_circum') {
+                let rot = M.rand(0, 360);
+                let spread = M.rand(60, 140);
+                let p1Deg = rot;
+                let p2Deg = rot + spread;
+                let p3Deg = rot + spread + M.rand(40, 360 - spread - 40);
+
+                let p1 = M.getPoint(cx, cy, radius, p1Deg);
+                let p2 = M.getPoint(cx, cy, radius, p2Deg);
+                let p3 = M.getPoint(cx, cy, radius, p3Deg);
+                let center = {x: cx, y: cy};
+
+                q.points = [p1, p2, p3, center];
+                q.lines = [[center, p1], [center, p2], [p3, p1], [p3, p2]];
+
+                let angleCircum = M.calcAngle(p1, p3, p2);
+                let angleCenter = angleCircum * 2;
+                let solveCenter = Math.random() > 0.5;
+                
+                q.correct = Math.round(solveCenter ? angleCenter : angleCircum);
+                let knownVal = Math.round(solveCenter ? angleCircum : angleCenter);
+
+                if (solveCenter) {
+                    q.labels.push({ pos: p3, text: knownVal+"°", color: '#fff', offsetMult: 1.2 });
+                    q.labels.push({ pos: center, text: "x", color: '#ff0055', offsetMult: 0.5 });
+                } else {
+                    q.labels.push({ pos: center, text: knownVal+"°", color: '#fff', offsetMult: 0.3 });
+                    q.labels.push({ pos: p3, text: "x", color: '#ff0055', offsetMult: 1.2 });
+                }
+            }
+            else if (type === 'cyclic_quad') {
+                let angles = [M.rand(0,80), M.rand(90,170), M.rand(180,260), M.rand(270,350)];
+                let pts = angles.map(a => M.getPoint(cx, cy, radius, a));
+                q.points = pts;
+                q.lines = [[pts[0], pts[1]], [pts[1], pts[2]], [pts[2], pts[3]], [pts[3], pts[0]]];
+
+                let angleKnown = Math.round(M.calcAngle(pts[3], pts[0], pts[1]));
+                let angleUnknown = 180 - angleKnown;
+
+                q.correct = angleUnknown;
+                q.labels.push({ pos: pts[0], text: angleKnown+"°", color: '#fff', offsetMult: 1.15 });
+                q.labels.push({ pos: pts[2], text: "x", color: '#ff0055', offsetMult: 1.15 });
+            }
+            else if (type === 'tangent') {
+                let tanAngle = M.rand(0, 360);
+                let pContact = M.getPoint(cx, cy, radius, tanAngle);
+                let t1 = { x: pContact.x + 800*Math.cos(M.rad(tanAngle+90)), y: pContact.y + 800*Math.sin(M.rad(tanAngle+90)) };
+                let t2 = { x: pContact.x - 800*Math.cos(M.rad(tanAngle+90)), y: pContact.y - 800*Math.sin(M.rad(tanAngle+90)) };
+                let chordAngleOffset = M.rand(40, 100); 
+                let pChord = M.getPoint(cx, cy, radius, tanAngle + chordAngleOffset);
+                let pAlt = M.getPoint(cx, cy, radius, tanAngle + chordAngleOffset + M.rand(50, 150));
+
+                q.points = [pContact, pChord, pAlt];
+                q.lines = [[t1, t2], [pContact, pChord], [pContact, pAlt], [pChord, pAlt]];
+                
+                let angleVal = Math.round(M.calcAngle(pContact, pAlt, pChord));
+                q.correct = angleVal;
+                
+                if(Math.random()>0.5) {
+                    q.labels.push({ pos: pContact, text: "x", color: '#ff0055', offsetMult: 1.2, isTangent:true });
+                    q.labels.push({ pos: pAlt, text: angleVal+"°", color: '#fff', offsetMult: 1.15 });
+                } else {
+                    q.labels.push({ pos: pContact, text: angleVal+"°", color: '#fff', offsetMult: 1.2, isTangent:true });
+                    q.labels.push({ pos: pAlt, text: "x", color: '#ff0055', offsetMult: 1.15 });
+                }
+            }
+            return q;
+        }
+
+        function drawProblem(q) {
+            ctx.clearRect(0, 0, width, height);
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+            ctx.strokeStyle = '#00ffcc';
+            ctx.lineWidth = 4;
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#00ffcc';
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+            
+            ctx.beginPath();
+            ctx.arc(cx, cy, 3, 0, Math.PI*2);
+            ctx.fillStyle = '#fff';
+            ctx.fill();
+
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 2;
+            q.lines.forEach(line => {
+                ctx.beginPath();
+                ctx.moveTo(line[0].x, line[0].y);
+                ctx.lineTo(line[1].x, line[1].y);
+                ctx.stroke();
+            });
+
+            ctx.font = "24px 'Black Ops One'";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+
+            q.labels.forEach(lbl => {
+                ctx.fillStyle = lbl.color;
+                let lx = lbl.pos.x, ly = lbl.pos.y;
+                let vx = lx - cx, vy = ly - cy;
+                let mag = Math.sqrt(vx*vx + vy*vy) || 1;
+                
+                if (lbl.pos.x === cx && lbl.pos.y === cy) {
+                    ly -= 25; 
+                } else if (lbl.isTangent) {
+                     lx = cx + (vx/mag) * (radius + 40);
+                     ly = cy + (vy/mag) * (radius + 40);
+                } else {
+                    lx = cx + (vx/mag) * (radius * lbl.offsetMult);
+                    ly = cy + (vy/mag) * (radius * lbl.offsetMult);
+                }
+
+                ctx.fillText(lbl.text, lx, ly);
+                ctx.beginPath();
+                ctx.arc(lbl.pos.x, lbl.pos.y, 15, 0, Math.PI*2);
+                ctx.fillStyle = lbl.color === '#ff0055' ? 'rgba(255,0,85,0.2)' : 'rgba(255,255,255,0.1)';
+                ctx.fill();
+            });
+            
+            let timerPct = state.timer / 100;
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius + 20, -Math.PI/2, (-Math.PI/2) + (Math.PI*2*timerPct));
+            ctx.strokeStyle = state.timer < 30 ? '#ff0055' : '#ffd700';
+            ctx.lineWidth = 5;
+            ctx.stroke();
+        }
+
+        function generateButtons(correctAnswer) {
+            const container = document.getElementById('btn-container');
+            container.innerHTML = '';
+            let options = new Set();
+            options.add(correctAnswer);
+            
+            while(options.size < 3) {
+                let mistake = 0;
+                let r = Math.random();
+                if(r < 0.25) mistake = 180 - correctAnswer;
+                else if (r < 0.5) mistake = 90 - correctAnswer;
+                else if (r < 0.75) mistake = correctAnswer * 2;
+                else mistake = Math.floor(correctAnswer / 2);
+                
+                if(mistake <= 0 || mistake === correctAnswer) mistake = correctAnswer + M.randInt(10, 20);
+                options.add(mistake);
+            }
+
+            let arr = Array.from(options).sort(() => Math.random() - 0.5);
+            arr.forEach(val => {
+                let btn = document.createElement('button');
+                btn.className = 'opt-btn';
+                btn.innerText = val + "°";
+                btn.onclick = () => checkAnswer(val, btn);
+                container.appendChild(btn);
+            });
+        }
+
+        function checkAnswer(val, btn) {
+            if (val === state.currentQ.correct) {
+                playSfx('correct');
+                state.score += 100 + Math.ceil(state.timer);
+                state.level++;
+                btn.style.background = '#00ffcc';
+                btn.style.color = 'black';
+                updateHUD();
+                setTimeout(nextLevel, 300);
+            } else {
+                playSfx('wrong');
+                state.lives--;
+                state.score = Math.max(0, state.score - 50);
+                btn.style.background = '#ff0055';
+                document.body.classList.add('shake');
+                showFeedback("WRONG!");
+                updateHUD();
+                
+                if (state.lives <= 0) {
+                    setTimeout(() => { document.body.classList.remove('shake'); gameOver(); }, 800);
+                } else {
+                    setTimeout(() => {
+                         document.body.classList.remove('shake');
+                         nextLevel(); 
+                    }, 800);
+                }
+            }
+        }
+
+        function showFeedback(text) {
+            const el = document.getElementById('feedback-overlay');
+            el.innerText = text;
+            el.style.opacity = 1;
+            el.style.color = '#ff0055';
+            setTimeout(() => { el.style.opacity = 0; }, 800);
+        }
+
+        function updateHUD() {
+            document.getElementById('score-disp').innerText = state.score;
+            document.getElementById('level-disp').innerText = state.level;
+            const hearts = document.querySelectorAll('.heart');
+            hearts.forEach((h, i) => {
+                if (i < state.lives) h.classList.remove('lost');
+                else h.classList.add('lost');
+            });
+        }
+
+        function animLoop() {
+            if (state.lives > 0) {
+                state.timer -= 0.05; 
+                if (state.timer <= 0) {
+                    state.lives--;
+                    playSfx('wrong');
+                    updateHUD();
+                    state.timer = 100;
+                    if(state.lives <= 0) gameOver();
+                    else nextLevel();
+                }
+                if(state.currentQ) drawProblem(state.currentQ);
+                requestAnimationFrame(animLoop);
+            }
+        }
+
+        function gameOver() {
+            // FIX: Hide the main Game UI so it doesn't bleed through
+            document.getElementById('game-ui').classList.add('hidden');
+            
+            document.getElementById('final-score').innerText = "FINAL SCORE: " + state.score;
+            let reason = "";
+            if (state.level < 3) reason = "RANK: ROOKIE";
+            else if (state.level < 6) reason = "RANK: CADET";
+            else reason = "RANK: ELITE";
+            
+            document.getElementById('death-reason').innerText = reason;
+            document.getElementById('game-over-screen').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>

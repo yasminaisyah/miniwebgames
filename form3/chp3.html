@@ -54,15 +54,15 @@
             pointer-events: auto;
         }
 
-        .stat {
-            text-align: center;
-        }
-        .stat-label { font-size: 0.8rem; color: #888; text-transform: uppercase; }
-        .stat-val { font-size: 1.5rem; font-weight: bold; }
+        .stat { text-align: center; min-width: 60px; }
+        .stat-label { font-size: 0.7rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+        .stat-val { font-size: 1.3rem; font-weight: bold; }
         #money-val { color: #00ff88; }
         #lives-val { color: #ff3333; }
         #wave-val { color: #00ccff; }
         #debt-val { color: #ff5555; }
+        #score-val { color: #ffd700; }
+        #time-val { color: #fff; }
 
         /* INTEREST TIMER */
         #interest-box {
@@ -109,11 +109,7 @@
         .t-cost { color: #00ff88; font-weight: bold; }
         .t-desc { font-size: 0.7rem; color: #aaa; margin-top: 5px; }
 
-        /* LOAN BUTTON */
-        #loan-btn {
-            background: #300;
-            border-color: #f00;
-        }
+        #loan-btn { background: #300; border-color: #f00; }
         #loan-btn:hover { background: #500; }
 
         /* SCREENS */
@@ -130,7 +126,7 @@
         }
         .hidden { display: none !important; }
 
-        h1 { color: #00ff88; font-size: 3rem; margin-bottom: 10px; }
+        h1 { color: #00ff88; font-size: 3rem; margin-bottom: 10px; text-transform: uppercase; }
         p { max-width: 500px; text-align: center; color: #ccc; line-height: 1.5; margin-bottom: 30px; }
         
         button.start-btn {
@@ -138,8 +134,22 @@
             padding: 15px 40px; font-size: 1.5rem; font-weight: bold;
             font-family: 'Chakra Petch'; cursor: pointer;
             box-shadow: 0 0 20px rgba(0, 255, 136, 0.4);
+            margin-top: 10px;
         }
         button.start-btn:hover { background: #fff; }
+
+        .star-container { font-size: 3rem; color: #333; margin-bottom: 15px; }
+        .star.active { color: #ffd700; text-shadow: 0 0 20px #ffd700; }
+
+        .result-box {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 20px;
+            border: 1px solid #555;
+            min-width: 300px;
+        }
 
         /* Floating Text */
         .floater {
@@ -164,16 +174,24 @@
     <div id="ui-layer">
         <div id="stats-bar">
             <div class="stat">
+                <div class="stat-label">Time</div>
+                <div class="stat-val" id="time-val">00:00</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Score</div>
+                <div class="stat-val" id="score-val">0</div>
+            </div>
+            <div class="stat">
                 <div class="stat-label">Cash</div>
                 <div class="stat-val" id="money-val">$400</div>
             </div>
             <div class="stat">
-                <div class="stat-label">Net Worth</div>
+                <div class="stat-label">Health</div>
                 <div class="stat-val" id="lives-val">20</div>
             </div>
             <div class="stat">
                 <div class="stat-label">Wave</div>
-                <div class="stat-val" id="wave-val">1</div>
+                <div class="stat-val" id="wave-val">1/5</div>
             </div>
             <div class="stat">
                 <div class="stat-label">Debt</div>
@@ -215,16 +233,28 @@
         <h1>ASSET DEFENSE</h1>
         <p><strong>Topic: Savings, Investment & Debt</strong><br><br>
         1. <strong>Interest:</strong> Every 5 seconds, you earn 5% on your CASH. Holding money is a strategy!<br>
-        2. <strong>Towers:</strong> Spend cash to build assets that destroy debt.<br>
-        3. <strong>Loans:</strong> Desperate? Take a loan, but the interest will drain you.<br><br>
-        Protect your Net Worth from the Red Debt Blobs!</p>
+        2. <strong>Goal:</strong> Survive 5 Waves to win.<br>
+        3. <strong>Score:</strong> Kill enemies and build wealth for points.<br><br>
+        Top Score: <span id="top-score-start">0</span></p>
         <button class="start-btn" onclick="startGame()">START DEFENSE</button>
     </div>
 
     <div id="game-over-screen" class="screen hidden">
-        <h1 style="color:#f55">BANKRUPT</h1>
-        <p>Your Net Worth hit zero.<br>Tip: Try to save more cash before the timer hits to maximize compound interest.</p>
-        <button class="start-btn" onclick="startGame()">TRY AGAIN</button>
+        <h1 id="end-title">GAME OVER</h1>
+        
+        <div class="star-container">
+            <span id="star1" class="star">★</span>
+            <span id="star2" class="star">★</span>
+            <span id="star3" class="star">★</span>
+        </div>
+
+        <div class="result-box">
+            <p style="margin:5px">Final Score: <span id="end-score" style="color:#ffd700; font-weight:bold; font-size:1.5rem">0</span></p>
+            <p style="margin:5px; font-size:0.9rem">High Score: <span id="end-high-score">0</span></p>
+        </div>
+        
+        <p id="end-msg">Your Net Worth hit zero.</p>
+        <button class="start-btn" onclick="startGame()">PLAY AGAIN</button>
     </div>
 </div>
 
@@ -236,11 +266,11 @@
     const TILE_SIZE = 60;
     const GRID_W = 16;
     const GRID_H = 10;
-    const INTEREST_RATE = 0.05; // 5%
-    const INTEREST_INTERVAL = 500; // Frames (approx 8.3 sec at 60fps) -> actually using Time
+    const INTEREST_RATE = 0.05; 
+    const MAX_WAVES = 5;
     
     // Map: 0=Grass(Build), 1=Path(Walk), 2=Base
-    // Simple winding path
+    // Refined map to ensure no ambiguity in pathing
     const MAP_DATA = [
         [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
         [1,1,1,1,0,0,1,1,1,1,1,1,0,0,0,0],
@@ -254,34 +284,61 @@
         [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
     ];
 
-    // Convert map to waypoints
-    const WAYPOINTS = [
-        {c:0, r:1}, {c:3, r:1}, {c:3, r:3}, {c:6, r:3}, {c:6, r:1}, {c:11, r:1}, {c:11, r:3}, 
-        {c:13, r:3}, {c:13, r:7}, {c:9, r:7}, {c:9, r:6}, {c:6, r:6}, {c:6, r:5}, {c:2, r:5},
-        {c:2, r:8}, {c:9, r:8}, {c:9, r:6}, // Wait, map visual above doesn't perfectly match auto-pathing.
-        // Hardcoding simplified path centers based on visual map above:
-        {x:0.5, y:1.5}, {x:3.5, y:1.5}, {x:3.5, y:3.5}, {x:6.5, y:3.5}, {x:6.5, y:1.5}, 
-        {x:11.5, y:1.5}, {x:11.5, y:3.5}, {x:13.5, y:3.5}, {x:13.5, y:8.5}, {x:15.5, y:8.5} // End
-    ];
-    // Correcting waypoints to match the array exactly
-    const PATH_POINTS = [
-        {c:0, r:1}, {c:3, r:1}, {c:3, r:3}, {c:6, r:3}, {c:6, r:1}, {c:11, r:1},
-        {c:11, r:3}, {c:13, r:3}, {c:13, r:6}, {c:9, r:6}, {c:9, r:6}, // Simplified visual check
-        // Actually, let's just make a simple function to follow '1's.
-    ];
+    // --- PATHFINDING (BFS) ---
+    // This solves the "Ball goes left" issue by mathematically finding the route
+    let PATH_COORDS = [];
+
+    function generatePath() {
+        let start = {x:0, y:1}; // Based on map [1][0] is 1
+        let queue = [{x: start.x, y: start.y, path: []}];
+        let visited = new Set();
+        
+        while(queue.length > 0) {
+            let current = queue.shift();
+            let key = `${current.x},${current.y}`;
+            
+            if(visited.has(key)) continue;
+            visited.add(key);
+
+            let newPath = [...current.path, {x: current.x + 0.5, y: current.y + 0.5}]; // Center of tile
+
+            // Check if Base (2)
+            if (MAP_DATA[current.y][current.x] === 2) {
+                return newPath;
+            }
+
+            // Neighbors: Right, Down, Up, Left
+            const dirs = [[1,0], [0,1], [0,-1], [-1,0]];
+            for (let d of dirs) {
+                let nx = current.x + d[0];
+                let ny = current.y + d[1];
+
+                if (nx >= 0 && nx < GRID_W && ny >= 0 && ny < GRID_H) {
+                    let val = MAP_DATA[ny][nx];
+                    if ((val === 1 || val === 2) && !visited.has(`${nx},${ny}`)) {
+                        queue.push({x: nx, y: ny, path: newPath});
+                    }
+                }
+            }
+        }
+        return [];
+    }
     
     // --- GAME STATE ---
     let state = {
         money: 400,
+        score: 0,
         lives: 20,
         wave: 1,
         debt: 0,
+        startTime: 0,
+        gameTime: 0,
         lastInterestTime: 0,
         active: false,
         enemies: [],
         towers: [],
         projectiles: [],
-        selectedTower: -1, // 0 or 1
+        selectedTower: -1, 
         spawnTimer: 0,
         spawnCount: 0
     };
@@ -289,6 +346,10 @@
     function resize() {
         canvas.width = GRID_W * TILE_SIZE;
         canvas.height = GRID_H * TILE_SIZE;
+        PATH_COORDS = generatePath(); // Generate path on load
+        
+        let hs = localStorage.getItem('assetDefenseHighScore') || 0;
+        document.getElementById('top-score-start').innerText = hs;
     }
     resize();
 
@@ -297,9 +358,12 @@
     function startGame() {
         state = {
             money: 400,
+            score: 0,
             lives: 20,
             wave: 1,
             debt: 0,
+            startTime: Date.now(),
+            gameTime: 0,
             lastInterestTime: Date.now(),
             active: true,
             enemies: [],
@@ -319,45 +383,52 @@
         if (!state.active) return;
         const now = Date.now();
 
-        // 1. INTEREST MECHANIC (Learning Point)
+        // Timer
+        state.gameTime = Math.floor((now - state.startTime) / 1000);
+        let mins = Math.floor(state.gameTime / 60).toString().padStart(2, '0');
+        let secs = (state.gameTime % 60).toString().padStart(2, '0');
+        document.getElementById('time-val').innerText = `${mins}:${secs}`;
+
+        // 1. INTEREST MECHANIC
         let timeDiff = now - state.lastInterestTime;
         let timeLeft = Math.max(0, 5000 - timeDiff);
         document.getElementById('int-timer').innerText = (timeLeft / 1000).toFixed(1) + "s";
         
         if (timeDiff >= 5000) {
-            // Apply Interest
             let interest = Math.floor(state.money * INTEREST_RATE);
             if (interest > 0) {
                 state.money += interest;
+                state.score += interest; // Score points for earning interest
                 spawnFloatText(`+${interest} INTEREST`, canvas.width/2, canvas.height/2, '#00ff88');
             }
             state.lastInterestTime = now;
             
-            // Apply Debt (Pain)
+            // Debt
             if (state.debt > 0) {
-                let debtPain = Math.ceil(state.debt * 0.10); // 10% debt interest
+                let debtPain = Math.ceil(state.debt * 0.10); 
                 state.money -= debtPain;
                 spawnFloatText(`-${debtPain} DEBT PAY`, canvas.width/2, canvas.height/2 + 30, '#ff5555');
-                if (state.money < 0) {
-                    // Force sell towers? or just negative money?
-                    // Negative money prevents building
-                }
             }
         }
 
         // 2. SPAWNING
         if (state.spawnCount > 0) {
             state.spawnTimer++;
-            if (state.spawnTimer > 60 - (state.wave * 2)) {
+            if (state.spawnTimer > 60 - (state.wave * 5)) {
                 spawnEnemy();
                 state.spawnTimer = 0;
                 state.spawnCount--;
             }
         } else if (state.enemies.length === 0) {
             // Wave Complete
-            state.wave++;
-            state.spawnCount = 5 + (state.wave * 3);
-            spawnFloatText(`WAVE ${state.wave}`, canvas.width/2, 100, '#fff');
+            if (state.wave < MAX_WAVES) {
+                state.wave++;
+                state.spawnCount = 5 + (state.wave * 4);
+                state.score += 100; // Wave Clear Bonus
+                spawnFloatText(`WAVE ${state.wave} START`, canvas.width/2, 100, '#fff');
+            } else {
+                endGame(true); // VICTORY
+            }
         }
 
         // 3. MOVING ENEMIES
@@ -369,6 +440,7 @@
                 state.enemies.splice(i, 1);
             } else if (e.hp <= 0) {
                 state.money += e.reward;
+                state.score += e.reward * 2;
                 state.enemies.splice(i, 1);
             }
         }
@@ -377,7 +449,6 @@
         state.towers.forEach(t => {
             if (t.cooldown > 0) t.cooldown--;
             else {
-                // Find target
                 let target = getTarget(t);
                 if (target) {
                     shoot(t, target);
@@ -398,39 +469,33 @@
             }
         }
 
-        if (state.lives <= 0) gameOver();
+        if (state.lives <= 0) endGame(false); // DEFEAT
+        if (state.money < 0) state.money = 0; // Prevent negative
         updateUI();
     }
 
     // --- GAMEPLAY HELPERS ---
 
     function spawnEnemy() {
-        // Path following logic: Start at [1,0]
         state.enemies.push({
-            x: 0, y: TILE_SIZE * 1.5,
-            hp: 20 + (state.wave * 10),
-            speed: 1 + (state.wave * 0.1),
-            reward: 5,
+            x: PATH_COORDS[0].x * TILE_SIZE, 
+            y: PATH_COORDS[0].y * TILE_SIZE,
+            hp: 20 + (state.wave * 15),
+            speed: 1.5 + (state.wave * 0.2),
+            reward: 5 + state.wave,
             pathIndex: 0,
             finished: false,
-            maxHp: 20 + (state.wave * 10)
+            maxHp: 20 + (state.wave * 15)
         });
     }
 
-    // Hardcoded path based on the map array visually
-    // 0,1 -> 3,1 -> 3,3 -> 6,3 -> 6,1 -> 11,1 -> 11,3 -> 13,3 -> 13,6 -> 9,6 -> 9,8 -> 15,8
-    const PATH_COORDS = [
-        {x: 3.5, y: 1.5}, {x: 3.5, y: 3.5}, {x: 6.5, y: 3.5}, {x: 6.5, y: 1.5},
-        {x: 11.5, y: 1.5}, {x: 11.5, y: 3.5}, {x: 13.5, y: 3.5}, {x: 13.5, y: 6.5},
-        {x: 9.5, y: 6.5}, {x: 9.5, y: 8.5}, {x: 15.5, y: 8.5}
-    ];
-
     function moveEnemy(e) {
-        if (e.pathIndex >= PATH_COORDS.length) {
+        if (e.pathIndex >= PATH_COORDS.length - 1) {
             e.finished = true;
             return;
         }
-        let target = PATH_COORDS[e.pathIndex];
+        
+        let target = PATH_COORDS[e.pathIndex + 1];
         let tx = target.x * TILE_SIZE;
         let ty = target.y * TILE_SIZE;
         
@@ -449,7 +514,6 @@
     }
 
     function getTarget(tower) {
-        // Simple: Closest
         let best = null;
         let minD = tower.range;
         state.enemies.forEach(e => {
@@ -466,7 +530,7 @@
         state.projectiles.push({
             x: tower.x, y: tower.y,
             target: target,
-            speed: 10,
+            speed: 12,
             dmg: tower.dmg,
             color: tower.type === 0 ? '#00ff88' : '#00ccff',
             life: 50,
@@ -475,7 +539,6 @@
     }
 
     function moveProjectile(p) {
-        // Homing missile
         if (!state.enemies.includes(p.target)) {
             p.life = 0; return;
         }
@@ -503,6 +566,7 @@
     function takeLoan() {
         state.money += 500;
         state.debt += 500;
+        state.score -= 50; // Penalty for taking loan
         spawnFloatText("LOAN +500", canvas.width/2, canvas.height/2, '#fff');
     }
 
@@ -510,6 +574,7 @@
         if (state.money >= 100 && state.debt > 0) {
             state.money -= 100;
             state.debt = Math.max(0, state.debt - 100);
+            state.score += 20; // Bonus for paying debt
         }
     }
 
@@ -525,17 +590,13 @@
 
         if (col < 0 || col >= GRID_W || row < 0 || row >= GRID_H) return;
 
-        // Check placement
         if (MAP_DATA[row][col] === 0) {
-            // Check existing tower
             let occupied = state.towers.some(t => Math.floor(t.x/TILE_SIZE) === col && Math.floor(t.y/TILE_SIZE) === row);
             if (occupied) return;
 
-            // Check cost
             let cost = state.selectedTower === 0 ? 100 : 300;
             if (state.money >= cost) {
                 state.money -= cost;
-                // Build
                 state.towers.push({
                     x: (col + 0.5) * TILE_SIZE,
                     y: (row + 0.5) * TILE_SIZE,
@@ -545,7 +606,6 @@
                     maxCooldown: state.selectedTower === 0 ? 20 : 60,
                     cooldown: 0
                 });
-                // Deselect
                 state.selectedTower = -1;
                 document.getElementById('btn-t0').classList.remove('selected');
                 document.getElementById('btn-t1').classList.remove('selected');
@@ -568,19 +628,21 @@
                 let x = c * TILE_SIZE;
                 let y = r * TILE_SIZE;
                 
-                if (val === 0) { // Grass
+                if (val === 0) { 
                     ctx.fillStyle = '#111';
                     ctx.fillRect(x, y, TILE_SIZE-1, TILE_SIZE-1);
-                    // Draw build marker if available
                     if ((c+r)%2==0) { ctx.fillStyle='#161616'; ctx.fillRect(x,y,TILE_SIZE,TILE_SIZE); }
-                } else if (val === 1) { // Path
+                } else if (val === 1) { 
                     ctx.fillStyle = '#222';
                     ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
                     ctx.strokeStyle = '#333';
                     ctx.strokeRect(x,y,TILE_SIZE,TILE_SIZE);
-                } else if (val === 2) { // Base
+                } else if (val === 2) { 
                     ctx.fillStyle = '#0055aa';
                     ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                    ctx.font = '10px Arial';
+                    ctx.fillStyle = 'white';
+                    ctx.fillText('BASE', x+10, y+35);
                 }
             }
         }
@@ -591,10 +653,12 @@
             ctx.beginPath();
             ctx.arc(t.x, t.y, 20, 0, Math.PI*2);
             ctx.fill();
-            // Range (hover effect simplified)
-            ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+            
+            // Base
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.arc(t.x, t.y, t.range, 0, Math.PI*2);
+            ctx.arc(t.x, t.y, 10, 0, Math.PI*2);
             ctx.stroke();
         });
 
@@ -605,7 +669,6 @@
             ctx.arc(e.x, e.y, 15, 0, Math.PI*2);
             ctx.fill();
             
-            // Health Bar
             let hpPct = e.hp / e.maxHp;
             ctx.fillStyle = 'red';
             ctx.fillRect(e.x - 15, e.y - 25, 30, 5);
@@ -635,17 +698,54 @@
 
     function updateUI() {
         document.getElementById('money-val').innerText = "$" + Math.floor(state.money);
+        document.getElementById('score-val').innerText = Math.floor(state.score);
         document.getElementById('lives-val').innerText = state.lives;
-        document.getElementById('wave-val').innerText = state.wave;
+        document.getElementById('wave-val').innerText = state.wave + "/" + MAX_WAVES;
         document.getElementById('debt-val').innerText = "$" + state.debt;
         
         if (state.debt > 0) document.getElementById('debt-val').style.color = '#f00';
         else document.getElementById('debt-val').style.color = '#888';
     }
 
-    function gameOver() {
+    function endGame(victory) {
         state.active = false;
         document.getElementById('game-over-screen').classList.remove('hidden');
+        
+        const title = document.getElementById('end-title');
+        const msg = document.getElementById('end-msg');
+        const endScore = document.getElementById('end-score');
+        const star1 = document.getElementById('star1');
+        const star2 = document.getElementById('star2');
+        const star3 = document.getElementById('star3');
+
+        star1.classList.remove('active');
+        star2.classList.remove('active');
+        star3.classList.remove('active');
+
+        // High Score
+        let hs = localStorage.getItem('assetDefenseHighScore') || 0;
+        if (state.score > hs) {
+            hs = Math.floor(state.score);
+            localStorage.setItem('assetDefenseHighScore', hs);
+        }
+        document.getElementById('end-high-score').innerText = hs;
+        endScore.innerText = Math.floor(state.score);
+
+        if (victory) {
+            title.innerText = "FINANCIAL FREEDOM!";
+            title.style.color = "#ffd700";
+            msg.innerText = "You defended your assets successfully.";
+            
+            // Stars Logic
+            star1.classList.add('active'); // 1 star for winning
+            if (state.lives > 10) star2.classList.add('active'); // 2 stars
+            if (state.lives >= 18) star3.classList.add('active'); // 3 stars
+        } else {
+            title.innerText = "BANKRUPT";
+            title.style.color = "#ff5555";
+            msg.innerText = "The debt consumed you. Try again!";
+            // No stars for losing
+        }
     }
 
     function loop() {

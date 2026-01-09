@@ -47,17 +47,18 @@
             transform: translateX(-50%);
             display: flex;
             gap: 20px;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.85);
             padding: 10px 30px;
             border-radius: 10px;
             border: 1px solid #444;
             pointer-events: auto;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
         }
 
         .stat { text-align: center; min-width: 60px; }
         .stat-label { font-size: 0.7rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
         .stat-val { font-size: 1.3rem; font-weight: bold; }
-        #money-val { color: #00ff88; }
+        #money-val { color: #00ff88; text-shadow: 0 0 5px rgba(0,255,136,0.5); }
         #lives-val { color: #ff3333; }
         #wave-val { color: #00ccff; }
         #debt-val { color: #ff5555; }
@@ -76,10 +77,11 @@
             text-align: center;
             width: 180px;
             pointer-events: auto;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.1);
         }
-        .int-title { color: #00ff88; font-weight: bold; margin-bottom: 5px; }
+        .int-title { color: #00ff88; font-weight: bold; margin-bottom: 5px; font-size: 0.9rem; }
         .int-timer { font-size: 2rem; font-weight: bold; }
-        .int-desc { font-size: 0.8rem; color: #aaa; margin-top: 5px; }
+        .int-desc { font-size: 0.8rem; color: #aaa; margin-top: 5px; line-height: 1.2; }
 
         /* BUILD MENU */
         #build-menu {
@@ -96,17 +98,18 @@
             background: #222;
             border: 2px solid #555;
             padding: 10px;
-            width: 100px;
+            width: 110px;
             text-align: center;
             cursor: pointer;
             transition: 0.2s;
             position: relative;
+            border-radius: 5px;
         }
-        .tower-card:hover { transform: translateY(-5px); border-color: #fff; }
-        .tower-card.selected { border-color: #00ff88; background: #003311; }
+        .tower-card:hover { transform: translateY(-5px); border-color: #fff; background: #333; }
+        .tower-card.selected { border-color: #00ff88; background: #003311; transform: scale(1.05); }
         
-        .t-name { font-weight: bold; font-size: 0.9rem; margin-bottom: 5px; }
-        .t-cost { color: #00ff88; font-weight: bold; }
+        .t-name { font-weight: bold; font-size: 0.8rem; margin-bottom: 5px; letter-spacing: 1px; }
+        .t-cost { color: #00ff88; font-weight: bold; font-size: 1.1rem; }
         .t-desc { font-size: 0.7rem; color: #aaa; margin-top: 5px; }
 
         #loan-btn { background: #300; border-color: #f00; }
@@ -116,40 +119,62 @@
         .screen {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.95);
+            background: rgba(5, 5, 10, 0.95);
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             z-index: 100;
             pointer-events: auto;
+            backdrop-filter: blur(5px);
         }
         .hidden { display: none !important; }
 
-        h1 { color: #00ff88; font-size: 3rem; margin-bottom: 10px; text-transform: uppercase; }
-        p { max-width: 500px; text-align: center; color: #ccc; line-height: 1.5; margin-bottom: 30px; }
+        h1 { color: #00ff88; font-size: 4rem; margin-bottom: 10px; text-transform: uppercase; text-shadow: 0 0 30px #00ff88; }
+        p { max-width: 600px; text-align: center; color: #ccc; line-height: 1.6; margin-bottom: 30px; font-size: 1.1rem; }
         
         button.start-btn {
-            background: #00ff88; color: #000; border: none;
-            padding: 15px 40px; font-size: 1.5rem; font-weight: bold;
+            background: transparent; 
+            color: #00ff88; 
+            border: 2px solid #00ff88;
+            padding: 15px 50px; font-size: 1.5rem; font-weight: bold;
             font-family: 'Chakra Petch'; cursor: pointer;
-            box-shadow: 0 0 20px rgba(0, 255, 136, 0.4);
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.2);
             margin-top: 10px;
+            transition: 0.2s;
+            text-transform: uppercase;
         }
-        button.start-btn:hover { background: #fff; }
+        button.start-btn:hover { background: #00ff88; color: #000; box-shadow: 0 0 40px rgba(0, 255, 136, 0.6); }
 
-        .star-container { font-size: 3rem; color: #333; margin-bottom: 15px; }
-        .star.active { color: #ffd700; text-shadow: 0 0 20px #ffd700; }
+        /* End Game Specifics */
+        .star-container { 
+            display: flex; 
+            gap: 15px; 
+            font-size: 4rem; 
+            color: #333; 
+            margin-bottom: 20px; 
+            height: 80px;
+        }
+        .star { transition: transform 0.3s, color 0.3s; }
+        .star.active { color: #ffd700; text-shadow: 0 0 30px #ffd700; transform: scale(1.2); }
+
+        .result-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 30px;
+            width: 400px;
+        }
 
         .result-box {
-            background: rgba(255,255,255,0.1);
-            padding: 20px;
-            border-radius: 10px;
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            border-radius: 5px;
             text-align: center;
-            margin-bottom: 20px;
-            border: 1px solid #555;
-            min-width: 300px;
+            border: 1px solid #333;
         }
+        .rb-label { color: #888; font-size: 0.8rem; text-transform: uppercase; }
+        .rb-val { color: #fff; font-size: 1.5rem; font-weight: bold; }
 
         /* Floating Text */
         .floater {
@@ -157,11 +182,13 @@
             font-weight: bold;
             pointer-events: none;
             animation: floatUp 1s forwards;
-            text-shadow: 1px 1px 0 #000;
+            text-shadow: 2px 2px 0 #000;
+            font-size: 1.2rem;
+            z-index: 50;
         }
         @keyframes floatUp {
             0% { transform: translateY(0); opacity: 1; }
-            100% { transform: translateY(-30px); opacity: 0; }
+            100% { transform: translateY(-40px); opacity: 0; }
         }
 
     </style>
@@ -219,7 +246,7 @@
             <div class="tower-card" id="loan-btn" onclick="takeLoan()">
                 <div class="t-name" style="color:#f55">TAKE LOAN</div>
                 <div class="t-cost">+$500</div>
-                <div class="t-desc">Cost: $2/sec<br>Interest!</div>
+                <div class="t-desc">Cost: $2/sec<br>High Risk</div>
             </div>
              <div class="tower-card" onclick="payDebt()" style="background:#442222; border-color:#f55">
                 <div class="t-name">PAY DEBT</div>
@@ -234,8 +261,13 @@
         <p><strong>Topic: Savings, Investment & Debt</strong><br><br>
         1. <strong>Interest:</strong> Every 5 seconds, you earn 5% on your CASH. Holding money is a strategy!<br>
         2. <strong>Goal:</strong> Survive 5 Waves to win.<br>
-        3. <strong>Score:</strong> Kill enemies and build wealth for points.<br><br>
-        Top Score: <span id="top-score-start">0</span></p>
+        3. <strong>Score:</strong> Kill enemies and accumulate wealth for high scores.</p>
+        
+        <div class="result-box" style="margin-bottom:20px; border-color:#00ff88; box-shadow:0 0 10px rgba(0,255,136,0.2);">
+            <div class="rb-label">ALL-TIME TOP SCORE</div>
+            <div class="rb-val" id="top-score-start" style="color:#00ff88">0</div>
+        </div>
+
         <button class="start-btn" onclick="startGame()">START DEFENSE</button>
     </div>
 
@@ -248,9 +280,23 @@
             <span id="star3" class="star">★</span>
         </div>
 
-        <div class="result-box">
-            <p style="margin:5px">Final Score: <span id="end-score" style="color:#ffd700; font-weight:bold; font-size:1.5rem">0</span></p>
-            <p style="margin:5px; font-size:0.9rem">High Score: <span id="end-high-score">0</span></p>
+        <div class="result-grid">
+            <div class="result-box">
+                <div class="rb-label">FINAL SCORE</div>
+                <div class="rb-val" id="end-score" style="color:#ffd700">0</div>
+            </div>
+            <div class="result-box">
+                <div class="rb-label">HIGH SCORE</div>
+                <div class="rb-val" id="end-high-score">0</div>
+            </div>
+            <div class="result-box">
+                <div class="rb-label">TIME</div>
+                <div class="rb-val" id="end-time">00:00</div>
+            </div>
+            <div class="result-box">
+                <div class="rb-label">LIVES LEFT</div>
+                <div class="rb-val" id="end-lives">0</div>
+            </div>
         </div>
         
         <p id="end-msg">Your Net Worth hit zero.</p>
@@ -270,7 +316,6 @@
     const MAX_WAVES = 5;
     
     // Map: 0=Grass(Build), 1=Path(Walk), 2=Base
-    // Refined map to ensure no ambiguity in pathing
     const MAP_DATA = [
         [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
         [1,1,1,1,0,0,1,1,1,1,1,1,0,0,0,0],
@@ -285,11 +330,10 @@
     ];
 
     // --- PATHFINDING (BFS) ---
-    // This solves the "Ball goes left" issue by mathematically finding the route
     let PATH_COORDS = [];
 
     function generatePath() {
-        let start = {x:0, y:1}; // Based on map [1][0] is 1
+        let start = {x:0, y:1}; 
         let queue = [{x: start.x, y: start.y, path: []}];
         let visited = new Set();
         
@@ -300,14 +344,12 @@
             if(visited.has(key)) continue;
             visited.add(key);
 
-            let newPath = [...current.path, {x: current.x + 0.5, y: current.y + 0.5}]; // Center of tile
+            let newPath = [...current.path, {x: current.x + 0.5, y: current.y + 0.5}];
 
-            // Check if Base (2)
             if (MAP_DATA[current.y][current.x] === 2) {
                 return newPath;
             }
 
-            // Neighbors: Right, Down, Up, Left
             const dirs = [[1,0], [0,1], [0,-1], [-1,0]];
             for (let d of dirs) {
                 let nx = current.x + d[0];
@@ -346,8 +388,9 @@
     function resize() {
         canvas.width = GRID_W * TILE_SIZE;
         canvas.height = GRID_H * TILE_SIZE;
-        PATH_COORDS = generatePath(); // Generate path on load
+        PATH_COORDS = generatePath();
         
+        // Load High Score on Load
         let hs = localStorage.getItem('assetDefenseHighScore') || 0;
         document.getElementById('top-score-start').innerText = hs;
     }
@@ -375,6 +418,12 @@
         };
         document.getElementById('start-screen').classList.add('hidden');
         document.getElementById('game-over-screen').classList.add('hidden');
+        
+        // Reset Visuals
+        document.getElementById('star1').classList.remove('active');
+        document.getElementById('star2').classList.remove('active');
+        document.getElementById('star3').classList.remove('active');
+        
         updateUI();
         loop();
     }
@@ -566,7 +615,7 @@
     function takeLoan() {
         state.money += 500;
         state.debt += 500;
-        state.score -= 50; // Penalty for taking loan
+        state.score -= 50; // Penalty
         spawnFloatText("LOAN +500", canvas.width/2, canvas.height/2, '#fff');
     }
 
@@ -574,7 +623,7 @@
         if (state.money >= 100 && state.debt > 0) {
             state.money -= 100;
             state.debt = Math.max(0, state.debt - 100);
-            state.score += 20; // Bonus for paying debt
+            state.score += 20; // Bonus
         }
     }
 
@@ -718,15 +767,24 @@
         const star2 = document.getElementById('star2');
         const star3 = document.getElementById('star3');
 
-        star1.classList.remove('active');
-        star2.classList.remove('active');
-        star3.classList.remove('active');
+        // Stats Display
+        let mins = Math.floor(state.gameTime / 60).toString().padStart(2, '0');
+        let secs = (state.gameTime % 60).toString().padStart(2, '0');
+        document.getElementById('end-time').innerText = `${mins}:${secs}`;
+        document.getElementById('end-lives').innerText = state.lives;
+
+        // Apply Time Bonus if won
+        if (victory) {
+            let timeBonus = Math.max(0, 300 - state.gameTime) * 10; // Faster = More Points
+            state.score += timeBonus;
+        }
 
         // High Score
         let hs = localStorage.getItem('assetDefenseHighScore') || 0;
         if (state.score > hs) {
             hs = Math.floor(state.score);
             localStorage.setItem('assetDefenseHighScore', hs);
+            msg.innerText = "NEW HIGH SCORE!";
         }
         document.getElementById('end-high-score').innerText = hs;
         endScore.innerText = Math.floor(state.score);
@@ -737,9 +795,9 @@
             msg.innerText = "You defended your assets successfully.";
             
             // Stars Logic
-            star1.classList.add('active'); // 1 star for winning
-            if (state.lives > 10) star2.classList.add('active'); // 2 stars
-            if (state.lives >= 18) star3.classList.add('active'); // 3 stars
+            setTimeout(() => star1.classList.add('active'), 200);
+            if (state.lives > 10) setTimeout(() => star2.classList.add('active'), 600);
+            if (state.lives >= 18) setTimeout(() => star3.classList.add('active'), 1000);
         } else {
             title.innerText = "BANKRUPT";
             title.style.color = "#ff5555";

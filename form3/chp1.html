@@ -55,18 +55,23 @@
             border: 1px solid rgba(255, 255, 255, 0.2);
             padding: 10px 20px;
             border-radius: 8px;
-            font-size: 1.2rem;
-            font-weight: bold;
+            font-size: 1.4rem; /* Increased size */
+            font-weight: 900;
             box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
         }
 
         #hint-box {
             margin-top: 10px;
-            font-size: 1.2rem;
-            color: #4db8ff;
+            font-size: 1.5rem; /* Increased size */
+            font-weight: bold;
+            color: #ffffff;    /* Changed to pure white for better visibility */
             text-shadow: 0 0 10px #4db8ff;
             text-align: center;
-            opacity: 0.9;
+            opacity: 1;        /* Full opacity */
+            background: rgba(0,0,0,0.3);
+            padding: 5px 15px;
+            border-radius: 20px;
         }
 
         /* Menus */
@@ -88,41 +93,44 @@
         .hidden { display: none !important; }
 
         h1 {
-            font-size: 3.5rem;
+            font-size: 4rem;
             margin-bottom: 10px;
             background: linear-gradient(to right, #4db8ff, #00ffcc);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             text-transform: uppercase;
             letter-spacing: 2px;
+            text-shadow: 0 0 30px rgba(77, 184, 255, 0.3);
         }
 
         p {
-            color: #a0aab5;
-            font-size: 1.1rem;
-            max-width: 500px;
+            color: #ffffff; /* Changed from grey to white */
+            font-size: 1.3rem;
+            max-width: 600px;
             text-align: center;
             line-height: 1.6;
             margin-bottom: 30px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
         }
 
         button {
-            padding: 15px 40px;
-            font-size: 1.5rem;
+            padding: 15px 50px;
+            font-size: 1.8rem;
             font-family: 'Exo 2', sans-serif;
-            font-weight: bold;
+            font-weight: 900;
             background: #4db8ff;
             color: #0b0f19;
-            border: none;
-            border-radius: 5px;
+            border: 2px solid #fff;
+            border-radius: 50px;
             cursor: pointer;
-            box-shadow: 0 0 20px rgba(77, 184, 255, 0.4);
+            box-shadow: 0 0 20px rgba(77, 184, 255, 0.6);
             transition: transform 0.2s, background 0.2s;
         }
 
         button:hover {
-            transform: scale(1.05);
+            transform: scale(1.1);
             background: #fff;
+            box-shadow: 0 0 40px rgba(255, 255, 255, 0.8);
         }
 
         /* Lane Click Areas */
@@ -166,7 +174,7 @@
     </div>
 
     <div id="game-over-screen" class="screen hidden">
-        <h1 style="color:#ff3333">SYSTEM FAILURE</h1>
+        <h1 style="color:#ff3333; -webkit-text-fill-color: #ff3333;">SYSTEM FAILURE</h1>
         <p>Your core integrity reached 0%.<br>Final Score: <span id="finalScore">0</span></p>
         <button onclick="startGame()">REBOOT</button>
     </div>
@@ -197,11 +205,11 @@
         playMove: function() { this.playTone(300, 'triangle', 0.05, 0.05); },
         playCatch: function() { 
             this.playTone(600, 'sine', 0.1, 0.1); 
-            setTimeout(()=>this.playTone(900, 'sine', 0.2, 0.1), 100);
+            this.playTone(900, 'sine', 0.2, 0.1);
         },
         playError: function() { 
             this.playTone(150, 'sawtooth', 0.3, 0.2); 
-            setTimeout(()=>this.playTone(100, 'sawtooth', 0.3, 0.2), 150);
+            this.playTone(100, 'sawtooth', 0.3, 0.2);
         }
     };
 
@@ -297,7 +305,7 @@
         level: 1,
         playerLane: 1, 
         dropY: -100,
-        dropX: 0, // NEW: Tracks the X position of falling equation
+        dropX: 0, 
         currentProblem: null,
         lanesX: [],
         laneWidth: 0,
@@ -315,7 +323,6 @@
             state.laneWidth * 1.5,
             state.laneWidth * 2.5
         ];
-        // Reset dropX if resizing
         if(state.active) state.dropX = state.lanesX[state.playerLane];
     }
     window.addEventListener('resize', resize);
@@ -346,7 +353,6 @@
         }
 
         state.dropY = -150;
-        // Start X at the current player lane so it feels connected immediately
         state.dropX = state.lanesX[state.playerLane]; 
         
         state.dropSpeed = 2 + (state.level * 0.3);
@@ -364,10 +370,11 @@
         }
     }
 
-    function drawMath(ctx, obj, x, y, size=40) {
+    // DRAW MATH: Increased default size from 40 to 50
+    function drawMath(ctx, obj, x, y, size=50) {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.font = `bold ${size}px "Exo 2"`;
+        ctx.font = `900 ${size}px "Exo 2"`; // Thicker font weight
         const smallSize = size * 0.6;
         const supOffset = size * -0.4;
 
@@ -378,58 +385,58 @@
             ctx.fillText("(", x - w/3, y);
             ctx.fillStyle = '#4db8ff'; 
             ctx.fillText(obj.base, x - w/6, y);
-            ctx.font = `bold ${smallSize}px "Exo 2"`;
+            ctx.font = `900 ${smallSize}px "Exo 2"`;
             ctx.fillStyle = '#ffcc00'; 
             ctx.fillText(obj.innerExp, x, y + supOffset);
-            ctx.font = `bold ${size}px "Exo 2"`;
+            ctx.font = `900 ${size}px "Exo 2"`;
             ctx.fillStyle = '#fff';
             ctx.fillText(")", x + w/6, y);
-            ctx.font = `bold ${smallSize}px "Exo 2"`;
+            ctx.font = `900 ${smallSize}px "Exo 2"`;
             ctx.fillStyle = '#ffcc00';
             ctx.fillText(obj.outerExp, x + w/3 + 10, y + supOffset);
         } else if (obj.qTop2) {
             ctx.fillStyle = '#4db8ff'; 
-            ctx.fillText(obj.qTop, x - 40, y);
-            ctx.font = `bold ${smallSize}px "Exo 2"`;
+            ctx.fillText(obj.qTop, x - 50, y);
+            ctx.font = `900 ${smallSize}px "Exo 2"`;
             ctx.fillStyle = '#ffcc00'; 
-            ctx.fillText(obj.qExp, x - 20, y + supOffset);
-            ctx.font = `bold ${size}px "Exo 2"`;
+            ctx.fillText(obj.qExp, x - 25, y + supOffset);
+            ctx.font = `900 ${size}px "Exo 2"`;
             ctx.fillStyle = '#fff'; 
-            ctx.fillText(obj.qTop2, x + 20, y);
-            ctx.font = `bold ${smallSize}px "Exo 2"`;
+            ctx.fillText(obj.qTop2, x + 25, y);
+            ctx.font = `900 ${smallSize}px "Exo 2"`;
             ctx.fillStyle = '#ffcc00'; 
-            ctx.fillText(obj.qExp2, x + 60, y + supOffset);
+            ctx.fillText(obj.qExp2, x + 75, y + supOffset);
         } else {
             ctx.fillStyle = '#fff';
             ctx.fillText(obj.qTop, x, y);
         }
     }
 
-    function drawAnswer(ctx, base, exp, x, y) {
-        const size = 30;
-        const smallSize = 18;
-        const offset = -12;
-        ctx.font = `bold ${size}px "Exo 2"`;
-        ctx.fillStyle = '#0b0f19'; 
+    // DRAW ANSWER: Now accepts a specific color parameter
+    function drawAnswer(ctx, base, exp, x, y, color) {
+        const size = 35; // Increased size
+        const smallSize = 22;
+        const offset = -14;
+        
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(base, x - 10, y + 5);
-        ctx.font = `bold ${smallSize}px "Exo 2"`;
-        ctx.fillText(exp, x + 15, y + 5 + offset);
+        
+        ctx.font = `900 ${size}px "Exo 2"`;
+        ctx.fillStyle = color; // Uses passed color
+        ctx.fillText(base, x - 12, y + 5);
+        
+        ctx.font = `900 ${smallSize}px "Exo 2"`;
+        ctx.fillText(exp, x + 18, y + 5 + offset);
     }
 
     function update() {
         if (!state.active) return;
 
-        // Move Drop Y
         state.dropY += state.dropSpeed;
 
-        // Move Drop X (Follow Player)
-        // Linear Interpolation (Lerp) for smooth movement
         let targetX = state.lanesX[state.playerLane];
-        state.dropX += (targetX - state.dropX) * 0.15; // 0.15 is smoothness factor
+        state.dropX += (targetX - state.dropX) * 0.15;
 
-        // Collision Check
         const playerY = canvas.height - 100;
         if (state.dropY > playerY - 30) {
             const chosenAns = state.shuffledAnswers[state.playerLane];
@@ -454,7 +461,6 @@
             }
         }
 
-        // Particles
         for(let i=state.particles.length-1; i>=0; i--) {
             let p = state.particles[i];
             p.x += p.vx; p.y += p.vy; p.life -= 0.05;
@@ -504,9 +510,7 @@
         ctx.arc(px, py, 40, 0, Math.PI*2);
         ctx.stroke();
 
-        // Draw Falling Problem (Using state.dropX now)
         if (state.currentProblem) {
-            // Visual Tether
             ctx.strokeStyle = 'rgba(77, 184, 255, 0.4)';
             ctx.lineWidth = 2;
             ctx.setLineDash([10, 10]);
@@ -516,7 +520,6 @@
             ctx.stroke();
             ctx.setLineDash([]);
 
-            // The Math
             drawMath(ctx, state.currentProblem, state.dropX, state.dropY);
         }
 
@@ -526,20 +529,27 @@
             const ax = state.lanesX[i];
             const ans = state.shuffledAnswers[i];
             
-            ctx.fillStyle = (i === state.playerLane) ? '#fff' : '#1a2236';
+            // Check if this box is the selected one
+            const isSelected = (i === state.playerLane);
+
+            // Box Background
+            ctx.fillStyle = isSelected ? '#fff' : '#1a2236';
             ctx.strokeStyle = '#4db8ff';
             ctx.lineWidth = 2;
             
-            const btnW = 100;
-            const btnH = 60;
+            const btnW = 120; // Wider buttons
+            const btnH = 70;  // Taller buttons
             
             ctx.beginPath();
-            ctx.roundRect(ax - btnW/2, ansY - btnH/2, btnW, btnH, 10);
+            ctx.roundRect(ax - btnW/2, ansY - btnH/2, btnW, btnH, 15);
             ctx.fill();
             ctx.stroke();
 
             if(state.currentProblem) {
-                drawAnswer(ctx, state.currentProblem.base, ans.exp, ax, ansY);
+                // If box is White (selected), text must be Dark.
+                // If box is Dark (unselected), text must be White.
+                const textColor = isSelected ? '#0b0f19' : '#ffffff';
+                drawAnswer(ctx, state.currentProblem.base, ans.exp, ax, ansY, textColor);
             }
         }
 

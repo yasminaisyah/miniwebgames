@@ -41,20 +41,23 @@
         #hud-top {
             display: flex;
             justify-content: space-between;
-            width: 90%;
-            margin-top: 20px;
+            width: 95%;
+            margin-top: 15px;
             text-shadow: 0 0 10px #0ff;
         }
 
         .hud-panel {
-            background: rgba(0, 20, 40, 0.7);
+            background: rgba(0, 20, 40, 0.8);
             border: 1px solid #0ff;
             color: #0ff;
-            padding: 10px 20px;
+            padding: 10px 15px;
             border-radius: 5px;
-            font-size: 1.5rem;
+            font-size: 1.2rem;
             font-weight: bold;
             transform: skew(-10deg);
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
+            min-width: 100px;
+            text-align: center;
         }
 
         /* Menus */
@@ -62,7 +65,7 @@
             position: absolute;
             top: 0; left: 0;
             width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.9);
+            background: rgba(0, 0, 0, 0.95);
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -73,7 +76,7 @@
         .hidden { display: none !important; }
 
         h1 {
-            font-size: 4rem;
+            font-size: 3.5rem;
             color: #fff;
             text-transform: uppercase;
             letter-spacing: 5px;
@@ -82,14 +85,16 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             text-shadow: 0 0 20px #0ff;
+            text-align: center;
         }
 
         p {
             color: #aaa;
-            font-size: 1.2rem;
+            font-size: 1.1rem;
             max-width: 600px;
             text-align: center;
-            margin-bottom: 40px;
+            margin-bottom: 30px;
+            line-height: 1.5;
         }
 
         button {
@@ -104,11 +109,50 @@
             cursor: pointer;
             box-shadow: 0 0 15px #0ff;
             transition: 0.2s;
+            margin-top: 20px;
         }
         button:hover {
             background: #fff;
             box-shadow: 0 0 30px #fff;
             transform: scale(1.1);
+        }
+
+        /* End Game Specifics */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .stat-box {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+        .stat-label { font-size: 0.9rem; color: #888; display: block; }
+        .stat-val { font-size: 1.8rem; color: #fff; font-weight: bold; }
+        
+        .stars {
+            font-size: 3rem;
+            color: #333; /* Empty star color */
+            margin-bottom: 10px;
+        }
+        .star-filled { color: #ffd700; text-shadow: 0 0 15px #ffd700; }
+
+        /* Floating +Time Text */
+        .float-text {
+            position: absolute;
+            font-weight: bold;
+            font-size: 1.5rem;
+            pointer-events: none;
+            animation: floatUp 1s forwards;
+            z-index: 5;
+        }
+        @keyframes floatUp {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-50px); opacity: 0; }
         }
 
     </style>
@@ -120,7 +164,8 @@
 
     <div id="ui-layer">
         <div id="hud-top">
-            <div class="hud-panel">SHIELD: <span id="hpVal">100</span>%</div>
+            <div class="hud-panel" style="border-color:#f33; color:#f33">HP: <span id="hpVal">100</span>%</div>
+            <div class="hud-panel" style="border-color:#ff0; color:#ff0">TIME: <span id="timeVal">60</span>s</div>
             <div class="hud-panel">SCORE: <span id="scoreVal">0</span></div>
         </div>
     </div>
@@ -131,12 +176,32 @@
         Your ship is carrying a <strong>Number</strong>.<br>
         Pilot into the <strong>Gate</strong> that matches its converted form.<br>
         (e.g., Ship: 500 &rightarrow; Gate: 5 x 10²)</p>
+        <div class="stat-box" style="margin-bottom: 20px;">
+            <span class="stat-label">HIGH SCORE</span>
+            <span class="stat-val" id="menuHighScore">0</span>
+        </div>
         <button onclick="startGame()">ENGAGE</button>
     </div>
 
     <div id="game-over-screen" class="screen hidden">
-        <h1 style="color: #f33; text-shadow: 0 0 20px #f00;">HULL BREACH</h1>
-        <p>Mission Failed.<br>Final Score: <span id="finalScore">0</span></p>
+        <h1 id="end-title" style="color: #f33; text-shadow: 0 0 20px #f00;">HULL BREACH</h1>
+        
+        <div class="stars" id="end-stars">
+            <span>★</span><span>★</span><span>★</span>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-box">
+                <span class="stat-label">FINAL SCORE</span>
+                <span class="stat-val" id="finalScore">0</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">HIGH SCORE</span>
+                <span class="stat-val" id="endHighScore">0</span>
+            </div>
+        </div>
+
+        <p id="end-reason">Mission Failed.</p>
         <button onclick="startGame()">RESTART</button>
     </div>
 </div>
@@ -164,7 +229,6 @@
             osc.stop(this.ctx.currentTime + dur);
         },
         playWarp: function() {
-            // Rising sci-fi sweep
             if (!this.ctx) return;
             const osc = this.ctx.createOscillator();
             const g = this.ctx.createGain();
@@ -184,17 +248,10 @@
     };
 
     /**
-     * MATH LOGIC: Standard Form & Sig Figs
+     * MATH LOGIC
      */
     function generateProblem(level) {
-        // Progression:
-        // 1-2: Large Int -> Std Form
-        // 3-4: Small Dec -> Std Form
-        // 5-6: Sig Figs
-        // 7+: Mix
-
         const modeRoll = Math.random();
-        // Determine Mode based on level
         let mode = 'large_std';
         if (level > 2) mode = Math.random() > 0.5 ? 'small_std' : 'large_std';
         if (level > 4) {
@@ -205,40 +262,32 @@
         }
 
         let questionText = "";
-        let correctHtml = ""; // HTML/Canvas safe string representation
+        let correctHtml = "";
         let decoys = [];
 
         if (mode === 'large_std') {
-            // e.g., 4500 -> 4.5 x 10^3
-            let power = Math.floor(Math.random() * 4) + 2; // 2 to 5
-            let mantissa = (Math.floor(Math.random() * 90) + 10) / 10; // 1.0 to 9.9
-            // Fix float issues
+            let power = Math.floor(Math.random() * 4) + 2; 
+            let mantissa = (Math.floor(Math.random() * 90) + 10) / 10; 
             mantissa = Math.round(mantissa * 10) / 10;
             
             let num = mantissa * Math.pow(10, power);
-            
-            // Format number (remove scientific notation if JS auto-converts)
             questionText = num.toString();
-            if (num >= 10000) questionText = num.toLocaleString().replace(/,/g, ''); // 10000 -> 10000
+            if (num >= 10000) questionText = num.toLocaleString().replace(/,/g, '');
 
             correctHtml = { base: mantissa, exp: power };
 
-            // Decoys
-            decoys.push({ base: mantissa * 10, exp: power - 1 }); // Wrong normalization (45 x 10^2)
-            decoys.push({ base: mantissa, exp: power + 1 });      // Wrong power
+            decoys.push({ base: mantissa * 10, exp: power - 1 });
+            decoys.push({ base: mantissa, exp: power + 1 });
             if (Math.random() > 0.5) decoys.push({ base: mantissa, exp: power - 1 });
-            else decoys.push({ base: (mantissa+1), exp: power }); // Wrong mantissa
+            else decoys.push({ base: (mantissa+1), exp: power });
         }
         else if (mode === 'small_std') {
-            // e.g., 0.0045 -> 4.5 x 10^-3
-            let power = Math.floor(Math.random() * 4) + 1; // 1 to 4
+            let power = Math.floor(Math.random() * 4) + 1; 
             let mantissa = (Math.floor(Math.random() * 90) + 10) / 10; 
             mantissa = Math.round(mantissa * 10) / 10;
 
-            // Create decimal string manually to avoid JS float precision mess
             let zeros = "0.";
             for(let i=0; i<power-1; i++) zeros += "0";
-            // Remove dot from mantissa for string concat
             let mStr = mantissa.toString().replace('.', '');
             questionText = zeros + mStr;
 
@@ -249,23 +298,18 @@
             decoys.push({ base: (mantissa/10), exp: -power });
         }
         else if (mode === 'sigfig') {
-            // Rounding
-            let sf = Math.floor(Math.random() * 2) + 1; // 1 or 2 or 3 s.f.
-            if(sf === 1) sf = 2; // Bias towards 2 and 3 sf
+            let sf = Math.floor(Math.random() * 2) + 1; 
+            if(sf === 1) sf = 2;
             if(Math.random() > 0.5) sf = 3;
 
-            // Generate a messy number
-            let n = (Math.random() * 100).toFixed(4); // 45.2341
+            let n = (Math.random() * 100).toFixed(4); 
             questionText = `${n}\n(${sf} s.f.)`;
 
-            // Calculate correct
             let num = parseFloat(n);
             let ans = Number(num.toPrecision(sf));
             
             correctHtml = { text: ans.toString() };
 
-            // Decoys (Truncation vs Rounding vs Wrong SF)
-            // Truncation simulation
             let wrong1 = Number(num.toPrecision(sf+1));
             let wrong2 = Number(num.toPrecision(sf-1));
             if(isNaN(wrong2)) wrong2 = ans + 1;
@@ -288,19 +332,25 @@
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
 
+    // Load High Score
+    let savedHighScore = localStorage.getItem('cosmicHighScore') || 0;
+    document.getElementById('menuHighScore').innerText = savedHighScore;
+
     let state = {
         active: false,
         score: 0,
         hp: 100,
         level: 1,
+        time: 60,
+        lastTime: 0,
         shipX: 0,
         shipTargetX: 0,
-        shipSpeed: 0, // visual tilt
+        shipSpeed: 0,
         stars: [],
         gates: [],
         currentProblem: null,
         problemTimer: 0,
-        warpFactor: 1, // Speed multiplier
+        warpFactor: 1,
         baseSpeed: 3
     };
 
@@ -316,7 +366,6 @@
     function handleInput(x) {
         if (!state.active) return;
         state.shipTargetX = x;
-        // Clamp
         if(state.shipTargetX < 50) state.shipTargetX = 50;
         if(state.shipTargetX > canvas.width - 50) state.shipTargetX = canvas.width - 50;
     }
@@ -325,46 +374,41 @@
     window.addEventListener('touchmove', e => { e.preventDefault(); handleInput(e.touches[0].clientX); }, {passive: false});
     window.addEventListener('keydown', e => {
         if (!state.active) return;
-        if (e.key === 'ArrowLeft') state.shipTargetX -= 100;
-        if (e.key === 'ArrowRight') state.shipTargetX += 100;
+        if (e.key === 'ArrowLeft') state.shipTargetX -= canvas.width / 3;
+        if (e.key === 'ArrowRight') state.shipTargetX += canvas.width / 3;
         handleInput(state.shipTargetX);
     });
 
-    // --- GAMEPLAY FUNCTIONS ---
-
+    // Game Logic
     function initStars() {
         state.stars = [];
         for(let i=0; i<150; i++) {
             state.stars.push({
                 x: Math.random() * canvas.width,
                 y: Math.random() * canvas.height,
-                z: Math.random() * 2 + 0.5 // Speed/Depth
+                z: Math.random() * 2 + 0.5 
             });
         }
     }
 
     function spawnGate() {
         const problem = generateProblem(state.level);
-        state.currentProblem = problem.q; // Put text on ship
+        state.currentProblem = problem.q;
         
-        // Gate Positions (3 Lanes roughly)
         const laneW = canvas.width / 3;
         const positions = [laneW * 0.5, laneW * 1.5, laneW * 2.5];
         
-        // Shuffle Answers
         let answers = [
             { val: problem.correct, type: 'correct', isStd: problem.isStd },
             { val: problem.decoys[0], type: 'wrong', isStd: problem.isStd },
             { val: problem.decoys[1] || problem.decoys[0], type: 'wrong', isStd: problem.isStd }
         ];
 
-        // Fisher-Yates shuffle
         for (let i = answers.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [answers[i], answers[j]] = [answers[j], answers[i]];
         }
 
-        // Create Gate Object
         state.gates.push({
             y: -150,
             slots: [
@@ -375,19 +419,87 @@
         });
     }
 
+    function showFloat(text, color) {
+        const el = document.createElement('div');
+        el.className = 'float-text';
+        el.innerText = text;
+        el.style.color = color;
+        el.style.left = (state.shipX - 20) + 'px';
+        el.style.top = (canvas.height - 200) + 'px';
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 1000);
+    }
+
+    function endGame(reason) {
+        state.active = false;
+        
+        // High Score Logic
+        if(state.score > savedHighScore) {
+            savedHighScore = state.score;
+            localStorage.setItem('cosmicHighScore', savedHighScore);
+        }
+
+        // Star Logic
+        let stars = 0;
+        if(state.score > 2000) stars = 3;
+        else if(state.score > 800) stars = 2;
+        else if(state.score > 0) stars = 1;
+
+        const starEl = document.getElementById('end-stars');
+        starEl.innerHTML = '';
+        for(let i=0; i<3; i++) {
+            let s = document.createElement('span');
+            s.innerText = '★';
+            if(i < stars) s.className = 'star-filled';
+            starEl.appendChild(s);
+        }
+
+        // Title and Colors based on reason
+        const titleEl = document.getElementById('end-title');
+        const reasonEl = document.getElementById('end-reason');
+        
+        if (reason === 'time') {
+            titleEl.innerText = "OUT OF TIME";
+            titleEl.style.color = "#ff0";
+            titleEl.style.textShadow = "0 0 20px #ff0";
+            reasonEl.innerText = "The warp gate closed.";
+        } else {
+            titleEl.innerText = "HULL BREACH";
+            titleEl.style.color = "#f33";
+            titleEl.style.textShadow = "0 0 20px #f00";
+            reasonEl.innerText = "Your shield reached 0%.";
+        }
+
+        document.getElementById('finalScore').innerText = state.score;
+        document.getElementById('endHighScore').innerText = savedHighScore;
+        document.getElementById('game-over-screen').classList.remove('hidden');
+    }
+
     function update() {
         if (!state.active) return;
 
-        // Smooth Ship Movement
+        // Timer Logic
+        let now = Date.now();
+        let dt = (now - state.lastTime) / 1000;
+        state.lastTime = now;
+        
+        state.time -= dt;
+        if (state.time <= 0) {
+            state.time = 0;
+            endGame('time');
+            return;
+        }
+
+        // Movement
         const dx = state.shipTargetX - state.shipX;
         state.shipX += dx * 0.1;
-        state.shipSpeed = dx * 0.1; // For tilt effect
+        state.shipSpeed = dx * 0.1;
 
-        // Starfield (Warp Effect)
+        // Speed calculation
         let speed = state.baseSpeed * state.warpFactor;
-        // Warp factor decay
-        if (state.warpFactor > 1) state.warpFactor *= 0.95;
+        if (state.warpFactor > 1) state.warpFactor *= 0.98; // Decay boost
 
+        // Starfield
         state.stars.forEach(s => {
             s.y += s.z * speed;
             if (s.y > canvas.height) {
@@ -396,92 +508,86 @@
             }
         });
 
-        // Gates Logic
-        state.problemTimer++;
-        if (state.gates.length === 0 && state.problemTimer > 100) {
+        // Spawn logic
+        state.problemTimer += speed;
+        if (state.gates.length === 0 && state.problemTimer > 300) {
             spawnGate();
             state.problemTimer = 0;
         }
+
+        // Gate Logic
+        const playerY = canvas.height - 150;
+        const gateW = (canvas.width / 3) - 20;
 
         for (let i = state.gates.length - 1; i >= 0; i--) {
             let g = state.gates[i];
             g.y += speed;
 
-            // Collision Check
-            const playerY = canvas.height - 150;
-            // Hitbox height
+            // Collision
             if (g.y > playerY - 40 && g.y < playerY + 40) {
-                // Find closest slot
-                let hitSlot = null;
-                let minDist = 999;
-                
-                g.slots.forEach(slot => {
-                    let d = Math.abs(state.shipX - slot.x);
-                    if (d < (canvas.width / 6)) { // Hitbox width
-                        hitSlot = slot;
-                    }
-                });
-
-                if (hitSlot && !g.hit) {
-                    g.hit = true; // One hit per gate
-                    if (hitSlot.item.type === 'correct') {
-                        // Success
-                        AudioSys.playWarp();
-                        state.score += 100 * state.level;
-                        state.warpFactor = 8; // WARP BOOST!
-                        if (state.score > state.level * 800) state.level++;
-                    } else {
-                        // Fail
-                        AudioSys.playCrash();
-                        state.hp -= 25;
-                        state.warpFactor = 0.5; // Slow down
-                    }
+                if (!g.hit) {
+                     // Check specific slot
+                    g.slots.forEach(slot => {
+                        let d = Math.abs(state.shipX - slot.x);
+                        if (d < gateW/2) {
+                            g.hit = true;
+                            if (slot.item.type === 'correct') {
+                                AudioSys.playWarp();
+                                state.score += 100 * state.level;
+                                state.warpFactor = 5; 
+                                state.time += 3; // BONUS TIME
+                                showFloat("+3s", "#0ff");
+                                if (state.score > state.level * 800) state.level++;
+                            } else {
+                                AudioSys.playCrash();
+                                state.hp -= 25;
+                                state.warpFactor = 0.5;
+                                state.time -= 5; // PENALTY TIME
+                                showFloat("-5s", "#f33");
+                            }
+                        }
+                    });
                 }
             }
 
             if (g.y > canvas.height) state.gates.splice(i, 1);
         }
 
-        // Game Over
         if (state.hp <= 0) {
-            state.active = false;
-            document.getElementById('finalScore').innerText = state.score;
-            document.getElementById('game-over-screen').classList.remove('hidden');
+            endGame('hp');
+            return;
         }
 
-        // UI Update
+        // Update HUD
         document.getElementById('scoreVal').innerText = state.score;
         document.getElementById('hpVal').innerText = state.hp;
         document.getElementById('hpVal').style.color = state.hp < 40 ? '#f33' : '#0ff';
+        
+        let timeInt = Math.ceil(state.time);
+        document.getElementById('timeVal').innerText = timeInt;
+        document.getElementById('timeVal').style.color = timeInt < 10 ? '#f33' : '#ff0';
 
         draw();
         requestAnimationFrame(update);
     }
 
-    // --- DRAWING FUNCTIONS ---
-
+    // --- DRAWING ---
     function drawStdForm(ctx, item, x, y) {
         ctx.fillStyle = '#fff';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         
         if (item.isStd) {
-            // Render 4.5 x 10^3
             ctx.font = 'bold 30px "Rajdhani"';
             let baseW = ctx.measureText(item.val.base).width;
             let xStr = " × 10";
             let xW = ctx.measureText(xStr).width;
-            
-            let totalW = baseW + xW + 15; // +15 for superscript approx
+            let totalW = baseW + xW + 15;
 
-            // Draw Base
             ctx.fillText(item.val.base + xStr, x - 5, y);
-            
-            // Draw Exponent
             ctx.font = 'bold 20px "Rajdhani"';
             ctx.fillText(item.val.exp, x + (totalW/2) - 5, y - 15);
         } else {
-            // Render Simple Text (Sig Figs)
             ctx.font = 'bold 30px "Rajdhani"';
             ctx.fillText(item.val.text, x, y);
         }
@@ -490,6 +596,17 @@
     function draw() {
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Lane Markers (Easier to identify)
+        ctx.strokeStyle = 'rgba(0, 255, 255, 0.1)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([10, 20]);
+        const laneW = canvas.width / 3;
+        ctx.beginPath();
+        ctx.moveTo(laneW, 0); ctx.lineTo(laneW, canvas.height);
+        ctx.moveTo(laneW*2, 0); ctx.lineTo(laneW*2, canvas.height);
+        ctx.stroke();
+        ctx.setLineDash([]);
 
         // Stars
         ctx.fillStyle = '#fff';
@@ -513,39 +630,36 @@
                 ctx.shadowBlur = 20;
                 ctx.shadowColor = '#0ff';
                 
-                // Gate Frame
+                // Frame
                 ctx.strokeStyle = '#0ff';
                 ctx.lineWidth = 3;
                 
-                // If hit, change color
-                if (g.hit && Math.abs(state.shipX - slot.x) < gateW/2) {
-                   // visual feedback logic handled by particle or simple flash here?
-                   // Simple: if this was the correct slot, flash green, else red
+                // If hit animation could go here
+                if(g.hit) {
+                     // fade out effect if hit
+                     ctx.globalAlpha = 0.5;
                 }
 
                 ctx.strokeRect(cx - gateW/2, cy - gateH/2, gateW, gateH);
                 
-                // Text Background
-                ctx.fillStyle = 'rgba(0, 20, 40, 0.8)';
+                ctx.fillStyle = 'rgba(0, 20, 40, 0.85)';
                 ctx.fillRect(cx - gateW/2, cy - gateH/2, gateW, gateH);
                 
                 ctx.shadowBlur = 0;
+                ctx.globalAlpha = 1;
 
-                // Answer Text
                 drawStdForm(ctx, slot.item, cx, cy);
             });
         });
 
-        // Player Ship
+        // Ship
         const shipX = state.shipX;
         const shipY = canvas.height - 150;
         
         ctx.save();
         ctx.translate(shipX, shipY);
-        // Tilt
         ctx.rotate(state.shipSpeed * 0.05 * Math.PI / 180);
         
-        // Ship Body
         ctx.shadowBlur = 15;
         ctx.shadowColor = '#0ff';
         ctx.fillStyle = '#000';
@@ -560,7 +674,6 @@
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // Engine Trail
         ctx.fillStyle = '#0ff';
         ctx.globalAlpha = 0.6;
         let flicker = Math.random() * 20;
@@ -571,26 +684,23 @@
         ctx.fill();
         ctx.globalAlpha = 1;
 
-        // The Question Text on Hull
         if (state.currentProblem) {
             ctx.fillStyle = '#fff';
-            ctx.font = 'bold 18px "Rajdhani"';
+            ctx.font = 'bold 22px "Rajdhani"';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.shadowBlur = 0;
             
-            // Handle multiline for Sig Figs
             let lines = state.currentProblem.split('\n');
             if (lines.length > 1) {
-                ctx.fillText(lines[0], 0, -50);
+                ctx.fillText(lines[0], 0, -60);
                 ctx.fillStyle = '#ff0';
-                ctx.font = '14px "Rajdhani"';
-                ctx.fillText(lines[1], 0, -30);
+                ctx.font = '16px "Rajdhani"';
+                ctx.fillText(lines[1], 0, -35);
             } else {
                 ctx.fillText(state.currentProblem, 0, -50);
             }
         }
-
         ctx.restore();
     }
 
@@ -601,12 +711,14 @@
         
         state.score = 0;
         state.hp = 100;
+        state.time = 60; // 60 Seconds
         state.level = 1;
         state.shipX = canvas.width / 2;
         state.shipTargetX = state.shipX;
         state.active = true;
         state.gates = [];
         state.warpFactor = 1;
+        state.lastTime = Date.now();
         
         initStars();
         spawnGate();

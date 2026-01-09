@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bridge Constructor: Fixed View</title>
+    <title>Bridge Constructor: Master Builder</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Roboto+Mono:wght@500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Roboto+Mono:wght@500;700&display=swap');
 
         body {
             margin: 0;
@@ -21,46 +21,75 @@
             width: 100vw;
             height: 100vh;
             overflow: hidden;
-            background: linear-gradient(to bottom, #2980b9, #2c3e50);
+            background: linear-gradient(to bottom, #2980b9 0%, #6dd5fa 50%, #ffffff 100%);
         }
 
         canvas { display: block; }
 
-        /* --- UI ELEMENTS --- */
+        /* --- HUD --- */
+        .hud-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            box-sizing: border-box;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            z-index: 20;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 1.2rem;
+            border-bottom: 4px solid #f39c12;
+            box-shadow: 0 5px 10px rgba(0,0,0,0.3);
+        }
+
+        .hud-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .hud-label { font-size: 0.8rem; color: #bdc3c7; }
+        .hud-val { font-weight: bold; color: #f1c40f; font-size: 1.5rem; text-shadow: 2px 2px 0px #000; }
+
+        /* --- BLUEPRINT PANEL --- */
         .panel {
             position: absolute;
-            background: rgba(0, 0, 0, 0.8);
-            border: 2px solid #f39c12;
+            background: #2c3e50; /* Blueprint Blue */
+            background-image: 
+                linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px);
+            background-size: 20px 20px;
+            border: 4px solid #fff;
             color: #ecf0f1;
-            padding: 15px;
-            border-radius: 5px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            padding: 20px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.5);
             pointer-events: none;
+            transform: rotate(-2deg);
         }
 
         #blueprint-hud {
-            top: 20px;
+            top: 90px;
             left: 20px;
             font-family: 'Roboto Mono', monospace;
-            transform: rotate(-1deg);
             z-index: 10;
+            width: 220px;
         }
 
-        .label { color: #aaa; font-size: 0.8rem; display: block; }
-        .val { font-size: 1.5rem; font-weight: bold; color: #f1c40f; }
-
-        #score-hud {
-            top: 20px;
-            right: 20px;
-            font-size: 1.5rem;
-            color: #2ecc71;
-            z-index: 10;
+        .blueprint-title {
+            background: #fff;
+            color: #2c3e50;
+            font-weight: bold;
+            padding: 2px 5px;
+            margin-bottom: 10px;
+            display: inline-block;
         }
 
-        /* --- METER READOUT (Moved to Top Center) --- */
+        /* --- METER READOUT --- */
         #meter-container {
             position: absolute;
-            top: 30px;
+            top: 100px;
             left: 50%;
             transform: translateX(-50%);
             z-index: 10;
@@ -68,99 +97,124 @@
         }
 
         #meter-readout {
-            background: #000;
-            color: #e74c3c; /* LED Red */
+            background: #111;
+            color: #e74c3c;
             font-family: 'Roboto Mono', monospace;
-            font-size: 3rem;
+            font-size: 3.5rem;
             padding: 10px 40px;
             border: 4px solid #555;
+            border-bottom: 8px solid #333;
             text-shadow: 0 0 10px #e74c3c;
-            min-width: 200px;
+            min-width: 240px;
             text-align: center;
             border-radius: 10px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.6);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
         
-        .glitch { animation: flicker 0.2s infinite; opacity: 0.5; }
-        .offline { color: #330000 !important; text-shadow: none !important; border-color: #330000 !important; }
+        .glitch { animation: flicker 0.2s infinite; opacity: 0.8; }
+        .offline { color: #555 !important; text-shadow: none !important; border-color: #333 !important; }
 
         @keyframes flicker {
             0% { opacity: 1; }
-            50% { opacity: 0.2; }
+            50% { opacity: 0.4; }
             100% { opacity: 1; }
         }
 
-        /* --- CONTROLS (Bottom Center) --- */
+        /* --- CONTROLS --- */
         #controls-area {
             position: absolute;
             bottom: 40px;
             width: 100%;
             display: flex;
             justify-content: center;
-            pointer-events: none; /* Only button is clickable */
+            pointer-events: none;
         }
 
         #build-btn {
             pointer-events: auto;
             background: #e67e22;
             color: white;
-            border: none;
+            border: 2px solid #fff;
             padding: 25px 80px;
-            font-size: 2rem;
+            font-size: 2.2rem;
             font-family: 'Black Ops One', cursive;
-            border-radius: 10px;
+            border-radius: 15px;
             cursor: pointer;
-            box-shadow: 0 10px 0 #d35400;
+            box-shadow: 0 10px 0 #d35400, 0 15px 20px rgba(0,0,0,0.4);
             text-transform: uppercase;
             letter-spacing: 2px;
-            transition: transform 0.1s;
+            transition: transform 0.1s, background 0.2s;
+            outline: none;
         }
         
         #build-btn:active {
-            transform: translateY(5px);
-            box-shadow: 0 5px 0 #d35400;
+            transform: translateY(10px);
+            box-shadow: 0 0 0 #d35400;
             background: #d35400;
+        }
+        
+        #build-btn:disabled {
+            background: #7f8c8d;
+            box-shadow: 0 5px 0 #555;
+            transform: translateY(5px);
+            cursor: not-allowed;
+            color: #bdc3c7;
+            font-size: 1.5rem;
         }
 
         /* --- SCREENS --- */
         .screen {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.9);
+            background: rgba(11, 15, 25, 0.95);
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             z-index: 100;
             color: white;
+            backdrop-filter: blur(5px);
         }
         .hidden { display: none !important; }
 
-        h1 { font-size: 4rem; color: #f39c12; text-shadow: 0 0 20px #f39c12; margin-bottom: 10px; text-align: center; }
+        h1 { font-size: 4rem; color: #f39c12; margin-bottom: 10px; text-align: center; letter-spacing: 3px; text-shadow: 0 5px 0 #d35400; }
         p { font-family: 'Roboto Mono'; font-size: 1.2rem; color: #bdc3c7; max-width: 600px; text-align: center; line-height: 1.6; }
 
         .btn-start {
             margin-top: 30px;
-            background: #27ae60; color: white; border: none;
-            padding: 15px 50px; font-size: 1.5rem; font-family: 'Black Ops One';
-            cursor: pointer; border-radius: 5px; box-shadow: 0 0 20px #27ae60;
+            background: #27ae60; color: white; border: 2px solid #fff;
+            padding: 15px 50px; font-size: 1.8rem; font-family: 'Black Ops One';
+            cursor: pointer; border-radius: 50px; box-shadow: 0 5px 0 #1e8449;
+            transition: transform 0.1s;
         }
         .btn-start:hover { transform: scale(1.05); background: #2ecc71; }
+        .btn-start:active { transform: scale(0.95); box-shadow: 0 2px 0 #1e8449; }
 
-        /* Floating Text */
+        /* Star Rating Display */
+        .stars-container {
+            display: flex;
+            gap: 15px;
+            font-size: 4rem;
+            margin: 20px 0;
+            height: 80px;
+        }
+        .star { color: #333; transition: color 0.3s, transform 0.3s; }
+        .star.gold { color: #f1c40f; text-shadow: 0 0 30px #f1c40f; transform: scale(1.2); }
+
+        /* Floating Text for Score */
         .float-text {
             position: absolute;
             font-family: 'Black Ops One';
-            font-size: 2rem;
+            font-size: 3rem;
             color: #fff;
-            text-shadow: 2px 2px 0 #000;
-            animation: floatUp 1s forwards;
+            text-shadow: 3px 3px 0 #000;
+            animation: floatUp 1.5s forwards;
             pointer-events: none;
             z-index: 50;
         }
         @keyframes floatUp {
-            0% { transform: translateY(0); opacity: 1; }
-            100% { transform: translateY(-50px); opacity: 0; }
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-100px) scale(1.2); opacity: 0; }
         }
 
     </style>
@@ -170,42 +224,66 @@
 <div id="game-container">
     <canvas id="gameCanvas"></canvas>
 
-    <div id="blueprint-hud" class="panel">
-        <span class="label">BLUEPRINT LENGTH</span>
-        <div class="val" id="bp-len">0 cm</div>
-        <div style="height:10px"></div>
-        <span class="label">SCALE RATIO</span>
-        <div class="val" id="bp-scale">1 : 100</div>
+    <div class="hud-bar">
+        <div class="hud-item">
+            <span class="hud-label">HIGH SCORE</span>
+            <span class="hud-val" id="hud-high">0</span>
+        </div>
+        <div class="hud-item">
+            <span class="hud-label">TIME</span>
+            <span class="hud-val" id="hud-timer" style="color:#fff">00:00</span>
+        </div>
+        <div class="hud-item">
+            <span class="hud-label">SCORE</span>
+            <span class="hud-val" id="hud-score">0</span>
+        </div>
     </div>
 
-    <div id="score-hud" class="panel">LEVEL <span id="level-display">1</span></div>
+    <div id="blueprint-hud" class="panel">
+        <div class="blueprint-title">PROJECT BLUEPRINT</div>
+        <span class="hud-label">DRAWING LENGTH</span>
+        <div class="hud-val" id="bp-len" style="color:#3498db; margin-bottom:10px;">0 cm</div>
+        
+        <span class="hud-label">SCALE RATIO</span>
+        <div class="hud-val" id="bp-scale" style="color:#3498db; margin-bottom:10px;">1 : 100</div>
+        
+        <div style="border-top:1px dashed #7f8c8d; margin-top:5px; padding-top:5px; font-size:0.7rem; color:#bdc3c7;">
+            FORMULA:<br>
+            CM × SCALE ÷ 100 = M
+        </div>
+    </div>
 
     <div id="meter-container">
         <div id="meter-readout">0.00m</div>
     </div>
 
     <div id="controls-area">
-        <button id="build-btn" onmousedown="startBuild()" onmouseup="stopBuild()" ontouchstart="startBuild()" ontouchend="stopBuild()">HOLD</button>
+        <button id="build-btn" onmousedown="startBuild()" onmouseup="stopBuild()" ontouchstart="startBuild()" ontouchend="stopBuild()">HOLD TO BUILD</button>
     </div>
 
     <div id="start-screen" class="screen">
-        <h1>HARDCORE ENGINEERING</h1>
-        <p><strong>Chapter 4: Scale Drawings</strong></p>
-        <p>Calculate the <strong>Actual Length</strong> in Meters.<br>
-        <span style="color:#f39c12">Formula: Drawing (cm) × Scale ÷ 100</span></p>
-        <p style="color:#e74c3c">WARNING: Measurement systems may fail at higher levels.</p>
-        <button class="btn-start" onclick="startGame()">INITIATE</button>
+        <h1>BRIDGE CONSTRUCTOR</h1>
+        <p><strong>Mission:</strong> Scale Drawings</p>
+        <p>1. Read the <strong>Blueprint</strong> (cm & Scale).<br>
+           2. Calculate the <strong>Real Length</strong> in Meters.<br>
+           3. <strong>HOLD</strong> button to build the bridge to that length.</p>
+        <p style="color:#f39c12; font-size:1.4rem;">Formula: cm × Scale ÷ 100</p>
+        <button class="btn-start" onclick="startGame()">START MISSION</button>
     </div>
 
     <div id="game-over-screen" class="screen hidden">
-        <h1 style="color:#c0392b">CATASTROPHIC FAILURE</h1>
-        <p id="fail-msg">Bridge collapse.</p>
+        <h1 id="end-title" style="color:#e74c3c">MISSION FAILED</h1>
+        <div class="stars-container" id="end-stars">
+            <div class="star">★</div><div class="star">★</div><div class="star">★</div>
+        </div>
+        <p id="fail-msg" style="font-size:1.5rem; color:#fff;">Bridge collapse.</p>
+        <p>Final Score: <span id="final-score" style="color:#f1c40f; font-weight:bold; font-size:2rem;">0</span></p>
         <button class="btn-start" onclick="startGame()">RETRY</button>
     </div>
 </div>
 
 <script>
-    // --- AUDIO SYSTEM (Synthesized) ---
+    // --- AUDIO SYSTEM ---
     const AudioSys = {
         ctx: null,
         osc: null,
@@ -215,14 +293,29 @@
             if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
         },
 
+        playTone: function(type, freqStart, freqEnd, duration, vol=0.1) {
+            if(!this.ctx) return;
+            const o = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            o.type = type;
+            o.frequency.setValueAtTime(freqStart, this.ctx.currentTime);
+            if(freqEnd) o.frequency.linearRampToValueAtTime(freqEnd, this.ctx.currentTime + duration);
+            g.gain.setValueAtTime(vol, this.ctx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+            o.connect(g);
+            g.connect(this.ctx.destination);
+            o.start();
+            o.stop(this.ctx.currentTime + duration);
+        },
+
         startDrill: function() {
             if (!this.ctx) return;
             this.osc = this.ctx.createOscillator();
             this.gain = this.ctx.createGain();
             this.osc.type = 'sawtooth';
-            this.osc.frequency.setValueAtTime(100, this.ctx.currentTime);
-            this.osc.frequency.linearRampToValueAtTime(150, this.ctx.currentTime + 0.1);
-            this.gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+            this.osc.frequency.setValueAtTime(60, this.ctx.currentTime);
+            this.osc.frequency.linearRampToValueAtTime(100, this.ctx.currentTime + 0.1);
+            this.gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
             this.osc.connect(this.gain);
             this.gain.connect(this.ctx.destination);
             this.osc.start();
@@ -236,34 +329,14 @@
             }
         },
 
-        playCrash: function() {
-            if (!this.ctx) return;
-            const osc = this.ctx.createOscillator();
-            const g = this.ctx.createGain();
-            osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(100, this.ctx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(10, this.ctx.currentTime + 0.5);
-            g.gain.setValueAtTime(0.3, this.ctx.currentTime);
-            g.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.5);
-            osc.connect(g);
-            g.connect(this.ctx.destination);
-            osc.start();
-            osc.stop(this.ctx.currentTime + 0.5);
+        playCrash: function() { this.playTone('sawtooth', 150, 20, 0.6, 0.4); },
+        playSuccess: function() { 
+            this.playTone('triangle', 400, 400, 0.1, 0.1); 
+            setTimeout(() => this.playTone('triangle', 600, 600, 0.3, 0.1), 100);
         },
-
-        playSuccess: function() {
-            if (!this.ctx) return;
-            const osc = this.ctx.createOscillator();
-            const g = this.ctx.createGain();
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(400, this.ctx.currentTime);
-            osc.frequency.setValueAtTime(600, this.ctx.currentTime + 0.1);
-            g.gain.setValueAtTime(0.1, this.ctx.currentTime);
-            g.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
-            osc.connect(g);
-            g.connect(this.ctx.destination);
-            osc.start();
-            osc.stop(this.ctx.currentTime + 0.3);
+        playLevelUp: function() {
+            this.playTone('sine', 500, 800, 0.2, 0.2);
+            setTimeout(() => this.playTone('sine', 800, 1200, 0.4, 0.2), 200);
         }
     };
 
@@ -271,11 +344,17 @@
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const readout = document.getElementById('meter-readout');
+    
+    let highScore = localStorage.getItem('bridgeHighScore') || 0;
+    document.getElementById('hud-high').innerText = highScore;
 
     let state = {
         active: false,
         level: 1,
-        phase: 'idle', // idle, building, driving, falling
+        score: 0,
+        timer: 30, 
+        lastTime: 0,
+        phase: 'idle', // idle, building, driving, falling, result
         
         targetM: 0,
         mapCm: 0,
@@ -289,15 +368,13 @@
         truckY: 0,
         truckAngle: 0,
 
-        buildSpeed: 0.1,
-        buildAccel: 0.005, 
         currentBuildRate: 0.1,
-        
-        displayState: 'on'
+        failMsg: "",
+        particles: []
     };
 
     const PPM = 30; // Pixels Per Meter
-    const GROUND_Y = 350; // Raised the ground level slightly to keep action centered
+    const GROUND_Y = window.innerHeight * 0.65; 
 
     function resize() {
         canvas.width = window.innerWidth;
@@ -306,14 +383,19 @@
     window.addEventListener('resize', resize);
     resize();
 
-    // --- GAME LOGIC ---
+    // --- LOGIC ---
 
     function startGame() {
         AudioSys.init();
         state.active = true;
         state.level = 1;
+        state.score = 0;
+        state.timer = 60; 
+        state.lastTime = Date.now();
+        
         document.getElementById('start-screen').classList.add('hidden');
         document.getElementById('game-over-screen').classList.add('hidden');
+        updateHUD();
         nextLevel();
         loop();
     }
@@ -321,51 +403,52 @@
     function nextLevel() {
         state.phase = 'idle';
         state.bridgeLen = 0;
+        state.particles = [];
+        state.truckY = GROUND_Y - 3; 
         state.truckX = 50;
-        state.truckY = GROUND_Y - 40;
         state.truckAngle = 0;
-        state.currentBuildRate = 0.1 + (state.level * 0.02); 
         
+        state.currentBuildRate = 0.08 + (state.level * 0.015); 
+        
+        if(state.level > 1) {
+            state.timer += 15;
+            showFloatText("+15s", canvas.width/2, 100, "#3498db");
+        }
+
         readout.innerText = "0.00m";
         readout.className = "";
-        document.getElementById('level-display').innerText = state.level;
-        document.getElementById('build-btn').innerText = "HOLD";
-        document.getElementById('build-btn').style.background = "#e67e22";
+        
+        const btn = document.getElementById('build-btn');
+        btn.innerText = "HOLD TO BUILD";
+        btn.style.background = "#e67e22";
+        btn.disabled = false;
 
-        // Generate Math
-        let useDecimal = state.level > 2;
-        let minM = 5 + state.level;
-        let maxM = 10 + (state.level * 2);
-        state.targetM = Math.floor(Math.random() * (maxM - minM)) + minM;
-        if (useDecimal) state.targetM += 0.5;
+        generateLevelMath();
+    }
 
-        const scales = [20, 50, 100, 200];
-        state.scale = scales[Math.floor(Math.random() * scales.length)];
-
-        // Calculate Map
+    function generateLevelMath() {
+        const scales = [50, 100, 200, 500];
         let goodMath = false;
+        
         while (!goodMath) {
-            let s = scales[Math.floor(Math.random() * scales.length)];
-            let m = (Math.floor(Math.random() * 20) + 5) / 2; 
-            let realM = (m * s) / 100;
+            state.scale = scales[Math.floor(Math.random() * scales.length)];
+            // Random cm between 4.0 and 12.0
+            state.mapCm = (Math.floor(Math.random() * 16) + 8) / 2; 
             
-            if (realM >= 5 && realM <= 25) { 
-                state.scale = s;
-                state.mapCm = m;
+            let realM = (state.mapCm * state.scale) / 100;
+            
+            if (realM >= 5 && realM <= 18) { 
                 state.targetM = realM;
                 goodMath = true;
             }
         }
 
-        // Setup Cliffs
         state.cliffLeft = 150;
         state.cliffRight = state.cliffLeft + (state.targetM * PPM);
 
         document.getElementById('bp-len').innerText = state.mapCm + " cm";
         document.getElementById('bp-scale').innerText = "1 : " + state.scale;
     }
-
-    // --- CONTROLS ---
 
     window.startBuild = function() {
         if (state.phase !== 'idle') return;
@@ -378,145 +461,251 @@
         state.phase = 'driving';
         AudioSys.stopDrill();
         
-        document.getElementById('build-btn').innerText = "TESTING";
-        document.getElementById('build-btn').style.background = "#7f8c8d";
+        const btn = document.getElementById('build-btn');
+        btn.innerText = "TESTING INTEGRITY...";
+        btn.style.background = "#7f8c8d";
+        btn.disabled = true;
         
         readout.className = "";
         readout.innerText = state.bridgeLen.toFixed(2) + "m";
     };
 
-    // --- MAIN LOOP ---
+    function createParticle(x, y, type) {
+        state.particles.push({
+            x: x, y: y,
+            vx: (Math.random() - 0.5) * 2,
+            vy: (Math.random() * -1) - 1,
+            life: 1.0,
+            type: type
+        });
+    }
 
     function update() {
         if (!state.active) return;
 
+        let now = Date.now();
+        let dt = (now - state.lastTime) / 1000;
+        state.lastTime = now;
+
+        if (state.phase !== 'result') {
+            state.timer -= dt;
+            if (state.timer <= 0) {
+                state.timer = 0;
+                endGame("TIME EXPIRED", 0);
+                return;
+            }
+        }
+        updateHUD();
+
+        // Building
         if (state.phase === 'building') {
-            state.currentBuildRate += 0.002; 
             state.bridgeLen += state.currentBuildRate;
+            createParticle(state.cliffLeft + (state.bridgeLen*PPM), GROUND_Y, 'spark');
 
-            if (state.level >= 2) {
-                if (Math.random() > 0.9) readout.classList.add('glitch');
-                else readout.classList.remove('glitch');
-            }
-            
-            if (state.level >= 4) {
-                if (state.bridgeLen > 3) {
-                    readout.className = 'offline';
-                    readout.innerText = "NO SIGNAL";
-                }
-            }
+            if (state.level >= 4 && Math.random() > 0.95) readout.classList.add('glitch');
+            else readout.classList.remove('glitch');
 
-            if (readout.className !== 'offline') {
+            if (state.level >= 6 && state.bridgeLen > 2) {
+                readout.className = 'offline';
+                readout.innerText = "NO SIGNAL";
+            } else if (readout.className !== 'offline') {
                 readout.innerText = state.bridgeLen.toFixed(2) + "m";
             }
         }
 
+        // Driving
         if (state.phase === 'driving') {
             state.truckX += 8;
+            
+            // Exhaust particles
+            if (Math.random() > 0.5) createParticle(state.truckX - 30, state.truckY, 'smoke');
 
             let bridgePx = state.bridgeLen * PPM;
             let gapPx = state.cliffRight - state.cliffLeft;
             
-            let toleranceM = Math.max(0.2, 1.0 - (state.level * 0.1));
-            let tolerancePx = toleranceM * PPM;
+            // Tolerance logic
+            let errorMargin = Math.max(0.4, 1.2 - (state.level * 0.1)); 
+            let marginPx = errorMargin * PPM;
 
             if (state.truckX > state.cliffLeft + 20) { 
-                if (bridgePx < gapPx - tolerancePx) {
-                    if (state.truckX > state.cliffLeft + bridgePx) {
+                
+                // TOO SHORT
+                if (bridgePx < gapPx - marginPx) {
+                     if (state.truckX > state.cliffLeft + bridgePx) {
                         state.phase = 'falling';
-                        state.failMsg = `TOO SHORT! Needed ${state.targetM}m.`;
+                        state.failMsg = `TOO SHORT!`;
                     }
                 } 
-                else if (bridgePx > gapPx + tolerancePx) {
-                     state.phase = 'falling';
-                     state.failMsg = `TOO LONG! Structural Integrity Failed.`;
-                     AudioSys.playCrash();
+                // TOO LONG
+                else if (bridgePx > gapPx + marginPx) {
+                    if (state.truckX > state.cliffLeft + (bridgePx/2)) {
+                        state.phase = 'falling';
+                        state.failMsg = `TOO LONG! Integrity Failed.`;
+                        AudioSys.playCrash();
+                    }
                 }
             }
 
-            if (state.truckX > state.cliffRight + 100) {
-                state.level++;
-                AudioSys.playSuccess();
-                showFloatText("SUCCESS", window.innerWidth/2, window.innerHeight/2, "#2ecc71");
-                nextLevel();
+            if (state.truckX > state.cliffRight + 120) {
+                calcScore();
             }
         }
 
+        // Falling
         if (state.phase === 'falling') {
             state.truckX += 3;
             state.truckY += 12;
             state.truckAngle += 0.05;
-
-            if (state.truckY > canvas.height + 100) {
-                gameOver(state.failMsg || "Mission Failed.");
+            if (state.truckY > canvas.height + 200) {
+                endGame(state.failMsg, 0);
             }
+        }
+
+        // Particles
+        for(let i=state.particles.length-1; i>=0; i--) {
+            let p = state.particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life -= 0.03;
+            if(p.life <= 0) state.particles.splice(i,1);
         }
     }
 
-    function gameOver(msg) {
+    function calcScore() {
+        state.phase = 'result';
+        
+        let diff = Math.abs(state.targetM - state.bridgeLen);
+        let accuracy = Math.max(0, 1 - (diff / state.targetM));
+        
+        let stars = 0;
+        if (diff < 0.3) stars = 3;
+        else if (diff < 0.8) stars = 2;
+        else stars = 1;
+
+        let levelPoints = Math.floor((1000 * state.level) * accuracy) + (stars * 500);
+        state.score += levelPoints;
+        
+        AudioSys.playLevelUp();
+        
+        if(stars === 3) showFloatText("★★★ PERFECT!", canvas.width/2, canvas.height/2, "#f1c40f");
+        else if(stars === 2) showFloatText("★★ GOOD", canvas.width/2, canvas.height/2, "#f1c40f");
+        else showFloatText("★ PASSED", canvas.width/2, canvas.height/2, "#fff");
+
+        setTimeout(() => {
+            state.level++;
+            nextLevel();
+        }, 2500);
+    }
+
+    function endGame(msg, stars) {
         state.active = false;
         AudioSys.playCrash();
+        
+        if (state.score > highScore) {
+            highScore = state.score;
+            localStorage.setItem('bridgeHighScore', highScore);
+            document.getElementById('hud-high').innerText = highScore;
+            msg += " (NEW RECORD!)";
+        }
+
+        document.getElementById('end-title').innerText = "GAME OVER";
         document.getElementById('fail-msg').innerText = msg;
+        document.getElementById('final-score').innerText = state.score;
+        
+        const starContainer = document.getElementById('end-stars');
+        starContainer.innerHTML = '<div class="star">★</div><div class="star">★</div><div class="star">★</div>';
+
         document.getElementById('game-over-screen').classList.remove('hidden');
+    }
+
+    function updateHUD() {
+        document.getElementById('hud-score').innerText = state.score;
+        let mins = Math.floor(state.timer / 60);
+        let secs = Math.floor(state.timer % 60);
+        let timeStr = (mins < 10 ? "0"+mins : mins) + ":" + (secs < 10 ? "0"+secs : secs);
+        const timerEl = document.getElementById('hud-timer');
+        timerEl.innerText = timeStr;
+        
+        if(state.timer < 10) timerEl.style.color = "#e74c3c";
+        else timerEl.style.color = "#fff";
     }
 
     function showFloatText(text, x, y, color) {
         const el = document.createElement('div');
         el.className = 'float-text';
         el.innerText = text;
-        el.style.left = x + 'px';
+        el.style.left = (x - 150) + 'px'; 
         el.style.top = y + 'px';
         el.style.color = color;
         document.body.appendChild(el);
-        setTimeout(() => el.remove(), 1000);
+        setTimeout(() => el.remove(), 1500);
     }
 
+    // --- DRAWING ---
+
     function draw() {
-        ctx.fillStyle = '#2c3e50';
+        // Sky
+        let grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        grad.addColorStop(0, "#2980b9");
+        grad.addColorStop(1, "#fff");
+        ctx.fillStyle = grad;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Grid
-        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-        ctx.lineWidth = 1;
-        for (let i = 0; i < canvas.width; i += PPM) {
-            ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
-        }
+        // Water at bottom
+        ctx.fillStyle = "#3498db";
+        ctx.fillRect(0, canvas.height - 100, canvas.width, 100);
+        ctx.fillStyle = "rgba(255,255,255,0.2)";
+        ctx.fillRect(0, canvas.height - 90, canvas.width, 10); // Water highlight
 
         // Cliffs
-        ctx.fillStyle = '#27ae60';
+        ctx.fillStyle = '#2ecc71'; // Grass
         ctx.fillRect(0, GROUND_Y, state.cliffLeft, canvas.height);
         ctx.fillRect(state.cliffRight, GROUND_Y, canvas.width, canvas.height);
         
-        ctx.fillStyle = '#7f8c8d'; 
-        ctx.fillRect(state.cliffLeft - 20, GROUND_Y + 20, 20, canvas.height);
-        ctx.fillRect(state.cliffRight, GROUND_Y + 20, 20, canvas.height);
+        ctx.fillStyle = '#7f8c8d'; // Concrete wall
+        ctx.fillRect(state.cliffLeft - 20, GROUND_Y, 20, canvas.height);
+        ctx.fillRect(state.cliffRight, GROUND_Y, 20, canvas.height);
+
+        // GHOST TARGET (The learning tool)
+        // Show the correct length only when not idle/building
+        if (state.phase === 'driving' || state.phase === 'result' || state.phase === 'falling') {
+            let correctPx = state.targetM * PPM;
+            let targetX = state.cliffLeft + correctPx;
+            
+            ctx.save();
+            ctx.strokeStyle = "rgba(39, 174, 96, 0.8)";
+            ctx.lineWidth = 4;
+            ctx.setLineDash([10, 5]);
+            ctx.beginPath();
+            ctx.moveTo(targetX, GROUND_Y - 50);
+            ctx.lineTo(targetX, GROUND_Y + 50);
+            ctx.stroke();
+            
+            ctx.fillStyle = "#27ae60";
+            ctx.font = "bold 16px Roboto Mono";
+            ctx.fillText("TARGET: " + state.targetM + "m", targetX - 40, GROUND_Y - 60);
+            ctx.restore();
+        }
 
         // Bridge
         if (state.bridgeLen > 0) {
             let lenPx = state.bridgeLen * PPM;
-            ctx.fillStyle = state.phase === 'falling' ? '#e74c3c' : '#f1c40f'; 
+            ctx.fillStyle = state.phase === 'falling' ? '#c0392b' : '#f1c40f'; 
+            
+            // Bridge Deck
             ctx.fillRect(state.cliffLeft, GROUND_Y, lenPx, 10);
             
+            // Truss
             ctx.strokeStyle = '#333';
             ctx.lineWidth = 2;
             ctx.beginPath();
             for(let i=0; i<lenPx; i+=20) {
+                if(i+20 > lenPx) break;
                 ctx.moveTo(state.cliffLeft + i, GROUND_Y);
-                ctx.lineTo(state.cliffLeft + i + 10, GROUND_Y + 20);
+                ctx.lineTo(state.cliffLeft + i + 10, GROUND_Y + 15);
                 ctx.lineTo(state.cliffLeft + i + 20, GROUND_Y);
             }
             ctx.stroke();
-        }
-
-        // Target Ghost Line (Tutorial Hint - Level 1 Only)
-        if (state.level === 1) {
-            ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-            ctx.setLineDash([5, 5]);
-            ctx.beginPath();
-            ctx.moveTo(state.cliffRight, GROUND_Y - 50);
-            ctx.lineTo(state.cliffRight, GROUND_Y + 50);
-            ctx.stroke();
-            ctx.setLineDash([]);
         }
 
         // Truck
@@ -524,16 +713,37 @@
         ctx.translate(state.truckX, state.truckY);
         ctx.rotate(state.truckAngle);
         
+        // Truck Body
+        ctx.fillStyle = '#e67e22'; // Orange Cab
+        ctx.fillRect(-30, -35, 40, 30); 
+        ctx.fillStyle = '#ecf0f1'; // Container
+        ctx.fillRect(-70, -40, 40, 35);
+        
+        // Window
         ctx.fillStyle = '#3498db';
-        ctx.fillRect(-30, -30, 60, 25);
-        ctx.fillStyle = '#2980b9';
-        ctx.fillRect(-30, -30, 15, 25); 
+        ctx.fillRect(-5, -30, 15, 12);
+
+        // Wheels
+        ctx.fillStyle = '#2c3e50';
+        ctx.beginPath(); ctx.arc(-50, -5, 8, 0, Math.PI*2); ctx.fill(); // Rear
+        ctx.beginPath(); ctx.arc(-10, -5, 8, 0, Math.PI*2); ctx.fill(); // Front
         
-        ctx.fillStyle = '#000';
-        ctx.beginPath(); ctx.arc(-20, -5, 8, 0, Math.PI*2); ctx.fill();
-        ctx.beginPath(); ctx.arc(20, -5, 8, 0, Math.PI*2); ctx.fill();
-        
+        // Hubcaps
+        ctx.fillStyle = '#95a5a6';
+        ctx.beginPath(); ctx.arc(-50, -5, 3, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(-10, -5, 3, 0, Math.PI*2); ctx.fill();
+
         ctx.restore();
+
+        // Particles
+        state.particles.forEach(p => {
+            ctx.globalAlpha = p.life;
+            ctx.fillStyle = p.type === 'smoke' ? '#7f8c8d' : '#f1c40f';
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.type === 'smoke' ? 5 : 2, 0, Math.PI*2);
+            ctx.fill();
+        });
+        ctx.globalAlpha = 1.0;
     }
 
     function loop() {

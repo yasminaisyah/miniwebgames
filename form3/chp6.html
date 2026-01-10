@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GEO-DEFENSE: PROTOCOL 6 </title>
+    <title>GEO-DEFENSE: PROTOCOL 6 (FINAL)</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap');
 
@@ -39,8 +39,22 @@
             justify-content: space-between;
             align-items: center;
             padding: 0 30px;
-            background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+            background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent);
             pointer-events: auto;
+            position: relative;
+        }
+
+        /* TIMER BAR */
+        #timer-bar-container {
+            position: absolute;
+            bottom: 0; left: 0;
+            width: 100%; height: 4px;
+            background: #222;
+        }
+        #timer-bar {
+            width: 100%; height: 100%;
+            background: var(--hud);
+            transition: width 0.1s linear, background 0.3s;
         }
 
         .stat-box {
@@ -119,8 +133,8 @@
         .overlay {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.95); /* Much darker background */
-            backdrop-filter: blur(10px);      /* Blur effect */
+            background: rgba(5, 5, 10, 0.98);
+            backdrop-filter: blur(10px);
             z-index: 100;
             display: flex;
             flex-direction: column;
@@ -132,7 +146,7 @@
         .hidden { display: none !important; }
 
         h1 { font-family: 'Black Ops One'; font-size: 4rem; margin: 0; color: var(--accent); text-shadow: 0 0 20px var(--danger); }
-        h2 { font-size: 2rem; color: var(--danger); margin-bottom: 20px; }
+        h2 { font-size: 2rem; color: var(--hud); margin-bottom: 20px; }
         p { max-width: 600px; line-height: 1.6; color: #ccc; margin-bottom: 30px; font-size: 1.2rem; }
 
         .start-btn {
@@ -146,6 +160,7 @@
             box-shadow: 0 0 30px var(--danger);
             animation: pulse 1.5s infinite;
             border-radius: 5px;
+            margin-top: 20px;
         }
 
         @keyframes pulse {
@@ -153,6 +168,42 @@
             50% { transform: scale(1.05); }
             100% { transform: scale(1); }
         }
+
+        /* --- STARS & RESULTS --- */
+        .star-container {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+            font-size: 3rem;
+        }
+        .star {
+            color: #333;
+            text-shadow: 0 0 5px #000;
+            transition: color 0.5s, text-shadow 0.5s;
+        }
+        .star.active {
+            color: var(--accent);
+            text-shadow: 0 0 20px var(--accent);
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .result-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            background: rgba(255,255,255,0.05);
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #333;
+            margin-bottom: 20px;
+        }
+        .res-item { text-align: left; }
+        .res-val { font-family: 'Black Ops One'; color: var(--hud); font-size: 1.5rem; text-align: right; }
 
         /* --- FEEDBACK --- */
         #feedback-overlay {
@@ -184,7 +235,7 @@
     <canvas id="bg-canvas" style="position:absolute; top:0; left:0; z-index:-1;"></canvas>
     <canvas id="game-canvas" style="position:absolute; top:0; left:0; z-index:0;"></canvas>
 
-    <div id="game-ui">
+    <div id="game-ui" class="hidden">
         <div class="hud-top">
             <div class="stat-box">
                 <div class="stat-label">DEFENSE LEVEL</div>
@@ -200,6 +251,10 @@
                 <div class="stat-label">SCORE</div>
                 <div class="stat-val" id="score-disp">0</div>
             </div>
+            
+            <div id="timer-bar-container">
+                <div id="timer-bar"></div>
+            </div>
         </div>
 
         <div id="center-stage">
@@ -214,14 +269,27 @@
     <div id="start-screen" class="overlay">
         <h1>GEO-DEFENSE</h1>
         <p>Mathematical precision required.<br>
-           Solve geometry problems to charge the defense grid.</p>
+           Solve geometry problems before the timer expires.</p>
+        <div style="color: var(--hud); margin-bottom: 20px;">TOP SCORE: <span id="menu-high-score">0</span></div>
         <button class="start-btn" onclick="initGame()">ENGAGE</button>
     </div>
 
     <div id="game-over-screen" class="overlay hidden">
-        <h1 style="color: var(--danger)">CRITICAL FAILURE</h1>
-        <h2 id="final-score">Score: 0</h2>
-        <p id="death-reason" style="font-size: 1.5rem; color: var(--hud);">Hull integrity compromised.</p>
+        <h1 style="color: var(--danger)" id="end-title">CRITICAL FAILURE</h1>
+        
+        <div class="star-container" id="star-box">
+            <div class="star">★</div>
+            <div class="star">★</div>
+            <div class="star">★</div>
+        </div>
+
+        <div class="result-grid">
+            <div class="res-item">FINAL SCORE</div> <div class="res-val" id="final-score">0</div>
+            <div class="res-item">LEVEL REACHED</div> <div class="res-val" id="final-level">0</div>
+            <div class="res-item">HIGH SCORE</div> <div class="res-val" id="final-high-score">0</div>
+        </div>
+
+        <p id="death-reason" style="font-size: 1.2rem; color: #aaa;">Hull integrity compromised.</p>
         <button class="start-btn" onclick="initGame()">REBOOT SYSTEM</button>
     </div>
 
@@ -257,7 +325,8 @@
             lives: 3,
             currentQ: null,
             timer: 100,
-            animFrame: null
+            animFrame: null,
+            isActive: false
         };
 
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -296,6 +365,10 @@
             bgCtx = bgCvs.getContext('2d');
             resize();
             drawBackground();
+            
+            // Load High Score
+            const hs = localStorage.getItem('geoDefenseHighScore') || 0;
+            document.getElementById('menu-high-score').innerText = hs;
         };
 
         window.addEventListener('resize', () => { resize(); drawBackground(); if(state.currentQ) drawProblem(state.currentQ); });
@@ -322,10 +395,11 @@
             state.level = 1;
             state.score = 0;
             state.lives = 3;
+            state.isActive = true;
+            state.timer = 100;
+            
             document.getElementById('start-screen').classList.add('hidden');
             document.getElementById('game-over-screen').classList.add('hidden');
-            
-            // Show Game UI again
             document.getElementById('game-ui').classList.remove('hidden');
             
             updateHUD();
@@ -344,7 +418,8 @@
             state.currentQ = generateGeometry(type);
             drawProblem(state.currentQ);
             generateButtons(state.currentQ.correct);
-            state.timer = 100;
+            state.timer = 100; // Reset timer for new level
+            updateTimerBar();
         }
 
         function generateGeometry(type) {
@@ -471,6 +546,7 @@
                 ctx.fill();
             });
             
+            // Circular timer background
             let timerPct = state.timer / 100;
             ctx.beginPath();
             ctx.arc(cx, cy, radius + 20, -Math.PI/2, (-Math.PI/2) + (Math.PI*2*timerPct));
@@ -508,6 +584,8 @@
         }
 
         function checkAnswer(val, btn) {
+            if(!state.isActive) return;
+
             if (val === state.currentQ.correct) {
                 playSfx('correct');
                 state.score += 100 + Math.ceil(state.timer);
@@ -554,31 +632,65 @@
             });
         }
 
+        function updateTimerBar() {
+            const bar = document.getElementById('timer-bar');
+            bar.style.width = state.timer + '%';
+            if(state.timer < 30) bar.style.background = '#ff0055';
+            else bar.style.background = '#00ffcc';
+        }
+
         function animLoop() {
-            if (state.lives > 0) {
-                state.timer -= 0.05; 
-                if (state.timer <= 0) {
-                    state.lives--;
-                    playSfx('wrong');
-                    updateHUD();
-                    state.timer = 100;
-                    if(state.lives <= 0) gameOver();
-                    else nextLevel();
-                }
-                if(state.currentQ) drawProblem(state.currentQ);
-                requestAnimationFrame(animLoop);
+            if (!state.isActive) return;
+
+            state.timer -= 0.1; // Timer speed
+            updateTimerBar();
+
+            if (state.timer <= 0) {
+                state.lives--;
+                playSfx('wrong');
+                updateHUD();
+                state.timer = 100;
+                if(state.lives <= 0) gameOver();
+                else nextLevel();
             }
+            if(state.currentQ) drawProblem(state.currentQ);
+            state.animFrame = requestAnimationFrame(animLoop);
         }
 
         function gameOver() {
-            // FIX: Hide the main Game UI so it doesn't bleed through
+            state.isActive = false;
+            cancelAnimationFrame(state.animFrame);
+            
             document.getElementById('game-ui').classList.add('hidden');
             
-            document.getElementById('final-score').innerText = "FINAL SCORE: " + state.score;
+            // Calculate Stars
+            let stars = 0;
+            if (state.score > 500) stars = 1;
+            if (state.score > 1500) stars = 2;
+            if (state.score > 3000) stars = 3;
+
+            // Render Stars
+            const starEls = document.querySelectorAll('#star-box .star');
+            starEls.forEach((el, i) => {
+                el.classList.remove('active');
+                if (i < stars) setTimeout(() => el.classList.add('active'), i * 300);
+            });
+
+            // Handle High Score
+            let hs = parseInt(localStorage.getItem('geoDefenseHighScore')) || 0;
+            if (state.score > hs) {
+                hs = state.score;
+                localStorage.setItem('geoDefenseHighScore', hs);
+            }
+
+            document.getElementById('final-score').innerText = state.score;
+            document.getElementById('final-level').innerText = state.level;
+            document.getElementById('final-high-score').innerText = hs;
+            
             let reason = "";
             if (state.level < 3) reason = "RANK: ROOKIE";
             else if (state.level < 6) reason = "RANK: CADET";
-            else reason = "RANK: ELITE";
+            else reason = "RANK: ELITE DEFENDER";
             
             document.getElementById('death-reason').innerText = reason;
             document.getElementById('game-over-screen').classList.remove('hidden');

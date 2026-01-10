@@ -2,18 +2,16 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chapter 9: Laser Intercept V2</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Chapter 9: Laser Intercept (Refined)</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Black+Ops+One&display=swap');
 
         :root {
             --bg-color: #050510;
-            --grid-color: rgba(0, 255, 255, 0.1);
-            --axis-color: rgba(0, 255, 255, 0.5);
-            --line-color: #ff0055;
             --text-color: #00ffaa;
             --hud-bg: rgba(0, 15, 10, 0.95);
+            --danger: #ff0055;
         }
 
         body {
@@ -27,13 +25,14 @@
             align-items: center;
             height: 100vh;
             user-select: none;
+            touch-action: none; /* Prevents zooming on mobile */
         }
 
-        /* HUD LAYOUT - RESTRUCTURED FOR VISIBILITY */
+        /* --- UI LAYER --- */
         #game-ui {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none;
+            pointer-events: none; /* Lets clicks pass through to canvas if needed */
             display: flex;
             flex-direction: column;
             justify-content: space-between;
@@ -49,80 +48,121 @@
         }
 
         .score-box {
-            font-size: 1.2rem;
+            font-size: 1.5rem;
             text-shadow: 0 0 10px var(--text-color);
+            font-weight: bold;
         }
 
-        /* NEW COMPACT BOTTOM PANEL */
+        /* --- CONTROLS --- */
         .mission-panel {
             pointer-events: auto;
             background: var(--hud-bg);
             border-top: 2px solid var(--text-color);
-            padding: 15px;
+            padding: 20px;
             text-align: center;
             width: 100%;
+            box-sizing: border-box;
             box-shadow: 0 -5px 30px rgba(0, 255, 170, 0.2);
             display: flex;
             flex-direction: column;
             align-items: center;
-            backdrop-filter: blur(5px);
+            backdrop-filter: blur(10px);
         }
 
         h2 { 
             margin: 0; 
             font-family: 'Black Ops One', cursive; 
             color: #fff; 
-            font-size: 1.2rem; /* Smaller Title */
+            font-size: 1.4rem; 
             letter-spacing: 2px; 
         }
         
         #question-display {
-            font-size: 1.1rem; /* Smaller Text */
-            margin: 5px 0 10px 0;
+            font-size: 1.2rem;
+            margin: 10px 0 15px 0;
             color: #bdfffa;
         }
 
-        /* BUTTONS - 3 COLUMNS */
         .options-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr); /* Force 3 columns */
+            grid-template-columns: repeat(3, 1fr);
             gap: 15px;
             width: 100%;
-            max-width: 500px;
+            max-width: 600px;
         }
 
-        button {
+        button.opt-btn {
             background: rgba(0, 50, 50, 0.6);
             border: 1px solid var(--text-color);
             color: #fff;
-            padding: 10px; /* Reduced padding */
+            padding: 15px;
             font-family: 'Share Tech Mono', monospace;
             font-size: 1.2rem;
             cursor: pointer;
-            transition: 0.2s;
+            transition: 0.1s;
             text-transform: uppercase;
             border-radius: 4px;
+            touch-action: manipulation;
         }
 
-        button:hover {
-            background: var(--text-color);
-            color: #000;
-            box-shadow: 0 0 15px var(--text-color);
-        }
+        button.opt-btn:active { background: #fff; color: #000; transform: scale(0.95); }
 
-        button:active { transform: scale(0.95); }
-
-        /* CANVAS */
-        canvas {
+        /* --- OVERLAYS --- */
+        .overlay {
             position: absolute;
-            top: 0; left: 0;
-            z-index: 1;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(5, 5, 16, 0.98);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100; /* Highest Z-index */
+            text-align: center;
+            pointer-events: auto;
+        }
+        .hidden { display: none !important; }
+
+        h1 {
+            font-family: 'Black Ops One';
+            font-size: 3.5rem;
+            color: var(--text-color);
+            text-shadow: 0 0 20px var(--text-color);
+            margin-bottom: 10px;
         }
 
-        /* FEEDBACK OVERLAY */
+        .action-btn {
+            background: var(--danger);
+            border: none;
+            padding: 20px 60px;
+            font-size: 1.5rem;
+            color: white;
+            font-family: 'Black Ops One';
+            cursor: pointer;
+            margin-top: 30px;
+            box-shadow: 0 0 30px var(--danger);
+            border-radius: 5px;
+            transition: transform 0.2s;
+        }
+        .action-btn:active { transform: scale(0.95); background: #fff; color: #000; }
+
+        /* --- STARS & RESULTS --- */
+        .star-container {
+            display: flex;
+            gap: 10px;
+            font-size: 4rem;
+            margin: 20px 0;
+        }
+        .star { color: #333; transition: color 0.5s, text-shadow 0.5s; }
+        .star.active { color: #ffd700; text-shadow: 0 0 20px #ffd700; }
+
+        .stat-row { font-size: 1.5rem; margin: 5px 0; color: #ccc; }
+        .stat-val { color: #fff; font-weight: bold; }
+
+        canvas { position: absolute; top: 0; left: 0; z-index: 1; }
+
         #feedback {
             position: absolute;
-            top: 40%; left: 50%; /* Moved up slightly */
+            top: 40%; left: 50%;
             transform: translate(-50%, -50%);
             font-size: 3rem;
             font-family: 'Black Ops One';
@@ -130,7 +170,7 @@
             pointer-events: none;
             transition: opacity 0.3s;
             text-shadow: 0 0 20px white;
-            z-index: 20;
+            z-index: 50;
             white-space: nowrap;
         }
 
@@ -140,9 +180,9 @@
 
     <canvas id="gridCanvas"></canvas>
 
-    <div id="game-ui">
+    <div id="game-ui" class="hidden">
         <div class="top-bar">
-            <div class="score-box">STATUS: <span id="status-text" style="color:#0f0">ACTIVE</span></div>
+            <div class="score-box">TIME: <span id="timer" style="color:#ff0055">60</span>s</div>
             <div class="score-box">SCORE: <span id="score">0</span></div>
         </div>
 
@@ -151,11 +191,36 @@
         <div class="mission-panel">
             <div>
                 <h2>TARGET DETECTED</h2>
-                <div id="question-display">Calculating...</div>
+                <div id="question-display">Loading...</div>
             </div>
             <div class="options-grid" id="buttons-container">
                 </div>
         </div>
+    </div>
+
+    <div id="start-screen" class="overlay">
+        <h1>LASER INTERCEPT</h1>
+        <p style="font-size: 1.2rem; max-width: 600px; color:#ccc; line-height: 1.5;">
+            Identify the Gradient (m) and Intercept (c).<br>
+            Tap the correct value to fire the laser.
+        </p>
+        <div class="stat-row" style="font-size:1rem; margin-top:20px;">BEST SCORE: <span id="menu-high-score">0</span></div>
+        <button class="action-btn" id="btn-start">INITIATE</button>
+    </div>
+
+    <div id="game-over-screen" class="overlay hidden">
+        <h1 style="color: #ff0055">MISSION ENDED</h1>
+        
+        <div class="star-container">
+            <div class="star" id="star1">★</div>
+            <div class="star" id="star2">★</div>
+            <div class="star" id="star3">★</div>
+        </div>
+
+        <div class="stat-row">FINAL SCORE: <span class="stat-val" id="final-score">0</span></div>
+        <div class="stat-row">HIGH SCORE: <span class="stat-val" id="final-high-score">0</span></div>
+        
+        <button class="action-btn" id="btn-restart">REBOOT SYSTEM</button>
     </div>
 
 <script>
@@ -187,6 +252,14 @@ function playSound(type) {
         gain.gain.linearRampToValueAtTime(0, now + 0.3);
         osc.start(now);
         osc.stop(now + 0.3);
+    } else if (type === 'gameover') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(400, now);
+        osc.frequency.exponentialRampToValueAtTime(100, now + 1.0);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.linearRampToValueAtTime(0, now + 1.0);
+        osc.start(now);
+        osc.stop(now + 1.0);
     }
 }
 
@@ -196,16 +269,28 @@ const ctx = canvas.getContext('2d');
 let w, h, originX, originY;
 const scale = 40; 
 
-// Game State
+// State Variables
 let currentLevel = {};
 let score = 0;
+let timer = 60;
+let lastTime = 0;
+let isPlaying = false;
 let laserBeam = null;
+let animationFrameId; // To control the loop
+
+// High Score
+let highScore = localStorage.getItem('laserInterceptHS') || 0;
+document.getElementById('menu-high-score').innerText = highScore;
+
+// Event Listeners for Buttons
+document.getElementById('btn-start').addEventListener('click', startGame);
+document.getElementById('btn-restart').addEventListener('click', startGame);
 
 function resize() {
     w = canvas.width = window.innerWidth;
     h = canvas.height = window.innerHeight;
     originX = w / 2;
-    originY = h * 0.45; // Moved grid CENTER up slightly so bottom UI doesn't cover it
+    originY = h * 0.45; 
 }
 window.addEventListener('resize', resize);
 resize();
@@ -256,13 +341,10 @@ class LevelGenerator {
             wrongAnswers.push(`y = 5x + 5`);
         }
 
-        // --- LIMIT TO 3 CHOICES LOGIC ---
         let choices = new Set([correctAnswer]);
-        // Add wrongs until we hit 3
         for (let w of wrongAnswers) {
             if (choices.size < 3) choices.add(w);
         }
-        // Fallback if duplicates reduced size
         while(choices.size < 3) choices.add(Math.floor(Math.random()*99));
 
         return {
@@ -281,14 +363,12 @@ function drawGrid() {
     ctx.lineWidth = 1;
     ctx.strokeStyle = 'rgba(0, 255, 255, 0.05)';
     
-    // Draw grid
+    // Grid Lines
     for(let x = 0; x < w; x += scale) {
-        // Vertical lines relative to origin
         const offsetX = (originX % scale); 
         ctx.beginPath(); ctx.moveTo(x + offsetX, 0); ctx.lineTo(x + offsetX, h); ctx.stroke();
     }
     for(let y = 0; y < h; y += scale) {
-        // Horizontal lines relative to origin
         const offsetY = (originY % scale);
         ctx.beginPath(); ctx.moveTo(0, y + offsetY); ctx.lineTo(w, y + offsetY); ctx.stroke();
     }
@@ -302,7 +382,6 @@ function drawGrid() {
     // Numbers
     ctx.fillStyle = '#00ffaa';
     ctx.font = '10px monospace';
-    // Draw numbers only near the center to avoid clutter
     for(let i = -8; i <= 8; i++) {
         if(i === 0) continue;
         const pos = toScreen(i, 0);
@@ -333,7 +412,6 @@ function drawTargetLine(m, c, isCorrectMode) {
         ctx.fillStyle = '#ffff00';
         ctx.beginPath(); ctx.arc(interceptPos.x, interceptPos.y, 5, 0, Math.PI*2); ctx.fill();
         
-        // Slope Triangle
         if(Math.abs(m) <= 4) {
             const pStart = toScreen(0, c);
             const pRun = toScreen(1, c);
@@ -352,6 +430,32 @@ function drawTargetLine(m, c, isCorrectMode) {
 /* ================= LOGIC LOOP ================= */
 const gen = new LevelGenerator();
 
+function startGame() {
+    // 1. Reset Logic
+    score = 0;
+    timer = 60;
+    isPlaying = true;
+    laserBeam = null;
+    lastTime = Date.now();
+
+    // 2. Reset UI
+    document.getElementById('start-screen').classList.add('hidden');
+    document.getElementById('game-over-screen').classList.add('hidden');
+    document.getElementById('game-ui').classList.remove('hidden');
+    
+    // Reset Stars for next game
+    document.getElementById('star1').className = 'star';
+    document.getElementById('star2').className = 'star';
+    document.getElementById('star3').className = 'star';
+
+    updateHUD();
+    initLevel();
+
+    // 3. Start Loop (Cancel old one first to be safe)
+    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    loop();
+}
+
 function initLevel() {
     currentLevel = gen.generate();
     
@@ -361,8 +465,10 @@ function initLevel() {
     
     currentLevel.choices.forEach(choice => {
         const btn = document.createElement('button');
+        btn.className = 'opt-btn';
         btn.innerText = choice;
-        btn.onclick = () => checkAnswer(choice, btn);
+        // Use closure to capture specific button and choice
+        btn.onclick = function() { checkAnswer(choice, btn); };
         btnContainer.appendChild(btn);
     });
     
@@ -370,27 +476,29 @@ function initLevel() {
 }
 
 function checkAnswer(val, btn) {
+    if(!isPlaying) return;
+
     if (val === currentLevel.ans) {
         score += 100;
-        document.getElementById('score').innerText = score;
-        document.getElementById('status-text').innerText = "HIT";
-        document.getElementById('status-text').style.color = "#00ff00";
+        updateHUD();
         playSound('laser');
         triggerFeedback("DESTROYED", "#0f0");
         
         laserBeam = { startTime: Date.now() };
         
-        const btns = document.querySelectorAll('button');
+        // Disable buttons
+        const btns = document.querySelectorAll('.opt-btn');
         btns.forEach(b => b.disabled = true);
         btn.style.background = '#00ff00';
         btn.style.color = '#000';
 
-        setTimeout(initLevel, 1500);
+        setTimeout(() => {
+            if(isPlaying) initLevel();
+        }, 1200);
     } else {
-        score -= 20;
-        document.getElementById('score').innerText = score;
-        document.getElementById('status-text').innerText = "MISS";
-        document.getElementById('status-text').style.color = "#ff0000";
+        score = Math.max(0, score - 50);
+        timer = Math.max(0, timer - 5); // Penalty
+        updateHUD();
         playSound('error');
         btn.style.background = '#ff0000';
         btn.disabled = true;
@@ -406,7 +514,62 @@ function triggerFeedback(text, color) {
     setTimeout(() => fb.style.opacity = 0, 800);
 }
 
+function updateHUD() {
+    document.getElementById('score').innerText = score;
+    document.getElementById('timer').innerText = Math.ceil(timer);
+    
+    const tEl = document.getElementById('timer');
+    if (timer < 10) tEl.style.color = "#ff0000";
+    else tEl.style.color = "#00ffaa";
+}
+
+function endGame() {
+    isPlaying = false;
+    playSound('gameover');
+    
+    // Explicitly hide Game UI and show Game Over
+    document.getElementById('game-ui').classList.add('hidden');
+    document.getElementById('game-over-screen').classList.remove('hidden');
+    
+    // Stars Logic
+    let stars = 0;
+    if (score > 300) stars = 1;
+    if (score > 800) stars = 2;
+    if (score > 1500) stars = 3;
+
+    // Animate Stars
+    if (stars >= 1) setTimeout(() => document.getElementById('star1').classList.add('active'), 200);
+    if (stars >= 2) setTimeout(() => document.getElementById('star2').classList.add('active'), 500);
+    if (stars >= 3) setTimeout(() => document.getElementById('star3').classList.add('active'), 800);
+
+    // High Score Logic
+    if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('laserInterceptHS', highScore);
+    }
+
+    document.getElementById('final-score').innerText = score;
+    document.getElementById('final-high-score').innerText = highScore;
+    document.getElementById('menu-high-score').innerText = highScore;
+}
+
 function loop() {
+    if (!isPlaying) return;
+
+    const now = Date.now();
+    const dt = (now - lastTime) / 1000;
+    lastTime = now;
+    
+    timer -= dt;
+    if (timer <= 0) {
+        timer = 0;
+        updateHUD(); // Show 0 before ending
+        endGame();
+        return;
+    }
+    updateHUD();
+
+    // Drawing
     ctx.clearRect(0, 0, w, h);
     drawGrid();
 
@@ -427,11 +590,9 @@ function loop() {
             }
         }
     }
-    requestAnimationFrame(loop);
+    
+    animationFrameId = requestAnimationFrame(loop);
 }
-
-initLevel();
-loop();
 
 </script>
 </body>

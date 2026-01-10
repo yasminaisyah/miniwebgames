@@ -51,14 +51,19 @@
         .data-row { margin-bottom: 2px; font-size: 1rem; }
         .data-val { color: #fff; font-weight: bold; font-size: 1.1rem; }
         
-        #score-box {
+        #stats-bar {
             top: 10px;
             left: 10px;
-            font-size: 1.5rem;
-            color: #00d9ff;
-            font-weight: bold;
-            padding: 10px 20px;
+            display: flex;
+            gap: 15px;
         }
+
+        .stat-item {
+            text-align: center;
+        }
+        .stat-label { font-size: 0.7rem; color: #88aaff; letter-spacing: 1px; }
+        .stat-val { font-size: 1.4rem; font-weight: bold; color: #fff; }
+        #time-val { color: #ffcc00; }
 
         /* --- CONTROLS --- */
         #control-deck {
@@ -117,7 +122,7 @@
             color: #00d9ff;
             width: 120px;
             text-align: right;
-            font-family: monospace; /* Monospace for alignment */
+            font-family: monospace; 
         }
 
         #fire-btn {
@@ -162,6 +167,7 @@
             font-weight: bold;
             cursor: pointer;
             transition: 0.2s;
+            margin-top: 10px;
         }
         .start-btn:hover { background: #00d9ff; color: #000; }
 
@@ -178,6 +184,35 @@
             white-space: nowrap;
         }
 
+        /* Stars & Results */
+        .star-container { font-size: 3rem; color: #333; margin-bottom: 15px; }
+        .star.active { color: #ffd700; text-shadow: 0 0 20px #ffd700; }
+        
+        .result-box {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #444;
+            min-width: 250px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .float-score {
+            position: absolute;
+            font-size: 2rem;
+            color: #ffd700;
+            font-weight: bold;
+            pointer-events: none;
+            animation: floatUp 1s forwards;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+
+        @keyframes floatUp {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-50px); opacity: 0; }
+        }
+
     </style>
 </head>
 <body>
@@ -185,7 +220,20 @@
 <div id="game-container">
     <canvas id="gameCanvas"></canvas>
 
-    <div id="score-box" class="hud-panel">FLOOR: <span id="floor-val">1</span></div>
+    <div id="stats-bar" class="hud-panel">
+        <div class="stat-item">
+            <div class="stat-label">FLOOR</div>
+            <div class="stat-val" id="floor-val">1/5</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-label">TIME</div>
+            <div class="stat-val" id="time-val">60</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-label">SCORE</div>
+            <div class="stat-val" id="score-val">0</div>
+        </div>
+    </div>
 
     <div id="data-deck" class="hud-panel">
         <div style="color:#88aaff; font-size:0.8rem; margin-bottom:5px;">TRIG DATA</div>
@@ -208,16 +256,29 @@
     <div id="start-screen" class="screen">
         <h1>TRIG CLIMBER</h1>
         <p><strong>Chapter 5: Trigonometric Ratios</strong></p>
-        <p>1. Look at the <strong>Holographic Formula</strong> on the wall.<br>
-        2. Find the Trig Value (top right).<br>
-        3. Calculate <strong>x</strong> to 3 decimal places.</p>
+        <p>1. Analyze the <strong>Holographic Formula</strong>.<br>
+        2. Find the Trig Value from the data deck.<br>
+        3. Calculate <strong>x</strong> (3 decimal places) to grapple up.</p>
+        <p style="color:#ffd700; font-size:0.9rem">Top Score: <span id="start-high-score">0</span></p>
         <button class="start-btn" onclick="startGame()">START CLIMB</button>
     </div>
 
     <div id="game-over-screen" class="screen hidden">
-        <h1 style="color:#ff3366">FALLEN</h1>
-        <p>Calculation Error.</p>
-        <p>Highest Floor: <span id="final-floor">1</span></p>
+        <h1 id="end-title" style="color:#ff3366">FALLEN</h1>
+        
+        <div class="star-container">
+            <span id="star1" class="star">★</span>
+            <span id="star2" class="star">★</span>
+            <span id="star3" class="star">★</span>
+        </div>
+
+        <div class="result-box">
+            <p style="margin:5px">Score: <span id="final-score" style="color:#fff; font-weight:bold;">0</span></p>
+            <p style="margin:5px; font-size:0.9rem">Highest Floor: <span id="final-floor">1</span></p>
+            <p style="margin:5px; font-size:0.9rem; color:#888">Best: <span id="end-high-score">0</span></p>
+        </div>
+
+        <p id="fail-reason">Calculation Error.</p>
         <button class="start-btn" onclick="startGame()">RETRY</button>
     </div>
 </div>
@@ -250,6 +311,11 @@
             this.playTone(200, 'square', 0.1); 
             setTimeout(()=>this.playTone(100, 'square', 0.2), 100);
         },
+        playWin: function() {
+            this.playTone(400, 'sine', 0.1);
+            setTimeout(()=>this.playTone(600, 'sine', 0.2), 100);
+            setTimeout(()=>this.playTone(800, 'sine', 0.4), 200);
+        },
         playFall: function() { 
             this.playTone(300, 'sawtooth', 0.5); 
             setTimeout(()=>this.playTone(100, 'sawtooth', 0.5), 100);
@@ -262,9 +328,13 @@
     const slider = document.getElementById('input-slider');
     const valDisplay = document.getElementById('input-display');
 
+    const MAX_FLOORS = 5;
+
     let state = {
         active: false,
         floor: 1,
+        score: 0,
+        timer: 60,
         
         // Player Position
         playerX: 100,
@@ -290,9 +360,10 @@
         hookTargetY: 0,
         animT: 0, 
         camY: 0, 
-        camTargetY: 0, // NEW: For smooth scrolling
+        camTargetY: 0,
         
-        displayVal: 0
+        displayVal: 0,
+        lastTime: 0
     };
 
     // Visual Scaling
@@ -301,6 +372,9 @@
     function resize() {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
+        // Load High Score
+        let hs = localStorage.getItem('trigClimberHS') || 0;
+        document.getElementById('start-high-score').innerText = hs;
     }
     window.addEventListener('resize', resize);
     resize();
@@ -311,15 +385,18 @@
         AudioSys.init();
         state.active = true;
         state.floor = 1;
+        state.score = 0;
+        state.timer = 60; // Total time to climb all floors
         state.playerX = 100;
         state.playerY = 0;
-        state.camY = -canvas.height/2; // Center player initially
+        state.camY = -canvas.height/2; 
         state.camTargetY = -canvas.height/2;
         state.hookActive = false;
+        state.lastTime = Date.now();
         
         document.getElementById('start-screen').classList.add('hidden');
         document.getElementById('game-over-screen').classList.add('hidden');
-        document.getElementById('floor-val').innerText = 1;
+        updateHUD();
         
         generateLevel();
         loop();
@@ -357,7 +434,7 @@
             
             // Slider range setup
             let maxVal = Math.ceil(height * 2.0);
-            slider.max = maxVal * 1000; // Multiply by 1000 for 3 decimal precision
+            slider.max = maxVal * 1000; 
             slider.value = 0;
         } 
         else {
@@ -396,7 +473,6 @@
     }
 
     slider.addEventListener('input', (e) => {
-        // Slider value is integer (0 - 100000 etc), divide by 1000 to get decimal
         let val = parseInt(e.target.value) / 1000;
         state.displayVal = val;
         valDisplay.innerText = val.toFixed(3);
@@ -416,11 +492,9 @@
         let scale = METER_SCALE; 
 
         if (state.type === 'tan') {
-            // Finding Height (Opposite) -> X is fixed (Adj), Y is input
             aimedX = state.playerX + (state.knownValue * scale);
             aimedY = state.playerY + (input * scale);
         } else {
-            // Finding Rope (Hypotenuse) -> Length is input, Angle is fixed
             let rad = state.angle * Math.PI / 180;
             let dx = (input * Math.cos(rad));
             let dy = (input * Math.sin(rad));
@@ -435,15 +509,25 @@
     function update() {
         if (!state.active) return;
 
-        // Camera Logic: Keep both Player and Target in view if possible
-        // Or simply center between them?
-        // Let's Center the camera on the midpoint of the current problem
-        let midY = (state.playerY + state.ledgeY) / 2;
-        // Offset so player isn't at very bottom
-        state.camTargetY = midY - (canvas.height * 0.4); 
+        // Timer Logic
+        let now = Date.now();
+        let dt = (now - state.lastTime) / 1000;
+        state.lastTime = now;
         
+        state.timer -= dt;
+        if (state.timer <= 0) {
+            state.timer = 0;
+            endGame(false, "Time Expired");
+            return;
+        }
+        updateHUD();
+
+        // Camera
+        let midY = (state.playerY + state.ledgeY) / 2;
+        state.camTargetY = midY - (canvas.height * 0.4); 
         state.camY += (state.camTargetY - state.camY) * 0.1;
 
+        // Hook Animation
         if (state.hookActive) {
             state.animT += 0.05;
             state.hookX = state.playerX + (state.hookTargetX - state.playerX) * state.animT;
@@ -456,34 +540,89 @@
     }
 
     function checkHit() {
-        let dx = state.hookX - state.ledgeX;
-        let dy = state.hookY - state.ledgeY;
-        let dist = Math.hypot(dx, dy);
-        
-        // Hitbox tolerance (Approx 20 pixels)
-        // Since we ask for 3 decimal precision, calculation should be very close.
-        // Visual tolerance is generous, but math must be close.
-        // Let's use math difference for logic
         let mathDiff = Math.abs(state.displayVal - state.targetValue);
         
-        if (mathDiff < 0.5) { // Within 0.5 units of answer
+        if (mathDiff < 0.5) { 
+            // SUCCESS
+            AudioSys.playHit();
+            
+            // Score Calc: 500 base + Speed Bonus
+            let points = 500;
+            state.score += points;
+            spawnFloatScore("+" + points);
+
+            // Move Player
             state.hookActive = false;
             state.playerX = state.ledgeX;
             state.playerY = state.ledgeY;
             state.floor++;
-            document.getElementById('floor-val').innerText = state.floor;
-            showFeedback("SECURED!", "#00d9ff");
-            AudioSys.playHit();
-            generateLevel();
+            state.timer += 15; // Time Bonus
+            
+            if (state.floor > MAX_FLOORS) {
+                endGame(true, "Summit Reached!");
+            } else {
+                showFeedback("SECURED!", "#00d9ff");
+                generateLevel();
+            }
         } else {
+            // FAIL
             AudioSys.playFall();
-            showFeedback("MISSED!", "#ff3366");
-            state.active = false;
-            document.getElementById('final-floor').innerText = state.floor;
-            setTimeout(() => {
-                document.getElementById('game-over-screen').classList.remove('hidden');
-            }, 1000);
+            endGame(false, "Missed Ledge");
         }
+    }
+
+    function endGame(victory, reason) {
+        state.active = false;
+        
+        const screen = document.getElementById('game-over-screen');
+        const title = document.getElementById('end-title');
+        const failMsg = document.getElementById('fail-reason');
+        const star1 = document.getElementById('star1');
+        const star2 = document.getElementById('star2');
+        const star3 = document.getElementById('star3');
+
+        screen.classList.remove('hidden');
+        document.getElementById('final-score').innerText = Math.floor(state.score);
+        document.getElementById('final-floor').innerText = state.floor - 1;
+
+        // Reset Stars
+        star1.classList.remove('active');
+        star2.classList.remove('active');
+        star3.classList.remove('active');
+
+        // High Score
+        let hs = localStorage.getItem('trigClimberHS') || 0;
+        if (state.score > hs) {
+            hs = Math.floor(state.score);
+            localStorage.setItem('trigClimberHS', hs);
+        }
+        document.getElementById('end-high-score').innerText = hs;
+
+        if (victory) {
+            AudioSys.playWin();
+            title.innerText = "MISSION COMPLETE";
+            title.style.color = "#00d9ff";
+            failMsg.innerText = "Summit reached successfully.";
+            
+            // Star Logic
+            star1.classList.add('active'); // Finish
+            if (state.score > 3000) star2.classList.add('active');
+            if (state.score > 4500) star3.classList.add('active');
+        } else {
+            title.innerText = "FALLEN";
+            title.style.color = "#ff3366";
+            failMsg.innerText = reason;
+        }
+    }
+
+    function updateHUD() {
+        document.getElementById('floor-val').innerText = Math.min(state.floor, MAX_FLOORS) + "/" + MAX_FLOORS;
+        document.getElementById('score-val').innerText = Math.floor(state.score);
+        
+        let t = Math.ceil(state.timer);
+        let el = document.getElementById('time-val');
+        el.innerText = t;
+        el.style.color = t < 10 ? '#ff3366' : '#ffcc00';
     }
 
     function showFeedback(text, col) {
@@ -492,6 +631,16 @@
         el.style.color = col;
         el.style.display = 'block';
         setTimeout(() => el.style.display = 'none', 1500);
+    }
+
+    function spawnFloatScore(txt) {
+        let el = document.createElement('div');
+        el.className = 'float-score';
+        el.innerText = txt;
+        el.style.left = (window.innerWidth/2) + 'px';
+        el.style.top = (window.innerHeight/2) + 'px';
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 1000);
     }
 
     // --- DRAWING ---
@@ -503,11 +652,10 @@
         ctx.save();
         
         // World to Screen Coords
-        // Canvas Y is down. Logic Y is Up.
         const worldToScreen = (wx, wy) => {
             return {
                 x: wx,
-                y: canvas.height - (wy - state.camY) // Simplified transform
+                y: canvas.height - (wy - state.camY) 
             };
         };
 
@@ -515,16 +663,14 @@
         let lPos = worldToScreen(state.ledgeX, state.ledgeY);
         
         // 1. Draw Platforms
-        // Player Platform
         ctx.fillStyle = '#222';
-        ctx.fillRect(pPos.x - 50, pPos.y, 100, canvas.height); // Downwards
+        ctx.fillRect(pPos.x - 50, pPos.y, 100, canvas.height); 
         ctx.fillStyle = '#00d9ff';
         ctx.fillRect(pPos.x - 50, pPos.y, 100, 10); 
 
-        // Target Wall
         ctx.fillStyle = '#1a1a20';
         ctx.fillRect(lPos.x, lPos.y, 200, canvas.height); 
-        ctx.fillStyle = '#ff0055'; // Target Ledge
+        ctx.fillStyle = '#ff0055'; 
         ctx.fillRect(lPos.x, lPos.y, 50, 10); 
 
         // 2. Draw Math Overlay
@@ -534,7 +680,6 @@
             ctx.lineWidth = 2;
             ctx.setLineDash([5, 5]);
             
-            // Triangle Lines
             ctx.moveTo(pPos.x, pPos.y); 
             ctx.lineTo(lPos.x, pPos.y); 
             ctx.lineTo(lPos.x, lPos.y); 
@@ -542,7 +687,6 @@
             ctx.stroke();
             ctx.setLineDash([]);
 
-            // Labels
             ctx.font = "bold 16px Rajdhani";
             ctx.fillStyle = "#fff";
             
@@ -563,12 +707,11 @@
                 ctx.fillText("x", (pPos.x + lPos.x)/2, (pPos.y + lPos.y)/2 - 20);
             }
             
-            // HOLOGRAPHIC FORMULA ON CANVAS
+            // HOLOGRAPHIC FORMULA
             ctx.font = "bold 22px Rajdhani";
             ctx.fillStyle = "#00d9ff";
             ctx.shadowColor = "rgba(0, 217, 255, 0.8)";
             ctx.shadowBlur = 15;
-            // Draw slightly above player
             ctx.fillText(state.formulaText, pPos.x - 20, pPos.y - 80);
             ctx.shadowBlur = 0;
         }
